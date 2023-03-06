@@ -22,11 +22,6 @@ use join_with_assignments::{
     formatar_chave_eletronica,
     write_csv,
     write_pqt,
-    /*
-    get_width,
-    print_matrix,
-    display_bipartite_matching,
-    */
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
