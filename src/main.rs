@@ -9,7 +9,6 @@ use std::{
     process, // process::exit(1)
     error::Error,
     time::Instant,
-    //collections::BTreeMap,
 };
 
 use join_with_assignments::{

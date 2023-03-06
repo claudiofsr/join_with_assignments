@@ -6,10 +6,6 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-#csv = "*"
-#tokio = { version = "*", features = ["full"] }
-#reqwest = { version = "*", features = ["blocking", "json"] }
-#num_cpus = "*"
 rayon = "*"
 serde = { version = "*", features = ["derive"] }
 polars = { version = "*", features = [ "lazy", "lazy_regex", "strings", "csv-file", "parquet", "asof_join", "list_eval", "list_take", "concat_str", "rank", "dtype-struct", "dtype-datetime", "dtype-categorical" ] }

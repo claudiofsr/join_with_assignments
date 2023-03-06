@@ -20,16 +20,10 @@ use polars::datatypes::DataType;
 use std::num::ParseFloatError;
 //use rayon::prelude::*;
 use std::{
+    cmp,
     error::Error,
     fs::File,
     process, // process::exit(1)
-    //io::Cursor,
-    //sync::Mutex,
-    //collections::BTreeMap,
-};
-
-use std::{
-    cmp,
     process::Command,
 };
 
