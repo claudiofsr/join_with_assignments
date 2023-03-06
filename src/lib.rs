@@ -18,6 +18,7 @@
 use polars::{prelude::*};
 use polars::datatypes::DataType;
 use std::num::ParseFloatError;
+use pathfinding::prelude::{Matrix, kuhn_munkres_min};
 //use rayon::prelude::*;
 use std::{
     cmp,
@@ -243,6 +244,33 @@ pub fn print_matrix(
 /* ---- final ---- */
 /* --- munkres --- */
 
+pub fn munkres_assignments(vec_a: Vec<f64>, vec_b: Vec<f64>) -> Series {
+
+    let array_1: Vec<i128> = vec_a.iter().map(|&v| (v * 100.0).round() as i128).collect();
+    let array_2: Vec<i128> = vec_b.iter().map(|&v| (v * 100.0).round() as i128).collect();
+
+    //let width: usize = get_width(&array_1, &array_2);
+    //println!("\nFind the minimum bipartite matching:");
+    //println!("array_1: {array_1:width$?}");
+    //println!("array_2: {array_2:width$?}");
+
+    let mut matrix: Vec<Vec<i128>> = get_matrix(&array_1, &array_2);
+
+    convert_to_square_matrix(&mut matrix);
+
+    // Assign weights to everybody choices
+    let weights: Matrix<i128> = Matrix::from_rows(matrix.clone()).unwrap();
+    let (_sum, assignments): (i128, Vec<usize>) = kuhn_munkres_min(&weights);
+
+    //display_bipartite_matching(width, &matrix, &array_1, &array_2, &assignments, false);
+    //print_matrix(width, &matrix[..], &array_1, &array_2, &assignments, true);
+
+    // convert Vec<usize> to Vec<u64>
+    let assignments_u64: Vec<u64> = assignments.iter().map(|&val| u64::try_from(val).unwrap() ).collect();
+
+    Series::new("New", assignments_u64)
+}
+
 // https://docs.rs/polars/latest/polars/prelude/struct.Series.html
 
 /*
@@ -276,6 +304,68 @@ fn download_file_from_the_internet(url: &str, output_file: &str) {
     println!("download '{output_file}' from '{url}'.");
 }
 */
+
+pub fn get_vec_vecf64(vec_opt_series: Vec<Option<Series>>) -> Result<Vec<Vec<f64>>, PolarsError> {
+
+    // https://stackoverflow.com/questions/71376935/how-to-get-a-vec-from-polars-series-or-chunkedarray
+
+    let vec: Vec<Vec<f64>> = vec_opt_series
+    .into_iter()
+    .map(|opt_series| opt_series
+        .map( |series| series
+            .f64()
+            .unwrap()
+            //.into_no_null_iter() // if we are certain we don't have missing values
+            .into_iter()
+            .map(|opt_f64| opt_f64.unwrap())
+            .collect::<Vec<f64>>()
+        )
+        .unwrap()
+    )
+    .collect();
+
+    Ok(vec)
+}
+
+pub fn get_vec_vecu64(vec_opt_series: Vec<Option<Series>>) -> Result<Vec<Vec<u64>>, PolarsError> {
+
+    // https://stackoverflow.com/questions/71376935/how-to-get-a-vec-from-polars-series-or-chunkedarray
+
+    let vec: Vec<Vec<u64>> = vec_opt_series
+    .into_iter()
+    .map(|opt_series| opt_series
+        .map( |series| series
+            .u64()
+            .unwrap()
+            .into_iter()
+            .map(|opt_u64| opt_u64.unwrap())
+            .collect::<Vec<u64>>()
+        )
+        .unwrap()
+    )
+    .collect();
+
+    Ok(vec)
+}
+
+pub fn get_vec_tuples(chave_doc: &str, lines_efd: &[u64], lines_nfe: &[u64], assignments: &[u64]) -> Vec<(String, u64, u64)> {
+
+    let mut chaves_valores_itens: Vec<(String, u64, u64)> = Vec::new();
+
+    for (row, &col) in assignments.iter().enumerate() {
+
+        let opt_line_efd: Option<&u64> = lines_efd.get(row);
+        let opt_line_nfe: Option<&u64> = lines_nfe.get(col as usize);
+        
+        if let (Some(&l_efd), Some(&l_nfe)) = (opt_line_efd, opt_line_nfe) {
+            let tuple = (chave_doc.to_string(), l_efd, l_nfe);
+            //println!("row: {row} ; tuple: {tuple:?}");
+            chaves_valores_itens.push(tuple);
+        }
+    }
+
+    chaves_valores_itens
+}
 
 #[allow(dead_code)]
 fn make_schema(side: &str) -> Schema {

@@ -3,7 +3,6 @@ use polars::prelude::*;
 //use polars_core::utils::{ _split_offsets, split_ca, split_series};
 use polars::datatypes::DataType;
 use rayon::prelude::*;
-use pathfinding::prelude::{Matrix, kuhn_munkres_min};
 use std::{
     env,
     process, // process::exit(1)
@@ -14,10 +13,12 @@ use std::{
 use join_with_assignments::{
     Config,
     clear_terminal_screen,
-    get_matrix,
-    convert_to_square_matrix,
     get_lazyframe_from_csv,
     datatype_to_f64,
+    get_vec_vecf64,
+    get_vec_vecu64,
+    get_vec_tuples,
+    munkres_assignments,
     formatar_chave_eletronica,
     write_csv,
     write_pqt,
@@ -111,6 +112,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // --- lazy_groupby_b ---
 
 
+
     let df_groupby_c: DataFrame = lazy_groupby_a
     .join(lazy_groupby_b, [col("Chave do Documento")], [col("Chave da Nota Fiscal Eletrônica : NF Item (Todos)")], JoinType::Inner)
     // An inner join produces a DataFrame that contains only the rows where the join key exists in both DataFrames.
@@ -160,55 +162,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     )
     .collect()?;
 
-    fn get_vec_vecf64(vec_opt_series: Vec<Option<Series>>) -> Result<Vec<Vec<f64>>, PolarsError> {
-
-        // https://stackoverflow.com/questions/71376935/how-to-get-a-vec-from-polars-series-or-chunkedarray
-
-        let vec: Vec<Vec<f64>> = vec_opt_series
-        .into_iter()
-        .map(|opt_series| opt_series
-            .map( |series| series
-                .f64()
-                .unwrap()
-                //.into_no_null_iter() // if we are certain we don't have missing values
-                .into_iter()
-                .map(|opt_f64| opt_f64.unwrap())
-                .collect::<Vec<f64>>()
-            )
-            .unwrap()
-        )
-        .collect();
-
-        Ok(vec)
-    }
-
-    fn munkres_assignments(vec_a: Vec<f64>, vec_b: Vec<f64>) -> Series {
-
-        let array_1: Vec<i128> = vec_a.iter().map(|&v| (v * 100.0).round() as i128).collect();
-        let array_2: Vec<i128> = vec_b.iter().map(|&v| (v * 100.0).round() as i128).collect();
-    
-        //let width: usize = get_width(&array_1, &array_2);
-        //println!("\nFind the minimum bipartite matching:");
-        //println!("array_1: {array_1:width$?}");
-        //println!("array_2: {array_2:width$?}");
-    
-        let mut matrix: Vec<Vec<i128>> = get_matrix(&array_1, &array_2);
-    
-        convert_to_square_matrix(&mut matrix);
-    
-        // Assign weights to everybody choices
-        let weights: Matrix<i128> = Matrix::from_rows(matrix.clone()).unwrap();
-        let (_sum, assignments): (i128, Vec<usize>) = kuhn_munkres_min(&weights);
-    
-        //display_bipartite_matching(width, &matrix, &array_1, &array_2, &assignments, false);
-        //print_matrix(width, &matrix[..], &array_1, &array_2, &assignments, true);
-
-        // convert Vec<usize> to Vec<u64>
-        let assignments_u64: Vec<u64> = assignments.iter().map(|&val| u64::try_from(val).unwrap() ).collect();
-
-        Series::new("New", assignments_u64)
-    }
-
     println!("df_groupby_c = lz_groupby_a.join(&lz_groupby_b)\n{df_groupby_c}\n");
 
     /*
@@ -217,6 +170,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("column_names: {column_names:#?}");
     println!("schema: {schema:#?}");
     */
+
 
 
     let column_chave_doc: &Series = df_groupby_c.column("Chave do Documento")?;
@@ -228,27 +182,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     let vec_opt_lines_efd: Vec<Option<Series>> = column_lines_efd.list()?.into_iter().collect();
     let vec_opt_lines_nfe: Vec<Option<Series>> = column_lines_nfe.list()?.into_iter().collect();
     let vec_opt_assignmen: Vec<Option<Series>> = column_assignmen.list()?.into_iter().collect();
-    
-    fn get_vec_vecu64(vec_opt_series: Vec<Option<Series>>) -> Result<Vec<Vec<u64>>, PolarsError> {
-
-        // https://stackoverflow.com/questions/71376935/how-to-get-a-vec-from-polars-series-or-chunkedarray
-
-        let vec: Vec<Vec<u64>> = vec_opt_series
-        .into_iter()
-        .map(|opt_series| opt_series
-            .map( |series| series
-                .u64()
-                .unwrap()
-                .into_iter()
-                .map(|opt_u64| opt_u64.unwrap())
-                .collect::<Vec<u64>>()
-            )
-            .unwrap()
-        )
-        .collect();
-
-        Ok(vec)
-    }
 
     let vec_chave_doc: Vec<&str>     = vec_opt_chave_doc.iter().map(|&opt_str| opt_str.unwrap()).collect();
     let vec_lines_efd: Vec<Vec<u64>> = get_vec_vecu64(vec_opt_lines_efd)?;
@@ -261,25 +194,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         .into_par_iter() // rayon: parallel iterator
         .map(|(chave_doc, lines_efd, lines_nfe, assignmen)| get_vec_tuples(chave_doc, &lines_efd, &lines_nfe, &assignmen))
         .collect();
-
-    fn get_vec_tuples(chave_doc: &str, lines_efd: &[u64], lines_nfe: &[u64], assignments: &[u64]) -> Vec<(String, u64, u64)> {
-
-        let mut chaves_valores_itens: Vec<(String, u64, u64)> = Vec::new();
-
-        for (row, &col) in assignments.iter().enumerate() {
-
-            let opt_line_efd: Option<&u64> = lines_efd.get(row);
-            let opt_line_nfe: Option<&u64> = lines_nfe.get(col as usize);
-            
-            if let (Some(&l_efd), Some(&l_nfe)) = (opt_line_efd, opt_line_nfe) {
-                let tuple = (chave_doc.to_string(), l_efd, l_nfe);
-                //println!("row: {row} ; tuple: {tuple:?}");
-                chaves_valores_itens.push(tuple);
-            }
-        }
-
-        chaves_valores_itens
-    }
 
     // Transform a vector of tuples into many vectors
     let mut col_chaves: Vec<String> = Vec::new();
@@ -302,6 +216,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("df_correlation:\n{df_correlation}\n");
     //write_csv(&mut df_correlation, ';', "output_correlation.csv")?;
+
 
 
 
