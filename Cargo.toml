@@ -1,0 +1,29 @@
+[package]
+name = "join_with_assignments"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+#csv = "*"
+#tokio = { version = "*", features = ["full"] }
+#reqwest = { version = "*", features = ["blocking", "json"] }
+#num_cpus = "*"
+rayon = "*"
+serde = { version = "*", features = ["derive"] }
+polars = { version = "*", features = [ "lazy", "lazy_regex", "strings", "csv-file", "parquet", "asof_join", "list_eval", "list_take", "concat_str", "rank", "dtype-struct", "dtype-datetime", "dtype-categorical" ] }
+#polars-core = "*" # split_ca
+chrono = { version = "*", features = ["serde", "rustc-serialize", "unstable-locales"] }
+arrow2 = "*" # bugfix: 'internal error: entered unreachable code'
+parquet = "*"
+pathfinding = "*"
+
+[profile.release]
+# https://doc.rust-lang.org/cargo/reference/profiles.html
+strip = true       # Automatically strip symbols from the binary
+opt-level = "z"    # Optimize for size
+lto = true         # Enable link time optimization
+codegen-units = 1  # Use a single codegen for size optimization
+panic = "abort"    # Remove traceback information
+incremental = true # Save information to disk, improving re-compile times.

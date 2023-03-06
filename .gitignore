@@ -1,0 +1,6 @@
+/target
+*.csv
+*.xlsx
+*.parquet
+nfe*
+efd*
