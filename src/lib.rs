@@ -32,21 +32,32 @@ use std::{
 #[derive(Default, Debug, Clone)]
 pub struct Config {
     // https://doc.rust-lang.org/book/ch12-03-improving-error-handling-and-modularity.html
-    pub csv_a: String,
-    pub csv_b: String,
+    pub csv_a: Option<String>,
+    pub csv_b: Option<String>,
+    pub dlm_a: Option<String>,
+    pub dlm_b: Option<String>,
 }
 
 impl Config {
+
     pub fn build(args: &[String]) -> Result<Config, &'static str> {
-        if args.len() != 3 {
-            println!("modo de uso:");
-            println!("\tjoin_with_assignments file1.csv file2.csv");
-            println!("Favor informar file1.csv e file2.csv");
-            return Err("not enough arguments!");
+
+        if !(args.len() >= 3 && args.len() <= 5) {
+            println!("Use:");
+            println!("\tjoin_with_assignments file1.csv file2.csv [delimiter1 delimiter2]\n");
+            println!("Please insert the two CSV format files: file1.csv file2.csv");
+            println!("Optionally enter delimiter characters for CSV files");
+            println!("delimiter1 and delimiter2 are characters that delimit the columns of csv files");
+            println!("By default, the delimiter character for CSV files is ;");
+            return Err("not enough arguments!\n");
         }
-        let csv_a = args[1].clone();
-        let csv_b = args[2].clone();
-        Ok(Config { csv_a, csv_b })
+
+        let csv_a: Option<String> = args.get(1).map(|s| s.to_string());
+        let csv_b: Option<String> = args.get(2).map(|s| s.to_string());
+        let dlm_a: Option<String> = args.get(3).map(|s| s.to_string());
+        let dlm_b: Option<String> = args.get(4).map(|s| s.to_string());
+
+        Ok(Config {csv_a, csv_b, dlm_a, dlm_b})
     }
 }
 
@@ -99,7 +110,7 @@ pub fn get_matrix(array1: &[i128], array2: &[i128]) -> Vec<Vec<i128>> {
 
 pub fn convert_to_square_matrix(matrix: &mut Vec<Vec<i128>>) {
 
-    // check if the matrix is a square matrix, 
+    // check if the matrix is a square matrix,
     // if not convert it to square matrix by padding zeroes.
 
     let row_number: usize = matrix.len();
@@ -116,7 +127,7 @@ pub fn convert_to_square_matrix(matrix: &mut Vec<Vec<i128>>) {
             let vector = vec![0; col_number];
             matrix.push(vector);
         }
-    } 
+    }
 
     if row_number > col_number { // Add columns
         for vector in &mut matrix[..] {
@@ -128,9 +139,9 @@ pub fn convert_to_square_matrix(matrix: &mut Vec<Vec<i128>>) {
 
 pub fn display_bipartite_matching (
     width: usize,
-    matrix: &[Vec<i128>], 
-    array1: &[i128], 
-    array2: &[i128], 
+    matrix: &[Vec<i128>],
+    array1: &[i128],
+    array2: &[i128],
     assignments: &[usize],
     filter: bool,
 ) -> i128 {
@@ -185,10 +196,10 @@ pub fn display_bipartite_matching (
 }
 
 pub fn print_matrix(
-    width: usize, 
-    matrix: &[Vec<i128>], 
-    array1: &[i128], 
-    array2: &[i128], 
+    width: usize,
+    matrix: &[Vec<i128>],
+    array1: &[i128],
+    array2: &[i128],
     assignments: &[usize],
     filter: bool,
 ) {
@@ -356,7 +367,7 @@ pub fn get_vec_tuples(chave_doc: &str, lines_efd: &[u64], lines_nfe: &[u64], ass
 
         let opt_line_efd: Option<&u64> = lines_efd.get(row);
         let opt_line_nfe: Option<&u64> = lines_nfe.get(col as usize);
-        
+
         if let (Some(&l_efd), Some(&l_nfe)) = (opt_line_efd, opt_line_nfe) {
             let tuple = (chave_doc.to_string(), l_efd, l_nfe);
             //println!("row: {row} ; tuple: {tuple:?}");
@@ -515,11 +526,12 @@ fn read_csv_lazy(file_path: &str, delimiter_char: char, _side: &str) -> Result<L
 }
 
 // https://docs.rs/polars/latest/polars/
-// We recommend to build your queries directly with polars-lazy. 
-// This allows you to combine expression into powerful aggregations and column selections. 
+// We recommend to build your queries directly with polars-lazy.
+// This allows you to combine expression into powerful aggregations and column selections.
 // All expressions are evaluated in parallel and your queries are optimized just in time.
 
-pub fn get_lazyframe_from_csv(file_path: &str, delimiter_char: char, side: &str) -> Result<LazyFrame, PolarsError> {
+pub fn get_lazyframe_from_csv(file_path: Option<String>, delimiter: Option<String>, side: &str) -> Result<LazyFrame, PolarsError> {
+
     let options = StrpTimeOptions {
         date_dtype: DataType::Date,
         fmt: Some("%-d/%-m/%Y".into()),
@@ -528,7 +540,13 @@ pub fn get_lazyframe_from_csv(file_path: &str, delimiter_char: char, side: &str)
         ..Default::default()
     };
 
-    let lazyframe: LazyFrame = read_csv_lazy(file_path, delimiter_char, side)?
+    let file_path: String = file_path.unwrap();
+
+    let delimiter_default: String = ";".to_string();
+    let delimiter_string: String = delimiter.unwrap_or(delimiter_default);
+    let delimiter_char: char = delimiter_string.chars().next().unwrap();
+
+    let lazyframe: LazyFrame = read_csv_lazy(&file_path, delimiter_char, side)?
         .with_column(
             col("^.*Data|Dia|birthday.*$")
             //cols(["Data","Date","Dia"])
@@ -605,7 +623,7 @@ pub fn datatype_to_f64(series: Series) -> Result<Option<Series>, PolarsError> {
             .into(),
         )),
     };
-    
+
     result_option_series
 }
 
@@ -645,7 +663,7 @@ fn utf8_to_f64(series: Series) -> Series {
 pub fn formatar_chave_eletronica(series: Series) -> Result<Option<Series>, PolarsError> {
 
     let result_option_series = match series.dtype() {
-        DataType::Utf8 => Ok(Some(get_44_digits(series))),
+        DataType::Utf8 => Ok(Some(format_digits(series))),
         _ => Err(PolarsError::InvalidOperation(
             format!(
                 "Not supported for Series with dtype {:?}",
@@ -654,12 +672,12 @@ pub fn formatar_chave_eletronica(series: Series) -> Result<Option<Series>, Polar
             .into(),
         )),
     };
-    
+
     result_option_series
 }
 
 // https://docs.rs/polars/latest/polars/prelude/string/struct.StringNameSpace.html#
-fn get_44_digits(series: Series) -> Series {
+fn format_digits(series: Series) -> Series {
 
     let series_formatted: Series = series
     .utf8()
@@ -668,14 +686,15 @@ fn get_44_digits(series: Series) -> Series {
     .map(|opt_str: Option<&str>| {
         opt_str.map(|str: &str|
             {
-                let codigo = str
-                .trim()
-                .chars()
-                .filter(|x| x.is_ascii_digit())
-                .collect::<String>();
+                let mut codigo: String = str.to_string();
+                codigo.retain(|current_char| current_char.is_ascii_digit());
 
-                // formatar código: '1234...89'
-                ["'", &codigo, "'"].concat()
+                if !codigo.is_empty() {
+                    // formatar código: '1234...89'
+                    ["'", &codigo, "'"].concat()
+                } else {
+                    codigo
+                }
             }
         )
      })
