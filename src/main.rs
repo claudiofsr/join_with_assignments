@@ -108,13 +108,18 @@ fn format_fazyframe_b (lazyframe: LazyFrame) -> LazyFrame {
 
 fn groupby_fazyframe_a (lazyframe: LazyFrame) -> Result<LazyFrame, PolarsError> {
 
+    let column_name:   &str = "Chave do Documento";
+    let column_number: &str = "Linhas EFD";
+    let column_value:  &str = "Valor Total do Item";
+
     let lf_groupby: LazyFrame = lazyframe
-    .groupby([col("Chave do Documento")])
+    .groupby([col(column_name)])
     .agg([
-        col("Linhas EFD"),
-        col("Valor Total do Item").alias("Valores dos Itens da Nota Fiscal EFD"),
+        col(column_number),
+        col(column_value).alias("Valores dos Itens da Nota Fiscal EFD"),
     ]);
 
+    println!("Group information according to column '{column_name}'");
     println!("groupby_fazyframe_a:\n{}\n", lf_groupby.clone().collect()?);
 
     Ok(lf_groupby)
@@ -122,18 +127,23 @@ fn groupby_fazyframe_a (lazyframe: LazyFrame) -> Result<LazyFrame, PolarsError> 
 
 fn groupby_fazyframe_b (lazyframe: LazyFrame) -> Result<LazyFrame, PolarsError> {
 
+    let column_name:   &str = "Chave da Nota Fiscal Eletrônica : NF Item (Todos)";
+    let column_number: &str = "Linhas NFE";
+    let column_value:  &str = "Valor da Nota Proporcional : NF Item (Todos) SOMA";
+
     let lf_groupby: LazyFrame = lazyframe
     .filter(
         when(col("Registro de Origem do Item : NF Item (Todos)").eq(lit("NFe")))
-        .then(col("Valor da Nota Proporcional : NF Item (Todos) SOMA").gt(0))
+        .then(col(column_value).gt(0))
         .otherwise(true)
     )
-    .groupby([col("Chave da Nota Fiscal Eletrônica : NF Item (Todos)")])
+    .groupby([col(column_name)])
     .agg([
-        col("Linhas NFE"),
-        col("Valor da Nota Proporcional : NF Item (Todos) SOMA").alias("Valores dos Itens da Nota Fiscal NFE"),
+        col(column_number),
+        col(column_value).alias("Valores dos Itens da Nota Fiscal NFE"),
     ]);
 
+    println!("Group information according to column '{column_name}'");
     println!("groupby_fazyframe_b:\n{}\n", lf_groupby.clone().collect()?);
 
     Ok(lf_groupby)
