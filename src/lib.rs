@@ -15,7 +15,7 @@
 // https://stackoverflow.com/questions/74521285/how-to-zip-2-list-columns-on-python-polars
 // https://stackoverflow.com/questions/71376935/how-to-get-a-vec-from-polars-series-or-chunkedarray
 
-use polars::{prelude::*};
+use polars::prelude::*;
 use polars::datatypes::DataType;
 use std::num::ParseFloatError;
 use pathfinding::prelude::{Matrix, kuhn_munkres_min};
@@ -43,12 +43,13 @@ impl Config {
     pub fn build(args: &[String]) -> Result<Config, &'static str> {
 
         if !(args.len() >= 3 && args.len() <= 5) {
-            println!("Use:");
+            println!("Usage:");
             println!("\tjoin_with_assignments file1.csv file2.csv [delimiter1 delimiter2]\n");
-            println!("Please insert the two CSV format files: file1.csv file2.csv");
+            println!("Please insert the two CSV files: file1.csv file2.csv");
             println!("Optionally enter delimiter characters for CSV files");
             println!("delimiter1 and delimiter2 are characters that delimit the columns of csv files");
             println!("By default, the delimiter character for CSV files is ;");
+            println!("Example: join_with_assignments file1.csv file2.csv \"|\" \",\"\n");
             return Err("not enough arguments!\n");
         }
 
