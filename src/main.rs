@@ -117,7 +117,8 @@ fn groupby_fazyframe_a (lazyframe: LazyFrame) -> Result<LazyFrame, PolarsError> 
     .agg([
         col(column_number),
         col(column_value).alias("Valores dos Itens da Nota Fiscal EFD"),
-    ]);
+    ])
+    .filter(col(column_name).is_not_null());
 
     println!("Group information according to column '{column_name}'");
     println!("groupby_fazyframe_a:\n{}\n", lf_groupby.clone().collect()?);
@@ -141,7 +142,8 @@ fn groupby_fazyframe_b (lazyframe: LazyFrame) -> Result<LazyFrame, PolarsError> 
     .agg([
         col(column_number),
         col(column_value).alias("Valores dos Itens da Nota Fiscal NFE"),
-    ]);
+    ])
+    .filter(col(column_name).is_not_null());
 
     println!("Group information according to column '{column_name}'");
     println!("groupby_fazyframe_b:\n{}\n", lf_groupby.clone().collect()?);

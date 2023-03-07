@@ -680,14 +680,15 @@ pub fn formatar_chave_eletronica(series: Series) -> Result<Option<Series>, Polar
 // https://docs.rs/polars/latest/polars/prelude/string/struct.StringNameSpace.html#
 fn format_digits(series: Series) -> Series {
 
-    let series_formatted: Series = series
+    let formatted: Series = series
     .utf8()
     .unwrap()
     .into_iter()
-    .map(|opt_str: Option<&str>| {
+    .map(|opt_str: Option<&str>|
         opt_str.map(|str: &str|
             {
                 let mut codigo: String = str.to_string();
+
                 codigo.retain(|current_char| current_char.is_ascii_digit());
 
                 if !codigo.is_empty() {
@@ -698,11 +699,11 @@ fn format_digits(series: Series) -> Series {
                 }
             }
         )
-     })
+    )
     .collect::<Utf8Chunked>()
     .into_series();
 
-    series_formatted
+    formatted
 }
 
 #[allow(dead_code)]
