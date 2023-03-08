@@ -15,8 +15,8 @@ use join_with_assignments::{
     clear_terminal_screen,
     get_lazyframe_from_csv,
     datatype_to_f64,
-    get_vec_vecf64,
-    get_vec_vecu64,
+    get_vec_of_vecf64,
+    get_vec_of_vecu64,
     get_vec_tuples,
     munkres_assignments,
     formatar_chave_eletronica,
@@ -194,8 +194,8 @@ fn join_lazyframes (lazyframe_a: LazyFrame, lazyframe_b: LazyFrame) -> Result<Da
                     let vec_opt_series_efd: Vec<Option<Series>> = chunked_array_efd.into_iter().collect();
                     let vec_opt_series_nfe: Vec<Option<Series>> = chunked_array_nfe.into_iter().collect();
 
-                    let vec_vecf64_efd: Vec<Vec<f64>> = get_vec_vecf64(vec_opt_series_efd)?;
-                    let vec_vecf64_nfe: Vec<Vec<f64>> = get_vec_vecf64(vec_opt_series_nfe)?;
+                    let vec_vecf64_efd: Vec<Vec<f64>> = get_vec_of_vecf64(vec_opt_series_efd)?;
+                    let vec_vecf64_nfe: Vec<Vec<f64>> = get_vec_of_vecf64(vec_opt_series_nfe)?;
 
                     // https://docs.rs/rayon/latest/rayon/iter/struct.MultiZip.html
                     // MultiZip is an iterator that zips up a tuple of parallel iterators to produce tuples of their items.
@@ -241,9 +241,9 @@ fn get_vec_from_assignments (dataframe: DataFrame) -> Result<Vec<Vec<(String, u6
     let vec_opt_assignmen: Vec<Option<Series>> = column_assignmen.list()?.into_iter().collect();
 
     let vec_chave_doc: Vec<&str>     = vec_opt_chave_doc.iter().map(|&opt_str| opt_str.unwrap()).collect();
-    let vec_lines_efd: Vec<Vec<u64>> = get_vec_vecu64(vec_opt_lines_efd)?;
-    let vec_lines_nfe: Vec<Vec<u64>> = get_vec_vecu64(vec_opt_lines_nfe)?;
-    let vec_assignmen: Vec<Vec<u64>> = get_vec_vecu64(vec_opt_assignmen)?;
+    let vec_lines_efd: Vec<Vec<u64>> = get_vec_of_vecu64(vec_opt_lines_efd)?;
+    let vec_lines_nfe: Vec<Vec<u64>> = get_vec_of_vecu64(vec_opt_lines_nfe)?;
+    let vec_assignmen: Vec<Vec<u64>> = get_vec_of_vecu64(vec_opt_assignmen)?;
 
     // https://docs.rs/rayon/latest/rayon/iter/struct.MultiZip.html
     // MultiZip is an iterator that zips up a tuple of parallel iterators to produce tuples of their items.

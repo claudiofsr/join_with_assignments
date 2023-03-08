@@ -315,13 +315,15 @@ fn download_file_from_the_internet(url: &str, output_file: &str) {
 }
 */
 
-pub fn get_vec_vecf64(vec_opt_series: Vec<Option<Series>>) -> Result<Vec<Vec<f64>>, PolarsError> {
+pub fn get_vec_of_vecf64(vec_opt_series: Vec<Option<Series>>) -> Result<Vec<Vec<f64>>, PolarsError> {
 
     // https://stackoverflow.com/questions/71376935/how-to-get-a-vec-from-polars-series-or-chunkedarray
 
     let vec: Vec<Vec<f64>> = vec_opt_series
+    //.par_iter() // rayon: parallel iterator
     .into_iter()
     .map(|opt_series| opt_series
+        .as_ref()
         .map( |series| series
             .f64()
             .unwrap()
@@ -337,13 +339,15 @@ pub fn get_vec_vecf64(vec_opt_series: Vec<Option<Series>>) -> Result<Vec<Vec<f64
     Ok(vec)
 }
 
-pub fn get_vec_vecu64(vec_opt_series: Vec<Option<Series>>) -> Result<Vec<Vec<u64>>, PolarsError> {
+pub fn get_vec_of_vecu64(vec_opt_series: Vec<Option<Series>>) -> Result<Vec<Vec<u64>>, PolarsError> {
 
     // https://stackoverflow.com/questions/71376935/how-to-get-a-vec-from-polars-series-or-chunkedarray
 
     let vec: Vec<Vec<u64>> = vec_opt_series
+    //.par_iter() // rayon: parallel iterator
     .into_iter()
     .map(|opt_series| opt_series
+        .as_ref()
         .map( |series| series
             .u64()
             .unwrap()
@@ -623,14 +627,21 @@ pub fn datatype_to_f64(series: Series, decimals: u32) -> Result<Option<Series>, 
 }
 
 fn round_series_f64(series: Series, decimals: u32) -> Series {
-    series
-        .f64()
-        .unwrap()
-        .into_iter()
+
+    let chunked_array: &ChunkedArray<Float64Type> = series.f64().unwrap();
+
+    let vec_option_f64: Vec<Option<f64>> = chunked_array.into_iter().collect();
+
+    let series: Series = vec_option_f64
+        .par_iter() // rayon: parallel iterator
+        //.into_iter()
         .map(|opt_f64|
             opt_f64.map(|f64| round_f64(f64, decimals))
         )
-        .collect()
+        .collect::<Float64Chunked>()
+        .into_series();
+
+    series
 }
 
 fn utf8_to_f64(series: Series, decimals: u32) -> Series {
@@ -638,7 +649,8 @@ fn utf8_to_f64(series: Series, decimals: u32) -> Series {
     let series_formatted: Series = series
         .utf8()
         .unwrap()
-        .into_iter()
+        .par_iter() // rayon: parallel iterator
+        //.into_iter()
         .map(|opt_str: Option<&str>| {
             opt_str.map(|str: &str|
                 {
@@ -684,32 +696,16 @@ pub fn formatar_chave_eletronica(series: Series) -> Result<Option<Series>, Polar
 // https://docs.rs/polars/latest/polars/prelude/string/struct.StringNameSpace.html#
 fn format_digits(series: Series) -> Series {
 
-    let use_rayon = true;
+    let formatted: Series = series
+    .utf8()
+    .unwrap()
+    .par_iter() // rayon: parallel iterator
+    //.into_iter()
+    .map(retain_only_digits)
+    .collect::<Utf8Chunked>()
+    .into_series();
 
-    if use_rayon {
-
-        let chunked_array: &ChunkedArray<Utf8Type> = series.utf8().unwrap();
-        let vec_option_str: Vec<Option<&str>> = chunked_array.into_iter().collect();
-        let formatted: Series = vec_option_str
-            .into_par_iter() // rayon: parallel iterator
-            .map(retain_only_digits)
-            .collect::<Utf8Chunked>()
-            .into_series();
-
-        formatted
-
-    } else {
-
-        let formatted: Series = series
-        .utf8()
-        .unwrap()
-        .into_iter()
-        .map(retain_only_digits)
-        .collect::<Utf8Chunked>()
-        .into_series();
-
-        formatted
-    }
+    formatted
 }
 
 fn retain_only_digits(opt_str: Option<&str>) -> Option<String> {
@@ -726,20 +722,7 @@ fn retain_only_digits(opt_str: Option<&str>) -> Option<String> {
         Some(cod)
     } else {
         None
-    }    
-}
-
-#[allow(dead_code)]
-fn absolute_value(str_val: Series) -> Result<Option<Series>, PolarsError> {
-    let series: Series = str_val
-        .f64()
-        .expect("fn absolute_value: series was not an f64 dtype")
-        .into_iter()
-        .map(|opt_value: Option<f64>| opt_value.map(|value: f64| value.abs()))
-        .collect::<Float64Chunked>()
-        .into_series();
-
-    Ok(Some(series))
+    }
 }
 
 #[cfg(test)]
@@ -810,14 +793,17 @@ pub fn df_multiple_values() -> Result<(), Box<dyn Error>> {
 
     // É necessário formatar o número de casas decimais
     let series_formatted: Vec<Option<Series>> = vec_opt_lines_efd
-        .into_iter()
-        .map(|opt_series| 
-            opt_series.map(|series| datatype_to_f64(series, 1).unwrap())
+        .par_iter() // rayon: parallel iterator
+        //.into_iter()
+        .map(|opt_series|
+            opt_series
+            .as_ref()
+            .map(|series| datatype_to_f64(series.clone(), 1).unwrap())
             .unwrap()
         )
         .collect();
 
-    let vec_lines: Vec<Vec<f64>> = get_vec_vecf64(series_formatted)?;
+    let vec_lines: Vec<Vec<f64>> = get_vec_of_vecf64(series_formatted)?;
 
     let first_list = vec![2.0, 3.3, 1.0];
 
@@ -850,22 +836,22 @@ pub fn execute_closures_in_parallel() -> Result<(), Box<dyn Error>> {
     let number = 5;
 
     let (a, b) = rayon::join(
-        || factorial(number), 
-        || strings_to_num(&["12", "100", "19887870", "56", "9098"]), 
-    ); 
+        || factorial(number),
+        || strings_to_num(&["12", "100", "19887870", "56", "9098"]),
+    );
 
-    println!("factorial of {number} is {a}"); 
+    println!("factorial of {number} is {a}");
     println!("numbers are {:?}", b) ;
 
     Ok(())
 }
 
-fn strings_to_num(slice: &[&str]) -> Vec<usize> { 
-    slice.iter().map(|&s| { 
-        s.parse::<usize>().expect("{s} is not a number") 
-    }).collect() 
-} 
+fn strings_to_num(slice: &[&str]) -> Vec<usize> {
+    slice.iter().map(|&s| {
+        s.parse::<usize>().expect("{s} is not a number")
+    }).collect()
+}
 
-fn factorial(n: u128) -> u128 { 
+fn factorial(n: u128) -> u128 {
     (1..=n).reduce(|multiple, next| multiple * next).unwrap()
-} 
+}
