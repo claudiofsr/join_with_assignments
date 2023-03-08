@@ -19,7 +19,7 @@ use polars::prelude::*;
 use polars::datatypes::DataType;
 use std::num::ParseFloatError;
 use pathfinding::prelude::{Matrix, kuhn_munkres_min};
-//use rayon::prelude::*;
+use rayon::prelude::*;
 use std::{
     cmp,
     error::Error,
@@ -684,17 +684,23 @@ pub fn formatar_chave_eletronica(series: Series) -> Result<Option<Series>, Polar
 // https://docs.rs/polars/latest/polars/prelude/string/struct.StringNameSpace.html#
 fn format_digits(series: Series) -> Series {
 
-    /*
-    let chunked_array: &ChunkedArray<Utf8Type> = series.utf8().unwrap();
-    let vec_option_str: Vec<Option<&str>> = chunked_array.into_iter().collect();
-    let formatted: Series = vec_option_str
-        .into_par_iter() // rayon: parallel iterator
-        .map(retain_only_digits)
-        .collect::<Utf8Chunked>()
-        .into_series();
-    */
+    let use_rayon = true;
 
-    let formatted: Series = series
+    if use_rayon {
+
+        let chunked_array: &ChunkedArray<Utf8Type> = series.utf8().unwrap();
+        let vec_option_str: Vec<Option<&str>> = chunked_array.into_iter().collect();
+        let formatted: Series = vec_option_str
+            .into_par_iter() // rayon: parallel iterator
+            .map(retain_only_digits)
+            .collect::<Utf8Chunked>()
+            .into_series();
+
+        formatted
+
+    } else {
+
+        let formatted: Series = series
         .utf8()
         .unwrap()
         .into_iter()
@@ -702,7 +708,8 @@ fn format_digits(series: Series) -> Series {
         .collect::<Utf8Chunked>()
         .into_series();
 
-    formatted
+        formatted
+    }
 }
 
 fn retain_only_digits(opt_str: Option<&str>) -> Option<String> {
@@ -747,10 +754,15 @@ mod test_functions {
         df_multiple_values()?;
         Ok(())
     }
+
+    #[test]
+    fn use_rayon_join() -> Result<(), Box<dyn Error>> {
+        execute_closures_in_parallel()?;
+        Ok(())
+    }
 }
 
 // https://stackoverflow.com/questions/70959170/is-there-a-way-to-apply-a-udf-function-returning-multiple-values-in-rust-polars
-#[allow(dead_code)]
 pub fn df_multiple_values() -> Result<(), Box<dyn Error>> {
     let df = df![
         "a" => [1.0, 2.0, 3.0],
@@ -829,11 +841,31 @@ fn black_box(a: f64, b: f64) -> (f64, f64, f64) {
     (a+b, 5.4 * a - 2.1 * b, a*b)
 }
 
-/*
 // https://blog.logrocket.com/implementing-data-parallelism-rayon-rust/
-// Takes two closures and potentially runs them in parallel. It returns a pair of the results from those closures.
-let (lf_a, lf_b) = rayon::join(
-    || format_fazyframe_a(lf_a),
-    || format_fazyframe_b(lf_b),
-);
-*/
+pub fn execute_closures_in_parallel() -> Result<(), Box<dyn Error>> {
+
+    // Takes two closures and potentially runs them in parallel.
+    // It returns a pair of the results from those closures.
+
+    let number = 5;
+
+    let (a, b) = rayon::join(
+        || factorial(number), 
+        || strings_to_num(&["12", "100", "19887870", "56", "9098"]), 
+    ); 
+
+    println!("factorial of {number} is {a}"); 
+    println!("numbers are {:?}", b) ;
+
+    Ok(())
+}
+
+fn strings_to_num(slice: &[&str]) -> Vec<usize> { 
+    slice.iter().map(|&s| { 
+        s.parse::<usize>().expect("{s} is not a number") 
+    }).collect() 
+} 
+
+fn factorial(n: u128) -> u128 { 
+    (1..=n).reduce(|multiple, next| multiple * next).unwrap()
+} 
