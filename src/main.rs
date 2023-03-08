@@ -26,6 +26,7 @@ use join_with_assignments::{
 
 fn main() -> Result<(), Box<dyn Error>> {
 
+    configure_the_environment();
     clear_terminal_screen();
 
     let args: Vec<String> = env::args().collect();
@@ -68,6 +69,16 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("Tempo de Execução Total: {:?}\n",time.elapsed());
 
     Ok(())
+}
+
+fn configure_the_environment() {
+    // https://stackoverflow.com/questions/70830241/rust-polars-how-to-show-all-columns/75675569#75675569
+    // https://pola-rs.github.io/polars/polars/index.html#config-with-env-vars
+    // Config with ENV vars
+    env::set_var("POLARS_FMT_TABLE_ROUNDED_CORNERS", "1"); // apply rounded corners to UTF8-styled tables.
+    //env::set_var("POLARS_FMT_MAX_COLS", "20"); // maximum number of columns shown when formatting DataFrames.
+    env::set_var("POLARS_FMT_MAX_ROWS", "10");   // maximum number of rows shown when formatting DataFrames.
+    env::set_var("POLARS_FMT_STR_LEN", "50");    // maximum number of characters printed per string value.
 }
 
 fn format_fazyframe_a (lazyframe: LazyFrame) -> LazyFrame {
