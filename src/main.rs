@@ -17,7 +17,7 @@ use join_with_assignments::{
     datatype_to_f64,
     get_vec_of_vecf64,
     get_vec_of_vecu64,
-    get_vec_tuples,
+    get_vec_of_tuples,
     munkres_assignments,
     formatar_chave_eletronica,
     write_csv,
@@ -249,7 +249,7 @@ fn get_vec_from_assignments (dataframe: DataFrame) -> Result<Vec<Vec<(String, u6
     // MultiZip is an iterator that zips up a tuple of parallel iterators to produce tuples of their items.
     let vec_vec_tuples: Vec<Vec<(String, u64, u64)>> = (vec_chave_doc, vec_lines_efd, vec_lines_nfe, vec_assignmen)
         .into_par_iter() // rayon: parallel iterator
-        .map(|(chave_doc, lines_efd, lines_nfe, assignmen)| get_vec_tuples(chave_doc, &lines_efd, &lines_nfe, &assignmen))
+        .map(|(chave_doc, lines_efd, lines_nfe, assignmen)| get_vec_of_tuples(chave_doc, &lines_efd, &lines_nfe, &assignmen))
         .collect();
 
     drop(dataframe);

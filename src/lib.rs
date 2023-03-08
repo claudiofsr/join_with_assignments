@@ -362,17 +362,17 @@ pub fn get_vec_of_vecu64(vec_opt_series: Vec<Option<Series>>) -> Result<Vec<Vec<
     Ok(vec)
 }
 
-pub fn get_vec_tuples(chave_doc: &str, lines_efd: &[u64], lines_nfe: &[u64], assignments: &[u64]) -> Vec<(String, u64, u64)> {
+pub fn get_vec_of_tuples(chave_doc: &str, slice_lines_efd: &[u64], slice_lines_nfe: &[u64], assignments: &[u64]) -> Vec<(String, u64, u64)> {
 
     let mut chaves_valores_itens: Vec<(String, u64, u64)> = Vec::new();
 
     for (row, &col) in assignments.iter().enumerate() {
 
-        let opt_line_efd: Option<&u64> = lines_efd.get(row);
-        let opt_line_nfe: Option<&u64> = lines_nfe.get(col as usize);
+        let opt_line_efd: Option<&u64> = slice_lines_efd.get(row);
+        let opt_line_nfe: Option<&u64> = slice_lines_nfe.get(col as usize);
 
-        if let (Some(&l_efd), Some(&l_nfe)) = (opt_line_efd, opt_line_nfe) {
-            let tuple = (chave_doc.to_string(), l_efd, l_nfe);
+        if let (Some(&line_efd), Some(&line_nfe)) = (opt_line_efd, opt_line_nfe) {
+            let tuple: (String, u64, u64) = (chave_doc.to_string(), line_efd, line_nfe);
             //println!("row: {row} ; tuple: {tuple:?}");
             chaves_valores_itens.push(tuple);
         }
