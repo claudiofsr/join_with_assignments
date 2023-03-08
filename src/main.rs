@@ -82,7 +82,7 @@ fn format_fazyframe_a (lazyframe: LazyFrame) -> LazyFrame {
     )
     .with_column(
         col("Valor Total do Item")
-        .apply(datatype_to_f64, GetOutput::from_type(DataType::Float64))
+        .apply(|x| datatype_to_f64(x, 2), GetOutput::from_type(DataType::Float64))
     )
 }
 
@@ -98,11 +98,11 @@ fn format_fazyframe_b (lazyframe: LazyFrame) -> LazyFrame {
     )
     .with_column(
         col("Valor da Nota Proporcional : NF Item (Todos) SOMA")
-        .apply(datatype_to_f64, GetOutput::from_type(DataType::Float64))
+        .apply(|x| datatype_to_f64(x, 2), GetOutput::from_type(DataType::Float64))
     )
     .with_column(
         col("ICMS: Base de Cálculo : NF Item (Todos) SOMA")
-        .apply(datatype_to_f64, GetOutput::from_type(DataType::Float64))
+        .apply(|x| datatype_to_f64(x, 2), GetOutput::from_type(DataType::Float64))
     )
 }
 
@@ -311,20 +311,20 @@ fn join_with_interline_correlations (lf_a: LazyFrame, lf_b: LazyFrame, df_correl
 
 fn verificar_correlacao_entre_dataframes (lazyframe: LazyFrame) -> Result<DataFrame, PolarsError> {
 
-    let valor_do_item_da_efd = "Valor Total do Item";
-    let valor_do_basecal_nfe = "Valor da Nota Proporcional : NF Item (Todos) SOMA";
-    let valor_do_baseicm_nfe = "ICMS: Base de Cálculo : NF Item (Todos) SOMA";
     let coluna_deverificacao = "Verificação dos Valores: EFD x Docs Fiscais";
+    let valor_do_item_da_efd = "Valor Total do Item";
+    let valor_da_nota_proporcional_nfe = "Valor da Nota Proporcional : NF Item (Todos) SOMA";
+    let valor_da_base_calculo_icms_nfe = "ICMS: Base de Cálculo : NF Item (Todos) SOMA";
 
-    let valores_iguais_basecal = col(valor_do_item_da_efd).eq(col(valor_do_basecal_nfe));
-    let valores_iguais_baseicm = col(valor_do_item_da_efd).eq(col(valor_do_baseicm_nfe));
+    let valores_iguais_nota_prop = col(valor_do_item_da_efd).eq(col(valor_da_nota_proporcional_nfe));
+    let valores_iguais_base_icms = col(valor_do_item_da_efd).eq(col(valor_da_base_calculo_icms_nfe));
 
     let dataframe: DataFrame = lazyframe
         .with_column(
-            when(valores_iguais_basecal)
+            when(valores_iguais_nota_prop)
             .then(lit("valores iguais: Nota Proporcional"))
             .otherwise(
-                when(valores_iguais_baseicm)
+                when(valores_iguais_base_icms)
                 .then(lit("valores iguais: Base de Cálculo do ICMS"))
                 .otherwise(lit(""))
             )

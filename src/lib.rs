@@ -70,13 +70,13 @@ pub fn clear_terminal_screen() {
     };
 }
 
-/* --- munkres --- */
-/* ---- start ---- */
-
-pub fn round_f64(x: f64, decimals: u32) -> f64 {
+fn round_f64(x: f64, decimals: u32) -> f64 {
     let y = 10i32.pow(decimals) as f64;
     (x * y).round() / y
 }
+
+/* --- munkres --- */
+/* ---- start ---- */
 
 pub fn get_width<T>(array1: &[T], array2: &[T]) -> usize
     where T: Copy + Clone + ToString + PartialOrd
@@ -282,8 +282,6 @@ pub fn munkres_assignments(vec_a: Vec<f64>, vec_b: Vec<f64>) -> Series {
 
     Series::new("New", assignments_u64)
 }
-
-// https://docs.rs/polars/latest/polars/prelude/struct.Series.html
 
 /*
 #[allow(dead_code)]
@@ -554,9 +552,6 @@ pub fn get_lazyframe_from_csv(file_path: Option<String>, delimiter: Option<Strin
             .str().strptime(options)
         );
 
-    //let out = GetOutput::from_type(DataType::Float64);
-    //let lazyframe = lazyframe.with_column(col("^.*ICMS.*$").apply(datatype_to_f64, out));
-
     println!("file_path: {file_path}\n{}\n", lazyframe.clone().collect()?);
 
     let binding: Arc<Schema> = lazyframe.schema().unwrap();
@@ -610,12 +605,11 @@ fn read_pqt(output_path: &str) -> Result<DataFrame, PolarsError> {
     Ok(df_parquet)
 }
 
-pub fn datatype_to_f64(series: Series) -> Result<Option<Series>, PolarsError> {
+pub fn datatype_to_f64(series: Series, decimals: u32) -> Result<Option<Series>, PolarsError> {
 
     let result_option_series = match series.dtype() {
-        //DataType::List(_) => series.list().unwrap().explode(),
-        DataType::Float64 => Ok(Some(series)),
-        DataType::Utf8    => Ok(Some(utf8_to_f64(series))),
+        DataType::Float64 => Ok(Some(round_series_f64(series, decimals))),
+        DataType::Utf8    => Ok(Some(utf8_to_f64(series, decimals))),
         _ => Err(PolarsError::InvalidOperation(
             format!(
                 "Not supported for Series with dtype {:?}",
@@ -628,38 +622,48 @@ pub fn datatype_to_f64(series: Series) -> Result<Option<Series>, PolarsError> {
     result_option_series
 }
 
-fn utf8_to_f64(series: Series) -> Series {
+fn round_series_f64(series: Series, decimals: u32) -> Series {
+    series
+        .f64()
+        .unwrap()
+        .into_iter()
+        .map(|opt_f64|
+            opt_f64.map(|f64| round_f64(f64, decimals))
+        )
+        .collect()
+}
+
+fn utf8_to_f64(series: Series, decimals: u32) -> Series {
 
     let series_formatted: Series = series
-    .utf8()
-    .unwrap()
-    .into_iter()
-    .map(|opt_str: Option<&str>| {
-        opt_str.map(|str: &str|
-            {
-                let result: Result<f64, ParseFloatError> = str
-                .trim()
-                .replace('.', "")
-                .replace(',', ".")
-                .parse::<f64>();
+        .utf8()
+        .unwrap()
+        .into_iter()
+        .map(|opt_str: Option<&str>| {
+            opt_str.map(|str: &str|
+                {
+                    let result: Result<f64, ParseFloatError> = str
+                    .trim()
+                    .replace('.', "")
+                    .replace(',', ".")
+                    .parse::<f64>();
 
-                match result {
-                    Ok(float) => float,
-                    Err(why) => {
-                        println!("fn utf8_to_f64()");
-                        println!("Error parse f64: {why}");
-                        process::exit(1)
+                    match result {
+                        Ok(float) => round_f64(float, decimals),
+                        Err(why) => {
+                            println!("fn utf8_to_f64()");
+                            println!("Error parse f64: {why}");
+                            process::exit(1)
+                        }
                     }
                 }
-            }
-        )
-     })
-    .collect::<Float64Chunked>()
-    .into_series();
+            )
+        })
+        .collect::<Float64Chunked>()
+        .into_series();
 
     series_formatted
 }
-
 
 pub fn formatar_chave_eletronica(series: Series) -> Result<Option<Series>, PolarsError> {
 
@@ -731,6 +735,20 @@ fn absolute_value(str_val: Series) -> Result<Option<Series>, PolarsError> {
     Ok(Some(series))
 }
 
+#[cfg(test)]
+mod test_functions {
+    // cargo test -- --help
+    // cargo test -- --show-output
+    // cargo test -- --show-output multiple_values
+    use super::*;
+
+    #[test]
+    fn function_returning_multiple_values() -> Result<(), Box<dyn Error>> {
+        df_multiple_values()?;
+        Ok(())
+    }
+}
+
 // https://stackoverflow.com/questions/70959170/is-there-a-way-to-apply-a-udf-function-returning-multiple-values-in-rust-polars
 #[allow(dead_code)]
 pub fn df_multiple_values() -> Result<(), Box<dyn Error>> {
@@ -739,7 +757,7 @@ pub fn df_multiple_values() -> Result<(), Box<dyn Error>> {
         "b" => [1.0, 2.0, 3.0]
     ]?;
 
-    let df = df
+    let df: DataFrame = df
         .lazy()
         .select([map_multiple(
             |columns| {
@@ -755,11 +773,53 @@ pub fn df_multiple_values() -> Result<(), Box<dyn Error>> {
             },
             [col("a"), col("b")],
             GetOutput::from_type(DataType::Float64),
-        ).alias("new column")
+        ).alias("Multiple Values")
         ])
         .collect()?;
 
-    dbg!(df);
+    //dbg!(df);
+    println!("{df}");
+
+    /*
+    shape: (3, 1)
+    ┌─────────────────┐
+    │ Multiple Values │
+    │ ---             │
+    │ list[f64]       │
+    ╞═════════════════╡
+    │ [2.0, 3.3, 1.0] │
+    │ [4.0, 6.6, 4.0] │
+    │ [6.0, 9.9, 9.0] │
+    └─────────────────┘
+    */
+
+    let column_multiple_values: &Series = df.column("Multiple Values")?;
+    let vec_opt_lines_efd: Vec<Option<Series>> = column_multiple_values.list()?.into_iter().collect();
+
+    // É necessário formatar o número de casas decimais
+    let series_formatted: Vec<Option<Series>> = vec_opt_lines_efd
+        .into_iter()
+        .map(|opt_series| 
+            opt_series.map(|series| datatype_to_f64(series, 1).unwrap())
+            .unwrap()
+        )
+        .collect();
+
+    let vec_lines: Vec<Vec<f64>> = get_vec_vecf64(series_formatted)?;
+
+    let first_list = vec![2.0, 3.3, 1.0];
+
+    assert!(
+        first_list
+        .into_iter()
+        .zip(vec_lines[0].clone())
+        .all(|(a, b)|
+            {
+                println!("a: {a:>3} ; b: {b:>3}");
+                a == b
+            }
+        )
+    );
 
     Ok(())
 }
@@ -768,22 +828,6 @@ pub fn df_multiple_values() -> Result<(), Box<dyn Error>> {
 fn black_box(a: f64, b: f64) -> (f64, f64, f64) {
     (a+b, 5.4 * a - 2.1 * b, a*b)
 }
-
-/*
-df_multiple_values()?;
-
-[src/lib.rs:658] df = shape: (3, 1)
-┌─────────────────┐
-│ new column      │
-│ ---             │
-│ list[f64]       │
-╞═════════════════╡
-│ [2.0, 3.3, 1.0] │
-│ [4.0, 6.6, 4.0] │
-│ [6.0, 9.9, 9.0] │
-└─────────────────┘
-*/
-
 
 /*
 // https://blog.logrocket.com/implementing-data-parallelism-rayon-rust/
