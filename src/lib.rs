@@ -686,25 +686,19 @@ fn format_digits(series: Series) -> Series {
     .into_iter()
     .map(|opt_str: Option<&str>|
         {
-            let option: Option<String> = opt_str.map(|str: &str|
-                {
-                    let mut only_digits: String = str.to_string();
-                    only_digits.retain(|current_char| current_char.is_ascii_digit());
-                    only_digits
-                }
-            );
+            let mut only_digits: String = match opt_str {
+                Some(str) => str.to_string(),
+                None => return None,
+            };
 
-            match option {
-                Some(digits) => {
-                    if !digits.is_empty() {
-                        // formatar código: '1234...89'
-                        let cod: String = ["'", &digits, "'"].concat();
-                        Some(cod)
-                    } else {
-                        None
-                    }
-                },
-                None => None,
+            only_digits.retain(|current_char| current_char.is_ascii_digit());
+
+            if !only_digits.is_empty() {
+                // formatar código: '1234...89'
+                let cod: String = ["'", &only_digits, "'"].concat();
+                Some(cod)
+            } else {
+                None
             }
         }
     )
