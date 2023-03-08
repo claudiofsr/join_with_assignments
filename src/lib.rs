@@ -680,32 +680,42 @@ pub fn formatar_chave_eletronica(series: Series) -> Result<Option<Series>, Polar
 // https://docs.rs/polars/latest/polars/prelude/string/struct.StringNameSpace.html#
 fn format_digits(series: Series) -> Series {
 
+    /*
+    let chunked_array: &ChunkedArray<Utf8Type> = series.utf8().unwrap();
+    let vec_option_str: Vec<Option<&str>> = chunked_array.into_iter().collect();
+    let formatted: Series = vec_option_str
+        .into_par_iter() // rayon: parallel iterator
+        .map(retain_only_digits)
+        .collect::<Utf8Chunked>()
+        .into_series();
+    */
+
     let formatted: Series = series
-    .utf8()
-    .unwrap()
-    .into_iter()
-    .map(|opt_str: Option<&str>|
-        {
-            let mut only_digits: String = match opt_str {
-                Some(str) => str.to_string(),
-                None => return None,
-            };
-
-            only_digits.retain(|current_char| current_char.is_ascii_digit());
-
-            if !only_digits.is_empty() {
-                // formatar código: '1234...89'
-                let cod: String = ["'", &only_digits, "'"].concat();
-                Some(cod)
-            } else {
-                None
-            }
-        }
-    )
-    .collect::<Utf8Chunked>()
-    .into_series();
+        .utf8()
+        .unwrap()
+        .into_iter()
+        .map(retain_only_digits)
+        .collect::<Utf8Chunked>()
+        .into_series();
 
     formatted
+}
+
+fn retain_only_digits(opt_str: Option<&str>) -> Option<String> {
+    let mut only_digits: String = match opt_str {
+        Some(str) => str.to_string(),
+        None => return None,
+    };
+
+    only_digits.retain(|current_char| current_char.is_ascii_digit());
+
+    if !only_digits.is_empty() {
+        // formatar código: '1234...89'
+        let cod: String = ["'", &only_digits, "'"].concat();
+        Some(cod)
+    } else {
+        None
+    }    
 }
 
 #[allow(dead_code)]
@@ -772,4 +782,14 @@ df_multiple_values()?;
 │ [4.0, 6.6, 4.0] │
 │ [6.0, 9.9, 9.0] │
 └─────────────────┘
+*/
+
+
+/*
+// https://blog.logrocket.com/implementing-data-parallelism-rayon-rust/
+// Takes two closures and potentially runs them in parallel. It returns a pair of the results from those closures.
+let (lf_a, lf_b) = rayon::join(
+    || format_fazyframe_a(lf_a),
+    || format_fazyframe_b(lf_b),
+);
 */
