@@ -200,13 +200,22 @@ fn join_lazyframes (lazyframe_a: LazyFrame, lazyframe_b: LazyFrame) -> Result<Da
                             {
                                 match (opt_series_efd, opt_series_nfe) {
                                     (Some(series_efd), Some(series_nfe)) => {
-                                        let vec_opt_f64_efd: Vec<Option<f64>> = series_efd.f64().unwrap().into_iter().collect();
-                                        let vec_float64_efd: Vec<f64> = get_vec_type(vec_opt_f64_efd);
-                                    
-                                        let vec_opt_f64_nfe: Vec<Option<f64>> = series_nfe.f64().unwrap().into_iter().collect();
-                                        let vec_float64_nfe: Vec<f64> = get_vec_type(vec_opt_f64_nfe);
+                                        // Evitar o uso de unwrap()
+                                        let opt_chunkarray_f64_efd: Option<&ChunkedArray<Float64Type>> = series_efd.f64().ok();
+                                        let opt_chunkarray_f64_nfe: Option<&ChunkedArray<Float64Type>> = series_nfe.f64().ok();
 
-                                        Some(munkres_assignments(&vec_float64_efd, &vec_float64_nfe))
+                                        match (opt_chunkarray_f64_efd, opt_chunkarray_f64_nfe) {
+                                            (Some(chunkarray_f64_efd), Some(chunkarray_f64_nfe)) => {
+                                                let vec_opt_f64_efd: Vec<Option<f64>> = chunkarray_f64_efd.into_iter().collect();
+                                                let vec_opt_f64_nfe: Vec<Option<f64>> = chunkarray_f64_nfe.into_iter().collect();
+
+                                                let vec_float64_efd: Vec<f64> = get_vec_type(vec_opt_f64_efd);
+                                                let vec_float64_nfe: Vec<f64> = get_vec_type(vec_opt_f64_nfe);
+
+                                                Some(munkres_assignments(&vec_float64_efd, &vec_float64_nfe))
+                                            },
+                                            _ => None,
+                                        }
                                     },
                                     _ => None,
                                 }
