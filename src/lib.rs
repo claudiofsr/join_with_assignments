@@ -327,55 +327,6 @@ pub fn get_vec_type<T>(vec_opt_type: Vec<Option<T>>) -> Vec<T>
         .collect()
 }
 
-#[allow(dead_code)]
-pub fn get_vec_of_vecf64(vec_opt_series: Vec<Option<Series>>) -> Result<Vec<Vec<f64>>, PolarsError> {
-
-    // https://stackoverflow.com/questions/71376935/how-to-get-a-vec-from-polars-series-or-chunkedarray
-
-    let vec: Vec<Vec<f64>> = vec_opt_series
-    //.par_iter() // rayon: parallel iterator
-    .into_iter()
-    .map(|opt_series| opt_series
-        .as_ref()
-        .map( |series| series
-            .f64()
-            .unwrap()
-            //.into_no_null_iter() // if we are certain we don't have missing values
-            .into_iter()
-            .map(|opt_f64| opt_f64.unwrap())
-            .collect::<Vec<f64>>()
-        )
-        .unwrap()
-    )
-    .collect();
-
-    Ok(vec)
-}
-
-#[allow(dead_code)]
-pub fn get_vec_of_vecu64(vec_opt_series: Vec<Option<Series>>) -> Result<Vec<Vec<u64>>, PolarsError> {
-
-    // https://stackoverflow.com/questions/71376935/how-to-get-a-vec-from-polars-series-or-chunkedarray
-
-    let vec: Vec<Vec<u64>> = vec_opt_series
-    //.par_iter() // rayon: parallel iterator
-    .into_iter()
-    .map(|opt_series| opt_series
-        .as_ref()
-        .map( |series| series
-            .u64()
-            .unwrap()
-            .into_iter()
-            .map(|opt_u64| opt_u64.unwrap())
-            .collect::<Vec<u64>>()
-        )
-        .unwrap()
-    )
-    .collect();
-
-    Ok(vec)
-}
-
 pub fn get_vec_of_tuples(chave_doc: &str, slice_lines_efd: &[u64], slice_lines_nfe: &[u64], assignments: &[u64]) -> Vec<(String, u64, u64)> {
 
     let mut chaves_valores_itens: Vec<(String, u64, u64)> = Vec::new();
@@ -817,7 +768,18 @@ pub fn df_multiple_values() -> Result<(), Box<dyn Error>> {
         )
         .collect();
 
-    let vec_lines: Vec<Vec<f64>> = get_vec_of_vecf64(series_formatted)?;
+    let vec_series: Vec<Series> = get_vec_type(series_formatted);
+
+    let vec_lines: Vec<Vec<f64>> = vec_series
+        .par_iter() // rayon: parallel iterator
+        //.into_iter()
+        .map(|series| {
+            let chunkedarray_f64: &ChunkedArray<Float64Type> = series.f64().unwrap();
+            let vec_opt_f64: Vec<Option<f64>>= chunkedarray_f64.into_iter().collect();
+            let vec_f64: Vec<f64>= get_vec_type(vec_opt_f64);
+            vec_f64
+        })
+        .collect();
 
     let first_list = vec![2.0, 3.3, 1.0];
 
