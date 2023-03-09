@@ -7,13 +7,33 @@ edition = "2021"
 
 [dependencies]
 rayon = "*"
-serde = { version = "*", features = ["derive"] }
-polars = { version = "*", features = [ "lazy", "lazy_regex", "strings", "csv-file", "parquet", "asof_join", "list_eval", "list_take", "concat_str", "rank", "dtype-struct", "dtype-datetime", "dtype-categorical" ] }
-#polars-core = "*" # split_ca
-chrono = { version = "*", features = ["serde", "rustc-serialize", "unstable-locales"] }
-arrow2 = "*" # bugfix: 'internal error: entered unreachable code'
+arrow2 = "*"
 parquet = "*"
 pathfinding = "*"
+serde = { version = "*", features = [
+    "derive",
+] }
+chrono = { version = "*", features = [
+    "serde",
+    "rustc-serialize",
+    "unstable-locales",
+] }
+polars = { version = "*", features = [
+    "lazy",
+    "lazy_regex",
+    "strings",
+    "csv-file",
+    "parquet",
+    "asof_join",
+    "list_eval",
+    "list_take",
+    "concat_str",
+    "rank",
+    "dtype-struct",
+    "dtype-datetime",
+    "dtype-categorical",
+] }
+#polars-core = "*" # split_ca
 
 [profile.release]
 # https://doc.rust-lang.org/cargo/reference/profiles.html
