@@ -327,7 +327,8 @@ pub fn get_vec_type<T>(vec_opt_type: Vec<Option<T>>) -> Vec<T>
         .collect()
 }
 
-fn get_vec_of_vecf64(vec_opt_series: Vec<Option<Series>>) -> Result<Vec<Vec<f64>>, PolarsError> {
+#[allow(dead_code)]
+pub fn get_vec_of_vecf64(vec_opt_series: Vec<Option<Series>>) -> Result<Vec<Vec<f64>>, PolarsError> {
 
     // https://stackoverflow.com/questions/71376935/how-to-get-a-vec-from-polars-series-or-chunkedarray
 
@@ -351,6 +352,7 @@ fn get_vec_of_vecf64(vec_opt_series: Vec<Option<Series>>) -> Result<Vec<Vec<f64>
     Ok(vec)
 }
 
+#[allow(dead_code)]
 pub fn get_vec_of_vecu64(vec_opt_series: Vec<Option<Series>>) -> Result<Vec<Vec<u64>>, PolarsError> {
 
     // https://stackoverflow.com/questions/71376935/how-to-get-a-vec-from-polars-series-or-chunkedarray

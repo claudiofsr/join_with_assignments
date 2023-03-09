@@ -16,7 +16,6 @@ use join_with_assignments::{
     get_lazyframe_from_csv,
     datatype_to_f64,
     get_vec_type,
-    get_vec_of_vecu64,
     get_vec_of_tuples,
     munkres_assignments,
     formatar_chave_eletronica,
@@ -53,8 +52,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     //print_column_and_schema(dataframe_joinned.clone());
 
-    let vec_vec_tuples: Vec<Vec<(String, u64, u64)>> = get_vec_from_assignments(dataframe_joinned)?;
-    let df_correlation: DataFrame = make_df_correlation(vec_vec_tuples)?;
+    let vec_opt_vec_tuples: Vec<Option<Vec<(String, u64, u64)>>> = get_vec_from_assignments(dataframe_joinned)?;
+    let df_correlation: DataFrame = make_df_correlation(vec_opt_vec_tuples)?;
 
     let lf_c: LazyFrame = join_with_interline_correlations(lf_a, lf_b, df_correlation)?;
     let mut dfd_output: DataFrame = verificar_correlacao_entre_dataframes(lf_c)?;
@@ -200,21 +199,26 @@ fn join_lazyframes (lazyframe_a: LazyFrame, lazyframe_b: LazyFrame) -> Result<Da
                             {
                                 match (opt_series_efd, opt_series_nfe) {
                                     (Some(series_efd), Some(series_nfe)) => {
-                                        // Evitar o uso de unwrap()
-                                        let opt_chunkarray_f64_efd: Option<&ChunkedArray<Float64Type>> = series_efd.f64().ok();
-                                        let opt_chunkarray_f64_nfe: Option<&ChunkedArray<Float64Type>> = series_nfe.f64().ok();
 
-                                        match (opt_chunkarray_f64_efd, opt_chunkarray_f64_nfe) {
-                                            (Some(chunkarray_f64_efd), Some(chunkarray_f64_nfe)) => {
-                                                let vec_opt_f64_efd: Vec<Option<f64>> = chunkarray_f64_efd.into_iter().collect();
-                                                let vec_opt_f64_nfe: Vec<Option<f64>> = chunkarray_f64_nfe.into_iter().collect();
+                                        let result_chunckedarray_f64_efd: Result<&ChunkedArray<Float64Type>, PolarsError> = series_efd.f64();
+                                        let result_chunckedarray_f64_nfe: Result<&ChunkedArray<Float64Type>, PolarsError> = series_nfe.f64();
+
+                                        match (result_chunckedarray_f64_efd, result_chunckedarray_f64_nfe) {
+                                            (Ok(chunckedarray_f64_efd), Ok(chunckedarray_f64_nfe)) => {
+                                                let vec_opt_f64_efd: Vec<Option<f64>> = chunckedarray_f64_efd.into_iter().collect();
+                                                let vec_opt_f64_nfe: Vec<Option<f64>> = chunckedarray_f64_nfe.into_iter().collect();
 
                                                 let vec_float64_efd: Vec<f64> = get_vec_type(vec_opt_f64_efd);
                                                 let vec_float64_nfe: Vec<f64> = get_vec_type(vec_opt_f64_nfe);
 
                                                 Some(munkres_assignments(&vec_float64_efd, &vec_float64_nfe))
                                             },
-                                            _ => None,
+                                            _ => {
+                                                println!("Float64Type PolarsError!");
+                                                println!("series_efd: {series_efd:?}");
+                                                println!("series_nfe: {series_nfe:?}");
+                                                None
+                                            },
                                         }
                                     },
                                     _ => None,
@@ -247,43 +251,75 @@ fn print_column_and_schema (dataframe: DataFrame) {
 }
 
 #[allow(clippy::type_complexity)]
-fn get_vec_from_assignments (dataframe: DataFrame) -> Result<Vec<Vec<(String, u64, u64)>>, PolarsError> {
+fn get_vec_from_assignments (dataframe: DataFrame) -> Result<Vec<Option<Vec<(String, u64, u64)>>>, PolarsError> {
 
+    // Get columns from dataframe
     let column_chave_doc: &Series = dataframe.column("Chave do Documento")?;
     let column_lines_efd: &Series = dataframe.column("Linhas EFD")?;
     let column_lines_nfe: &Series = dataframe.column("Linhas NFE")?;
     let column_assignmen: &Series = dataframe.column("Munkres Assignments")?;
 
-    let vec_opt_chave_doc: Vec<Option<&str>>   = column_chave_doc.utf8()?.into_iter().collect();
-    let vec_opt_lines_efd: Vec<Option<Series>> = column_lines_efd.list()?.into_iter().collect();
-    let vec_opt_lines_nfe: Vec<Option<Series>> = column_lines_nfe.list()?.into_iter().collect();
-    let vec_opt_assignmen: Vec<Option<Series>> = column_assignmen.list()?.into_iter().collect();
-
-    let vec_chave_doc: Vec<&str>     = get_vec_type(vec_opt_chave_doc);
-    let vec_lines_efd: Vec<Vec<u64>> = get_vec_of_vecu64(vec_opt_lines_efd)?;
-    let vec_lines_nfe: Vec<Vec<u64>> = get_vec_of_vecu64(vec_opt_lines_nfe)?;
-    let vec_assignmen: Vec<Vec<u64>> = get_vec_of_vecu64(vec_opt_assignmen)?;
+    // Get rows from columns with into_iter()
+    let vec_opt_chave_doc:  Vec<Option<&str>>   = column_chave_doc.utf8()?.into_iter().collect();
+    let vec_opt_series_efd: Vec<Option<Series>> = column_lines_efd.list()?.into_iter().collect();
+    let vec_opt_series_nfe: Vec<Option<Series>> = column_lines_nfe.list()?.into_iter().collect();
+    let vec_opt_series_asg: Vec<Option<Series>> = column_assignmen.list()?.into_iter().collect();
 
     // https://docs.rs/rayon/latest/rayon/iter/struct.MultiZip.html
     // MultiZip is an iterator that zips up a tuple of parallel iterators to produce tuples of their items.
-    let vec_vec_tuples: Vec<Vec<(String, u64, u64)>> = (vec_chave_doc, vec_lines_efd, vec_lines_nfe, vec_assignmen)
+    let vec_opt_vec_tuples: Vec<Option<Vec<(String, u64, u64)>>> = (vec_opt_chave_doc, vec_opt_series_efd, vec_opt_series_nfe, vec_opt_series_asg)
         .into_par_iter() // rayon: parallel iterator
-        .map(|(chave_doc, lines_efd, lines_nfe, assignmen)| get_vec_of_tuples(chave_doc, &lines_efd, &lines_nfe, &assignmen))
+        .map(|(opt_chave_doc, opt_series_efd, opt_series_nfe, opt_series_asg)| 
+            {
+                match (opt_chave_doc, opt_series_efd, opt_series_nfe, opt_series_asg) {
+                    (Some(chave_doc), Some(series_efd), Some(series_nfe), Some(series_asg)) =>
+                        {
+                            let result_chunckedarray_u64_efd: Result<&ChunkedArray<UInt64Type>, PolarsError> = series_efd.u64();
+                            let result_chunckedarray_u64_nfe: Result<&ChunkedArray<UInt64Type>, PolarsError> = series_nfe.u64();
+                            let result_chunckedarray_u64_asg: Result<&ChunkedArray<UInt64Type>, PolarsError> = series_asg.u64();
+
+                            match (result_chunckedarray_u64_efd, result_chunckedarray_u64_nfe, result_chunckedarray_u64_asg) {
+                                (Ok(chunckedarray_u64_efd), Ok(chunckedarray_u64_nfe), Ok(chunckedarray_u64_asg)) => {
+
+                                    let vec_opt_u64_efd: Vec<Option<u64>> = chunckedarray_u64_efd.into_iter().collect();
+                                    let vec_opt_u64_nfe: Vec<Option<u64>> = chunckedarray_u64_nfe.into_iter().collect();
+                                    let vec_opt_u64_asg: Vec<Option<u64>> = chunckedarray_u64_asg.into_iter().collect();
+
+                                    let vec_float64_efd: Vec<u64> = get_vec_type(vec_opt_u64_efd);
+                                    let vec_float64_nfe: Vec<u64> = get_vec_type(vec_opt_u64_nfe);
+                                    let vec_float64_asg: Vec<u64> = get_vec_type(vec_opt_u64_asg);
+
+                                    Some(get_vec_of_tuples(chave_doc, &vec_float64_efd, &vec_float64_nfe, &vec_float64_asg))
+                                },
+                                _ => {
+                                    println!("UInt64Type PolarsError!");
+                                    println!("chave_doc: {chave_doc}");
+                                    println!("series_efd: {series_efd:?}");
+                                    println!("series_nfe: {series_nfe:?}");
+                                    println!("series_asg: {series_asg:?}");
+                                    None
+                                },
+                            }
+                        },
+                    _ => None
+                }
+            }
+        )
         .collect();
 
     drop(dataframe);
 
-    Ok(vec_vec_tuples)
+    Ok(vec_opt_vec_tuples)
 }
 
-fn make_df_correlation(vec_vec_tuples: Vec<Vec<(String, u64, u64)>>) -> Result<DataFrame, PolarsError> {
+fn make_df_correlation(vec_opt_vec_tuples:Vec<Option<Vec<(String, u64, u64)>>>) -> Result<DataFrame, PolarsError> {
 
     // Transform a vector of tuples into many vectors
     let mut col_chaves: Vec<String> = Vec::new();
     let mut col_lines_efd: Vec<u64> = Vec::new();
     let mut col_lines_nfe: Vec<u64> = Vec::new();
 
-    for vec_tuples in vec_vec_tuples {
+    for vec_tuples in vec_opt_vec_tuples.into_iter().flatten() {
         for (chave, line_efd, line_nfe) in vec_tuples {
             col_chaves.push(chave);
             col_lines_efd.push(line_efd);
