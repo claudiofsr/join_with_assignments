@@ -256,7 +256,8 @@ pub fn print_matrix(
 /* ---- final ---- */
 /* --- munkres --- */
 
-pub fn munkres_assignments(vec_a: Vec<f64>, vec_b: Vec<f64>) -> Series {
+/// Get Series of minimal Munkres Assignments from two f64 Slices
+pub fn munkres_assignments(vec_a: &[f64], vec_b: &[f64]) -> Series {
 
     let array_1: Vec<i128> = vec_a.iter().map(|&v| (v * 100.0).round() as i128).collect();
     let array_2: Vec<i128> = vec_b.iter().map(|&v| (v * 100.0).round() as i128).collect();
@@ -315,7 +316,18 @@ fn download_file_from_the_internet(url: &str, output_file: &str) {
 }
 */
 
-pub fn get_vec_of_vecf64(vec_opt_series: Vec<Option<Series>>) -> Result<Vec<Vec<f64>>, PolarsError> {
+/// Remove intermadiate Option
+pub fn get_vec_type<T>(vec_opt_type: Vec<Option<T>>) -> Vec<T> 
+    where T: std::default::Default
+{
+    vec_opt_type
+        //.into_no_null_iter() // if we are certain we don't have missing values
+        .into_iter()
+        .map(|opt_type| opt_type.unwrap_or_default())
+        .collect()
+}
+
+fn get_vec_of_vecf64(vec_opt_series: Vec<Option<Series>>) -> Result<Vec<Vec<f64>>, PolarsError> {
 
     // https://stackoverflow.com/questions/71376935/how-to-get-a-vec-from-polars-series-or-chunkedarray
 

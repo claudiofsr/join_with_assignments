@@ -15,7 +15,7 @@ use join_with_assignments::{
     clear_terminal_screen,
     get_lazyframe_from_csv,
     datatype_to_f64,
-    get_vec_of_vecf64,
+    get_vec_type,
     get_vec_of_vecu64,
     get_vec_of_tuples,
     munkres_assignments,
@@ -181,27 +181,37 @@ fn join_lazyframes (lazyframe_a: LazyFrame, lazyframe_b: LazyFrame) -> Result<Da
             ])
             .apply(
                 |s| {
-                    // downcast to struct
+                    // Downcast to struct
                     let struct_chunked: &StructChunked = s.struct_()?;
 
-                    // get the fields as Series
+                    // Get the fields as Series
                     let series_list_efd: &Series = &struct_chunked.field_by_name("Valores dos Itens da Nota Fiscal EFD")?;
                     let series_list_nfe: &Series = &struct_chunked.field_by_name("Valores dos Itens da Nota Fiscal NFE")?;
 
-                    let chunked_array_efd: &ChunkedArray<ListType> = series_list_efd.list()?;
-                    let chunked_array_nfe: &ChunkedArray<ListType> = series_list_nfe.list()?;
-
-                    let vec_opt_series_efd: Vec<Option<Series>> = chunked_array_efd.into_iter().collect();
-                    let vec_opt_series_nfe: Vec<Option<Series>> = chunked_array_nfe.into_iter().collect();
-
-                    let vec_vecf64_efd: Vec<Vec<f64>> = get_vec_of_vecf64(vec_opt_series_efd)?;
-                    let vec_vecf64_nfe: Vec<Vec<f64>> = get_vec_of_vecf64(vec_opt_series_nfe)?;
+                    // Get rows from columns with into_iter()
+                    let vec_opt_series_efd: Vec<Option<Series>> = series_list_efd.list()?.into_iter().collect();
+                    let vec_opt_series_nfe: Vec<Option<Series>> = series_list_nfe.list()?.into_iter().collect();
 
                     // https://docs.rs/rayon/latest/rayon/iter/struct.MultiZip.html
                     // MultiZip is an iterator that zips up a tuple of parallel iterators to produce tuples of their items.
-                    let vec_series: Vec<Series> = (vec_vecf64_efd, vec_vecf64_nfe)
+                    let vec_series: Vec<Option<Series>> = (vec_opt_series_efd, vec_opt_series_nfe)
                         .into_par_iter() // rayon: parallel iterator
-                        .map(|(vecf64_efd, vecf64_nfe)| munkres_assignments(vecf64_efd, vecf64_nfe))
+                        .map(|(opt_series_efd, opt_series_nfe)| 
+                            {
+                                match (opt_series_efd, opt_series_nfe) {
+                                    (Some(series_efd), Some(series_nfe)) => {
+                                        let vec_opt_f64_efd: Vec<Option<f64>> = series_efd.f64().unwrap().into_iter().collect();
+                                        let vec_float64_efd: Vec<f64> = get_vec_type(vec_opt_f64_efd);
+                                    
+                                        let vec_opt_f64_nfe: Vec<Option<f64>> = series_nfe.f64().unwrap().into_iter().collect();
+                                        let vec_float64_nfe: Vec<f64> = get_vec_type(vec_opt_f64_nfe);
+
+                                        Some(munkres_assignments(&vec_float64_efd, &vec_float64_nfe))
+                                    },
+                                    _ => None,
+                                }
+                            }
+                        )
                         .collect();
 
                     let new_series = Series::new("New", vec_series);
@@ -240,7 +250,7 @@ fn get_vec_from_assignments (dataframe: DataFrame) -> Result<Vec<Vec<(String, u6
     let vec_opt_lines_nfe: Vec<Option<Series>> = column_lines_nfe.list()?.into_iter().collect();
     let vec_opt_assignmen: Vec<Option<Series>> = column_assignmen.list()?.into_iter().collect();
 
-    let vec_chave_doc: Vec<&str>     = vec_opt_chave_doc.iter().map(|&opt_str| opt_str.unwrap()).collect();
+    let vec_chave_doc: Vec<&str>     = get_vec_type(vec_opt_chave_doc);
     let vec_lines_efd: Vec<Vec<u64>> = get_vec_of_vecu64(vec_opt_lines_efd)?;
     let vec_lines_nfe: Vec<Vec<u64>> = get_vec_of_vecu64(vec_opt_lines_nfe)?;
     let vec_assignmen: Vec<Vec<u64>> = get_vec_of_vecu64(vec_opt_assignmen)?;
