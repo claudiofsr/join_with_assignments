@@ -14,7 +14,7 @@ use join_with_assignments::{
     Config,
     clear_terminal_screen,
     get_lazyframe_from_csv,
-    datatype_to_f64,
+    round_series,
     get_vec_type,
     get_vec_of_tuples,
     munkres_assignments,
@@ -94,7 +94,7 @@ fn format_fazyframe_a (lazyframe: LazyFrame) -> LazyFrame {
     )
     .with_column(
         col("Valor Total do Item")
-        .apply(|series| datatype_to_f64(series, 2), GetOutput::from_type(DataType::Float64))
+        .apply(|series| round_series(series, 2), GetOutput::from_type(DataType::Float64))
     )
 }
 
@@ -110,11 +110,11 @@ fn format_fazyframe_b (lazyframe: LazyFrame) -> LazyFrame {
     )
     .with_column(
         col("Valor da Nota Proporcional : NF Item (Todos) SOMA")
-        .apply(|series| datatype_to_f64(series, 2), GetOutput::from_type(DataType::Float64))
+        .apply(|series| round_series(series, 2), GetOutput::from_type(DataType::Float64))
     )
     .with_column(
         col("ICMS: Base de Cálculo : NF Item (Todos) SOMA")
-        .apply(|series| datatype_to_f64(series, 2), GetOutput::from_type(DataType::Float64))
+        .apply(|series| round_series(series, 2), GetOutput::from_type(DataType::Float64))
     )
 }
 

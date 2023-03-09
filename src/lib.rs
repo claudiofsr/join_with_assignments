@@ -574,11 +574,11 @@ fn read_pqt(output_path: &str) -> Result<DataFrame, PolarsError> {
     Ok(df_parquet)
 }
 
-pub fn datatype_to_f64(series: Series, decimals: u32) -> Result<Option<Series>, PolarsError> {
+pub fn round_series(series: Series, decimals: u32) -> Result<Option<Series>, PolarsError> {
 
     let result_option_series = match series.dtype() {
-        DataType::Float64 => Ok(Some(round_series_f64(series, decimals))),
-        DataType::Utf8    => Ok(Some(utf8_to_f64(series, decimals))),
+        DataType::Float64 => Ok(Some(round_series_float64(series, decimals))),
+        DataType::Utf8    => Ok(Some(round_series_utf8(series, decimals))),
         _ => Err(PolarsError::InvalidOperation(
             format!(
                 "Not supported for Series with dtype {:?}",
@@ -591,7 +591,7 @@ pub fn datatype_to_f64(series: Series, decimals: u32) -> Result<Option<Series>, 
     result_option_series
 }
 
-fn round_series_f64(series: Series, decimals: u32) -> Series {
+fn round_series_float64(series: Series, decimals: u32) -> Series {
 
     let chunked_array: &ChunkedArray<Float64Type> = series.f64().unwrap();
 
@@ -609,7 +609,7 @@ fn round_series_f64(series: Series, decimals: u32) -> Series {
     series
 }
 
-fn utf8_to_f64(series: Series, decimals: u32) -> Series {
+fn round_series_utf8(series: Series, decimals: u32) -> Series {
 
     let series_formatted: Series = series
         .utf8()
@@ -628,7 +628,7 @@ fn utf8_to_f64(series: Series, decimals: u32) -> Series {
                     match result {
                         Ok(float) => round_f64(float, decimals),
                         Err(why) => {
-                            println!("fn utf8_to_f64()");
+                            println!("fn round_series_utf8()");
                             println!("Error parse f64: {why}");
                             process::exit(1)
                         }
@@ -763,7 +763,7 @@ pub fn df_multiple_values() -> Result<(), Box<dyn Error>> {
         .map(|opt_series|
             opt_series
             .as_ref()
-            .map(|series| datatype_to_f64(series.clone(), 1).unwrap())
+            .map(|series| round_series(series.clone(), 1).unwrap())
             .unwrap()
         )
         .collect();
