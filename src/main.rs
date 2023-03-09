@@ -23,6 +23,8 @@ use join_with_assignments::{
     write_pqt,
 };
 
+type VecTuples = Vec<(String, u64, u64)>;
+
 fn main() -> Result<(), Box<dyn Error>> {
 
     configure_the_environment();
@@ -52,7 +54,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     //print_column_and_schema(dataframe_joinned.clone());
 
-    let vec_opt_vec_tuples: Vec<Option<Vec<(String, u64, u64)>>> = get_vec_from_assignments(dataframe_joinned)?;
+    let vec_opt_vec_tuples: Vec<Option<VecTuples>> = get_vec_from_assignments(dataframe_joinned)?;
     let df_correlation: DataFrame = make_df_correlation(vec_opt_vec_tuples)?;
 
     let lf_c: LazyFrame = join_with_interline_correlations(lf_a, lf_b, df_correlation)?;
@@ -250,8 +252,7 @@ fn print_column_and_schema (dataframe: DataFrame) {
     println!("schema: {schema:#?}");
 }
 
-#[allow(clippy::type_complexity)]
-fn get_vec_from_assignments (dataframe: DataFrame) -> Result<Vec<Option<Vec<(String, u64, u64)>>>, PolarsError> {
+fn get_vec_from_assignments (dataframe: DataFrame) -> Result<Vec<Option<VecTuples>>, PolarsError> {
 
     // Get columns from dataframe
     let column_chave_doc: &Series = dataframe.column("Chave do Documento")?;
@@ -267,7 +268,7 @@ fn get_vec_from_assignments (dataframe: DataFrame) -> Result<Vec<Option<Vec<(Str
 
     // https://docs.rs/rayon/latest/rayon/iter/struct.MultiZip.html
     // MultiZip is an iterator that zips up a tuple of parallel iterators to produce tuples of their items.
-    let vec_opt_vec_tuples: Vec<Option<Vec<(String, u64, u64)>>> = (vec_opt_chave_doc, vec_opt_series_efd, vec_opt_series_nfe, vec_opt_series_asg)
+    let vec_opt_vec_tuples: Vec<Option<VecTuples>> = (vec_opt_chave_doc, vec_opt_series_efd, vec_opt_series_nfe, vec_opt_series_asg)
         .into_par_iter() // rayon: parallel iterator
         .map(|(opt_chave_doc, opt_series_efd, opt_series_nfe, opt_series_asg)| 
             {
@@ -312,7 +313,7 @@ fn get_vec_from_assignments (dataframe: DataFrame) -> Result<Vec<Option<Vec<(Str
     Ok(vec_opt_vec_tuples)
 }
 
-fn make_df_correlation(vec_opt_vec_tuples:Vec<Option<Vec<(String, u64, u64)>>>) -> Result<DataFrame, PolarsError> {
+fn make_df_correlation(vec_opt_vec_tuples:Vec<Option<VecTuples>>) -> Result<DataFrame, PolarsError> {
 
     // Transform a vector of tuples into many vectors
     let mut col_chaves: Vec<String> = Vec::new();
