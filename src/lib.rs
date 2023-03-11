@@ -28,6 +28,7 @@ use std::{
     process::Command,
 };
 
+pub type VecTuples = Vec<(String, u64, u64)>;
 
 #[derive(Default, Debug, Clone)]
 pub struct Config {
@@ -271,8 +272,34 @@ pub fn print_matrix(
 /* ---- final ---- */
 /* --- munkres --- */
 
+pub fn get_option_assignments(series_efd: Series, series_nfe: Series) -> Option<Series> {
+
+    let result_chunckedarray_f64_efd: Result<&ChunkedArray<Float64Type>, PolarsError> = series_efd.f64();
+    let result_chunckedarray_f64_nfe: Result<&ChunkedArray<Float64Type>, PolarsError> = series_nfe.f64();
+
+    match (result_chunckedarray_f64_efd, result_chunckedarray_f64_nfe) {
+        (Ok(chunckedarray_f64_efd), Ok(chunckedarray_f64_nfe)) => {
+            let vec_opt_f64_efd: Vec<Option<f64>> = chunckedarray_f64_efd.into_iter().collect();
+            let vec_opt_f64_nfe: Vec<Option<f64>> = chunckedarray_f64_nfe.into_iter().collect();
+
+            let vec_float64_efd: Vec<f64> = get_vec_type(vec_opt_f64_efd);
+            let vec_float64_nfe: Vec<f64> = get_vec_type(vec_opt_f64_nfe);
+
+            let vec_assignments: Vec<u64> = munkres_assignments(&vec_float64_efd, &vec_float64_nfe);
+
+            Some(Series::new("New", vec_assignments))
+        },
+        _ => {
+            println!("Float64Type PolarsError!");
+            println!("series_efd.dtype(): {} ; series_efd: {series_efd:?}", series_efd.dtype());
+            println!("series_nfe.dtype(): {} ; series_nfe: {series_nfe:?}", series_nfe.dtype());
+            None
+        },
+    }
+}
+
 /// Get Series of minimal Munkres Assignments from two f64 Slices
-pub fn munkres_assignments(vec_a: &[f64], vec_b: &[f64]) -> Series {
+fn munkres_assignments(vec_a: &[f64], vec_b: &[f64]) -> Vec<u64> {
 
     let array_1: Vec<i128> = vec_a.iter().map(|&v| (v * 100.0).round() as i128).collect();
     let array_2: Vec<i128> = vec_b.iter().map(|&v| (v * 100.0).round() as i128).collect();
@@ -294,9 +321,65 @@ pub fn munkres_assignments(vec_a: &[f64], vec_b: &[f64]) -> Series {
     //print_matrix(width, &matrix[..], &array_1, &array_2, &assignments, true);
 
     // convert Vec<usize> to Vec<u64>
-    let assignments_u64: Vec<u64> = assignments.iter().map(|&val| u64::try_from(val).unwrap() ).collect();
+    let assignments_u64: Vec<u64> = assignments
+        .iter()
+        .map(|&val| u64::try_from(val).unwrap())
+        .collect();
 
-    Series::new("New", assignments_u64)
+    assignments_u64
+}
+
+pub fn get_opt_vectuples(chave_doc: &str, series_efd: Series, series_nfe: Series, series_asg: Series) -> Option<VecTuples> {
+
+    let result_chunckedarray_u64_efd: Result<&ChunkedArray<UInt64Type>, PolarsError> = series_efd.u64();
+    let result_chunckedarray_u64_nfe: Result<&ChunkedArray<UInt64Type>, PolarsError> = series_nfe.u64();
+    let result_chunckedarray_u64_asg: Result<&ChunkedArray<UInt64Type>, PolarsError> = series_asg.u64();
+
+    match (result_chunckedarray_u64_efd, result_chunckedarray_u64_nfe, result_chunckedarray_u64_asg) {
+        (Ok(chunckedarray_u64_efd), Ok(chunckedarray_u64_nfe), Ok(chunckedarray_u64_asg)) => {
+
+            let vec_opt_u64_efd: Vec<Option<u64>> = chunckedarray_u64_efd.into_iter().collect();
+            let vec_opt_u64_nfe: Vec<Option<u64>> = chunckedarray_u64_nfe.into_iter().collect();
+            let vec_opt_u64_asg: Vec<Option<u64>> = chunckedarray_u64_asg.into_iter().collect();
+
+            let vec_float64_efd: Vec<u64> = get_vec_type(vec_opt_u64_efd);
+            let vec_float64_nfe: Vec<u64> = get_vec_type(vec_opt_u64_nfe);
+            let vec_float64_asg: Vec<u64> = get_vec_type(vec_opt_u64_asg);
+
+            line_assignments(chave_doc, &vec_float64_efd, &vec_float64_nfe, &vec_float64_asg)
+        },
+        _ => {
+            println!("UInt64Type PolarsError!");
+            println!("chave_doc: {chave_doc}");
+            println!("series_efd.dtype(): {} ; series_efd: {series_efd:?}", series_efd.dtype());
+            println!("series_nfe.dtype(): {} ; series_nfe: {series_nfe:?}", series_nfe.dtype());
+            println!("series_asg.dtype(): {} ; series_asg: {series_asg:?}", series_asg.dtype());
+            None
+        },
+    }
+}
+
+fn line_assignments(chave_doc: &str, slice_lines_efd: &[u64], slice_lines_nfe: &[u64], assignments: &[u64]) -> Option<VecTuples> {
+
+    let mut chaves_valores_itens: VecTuples = Vec::new();
+
+    for (row, &col) in assignments.iter().enumerate() {
+
+        let opt_line_efd: Option<&u64> = slice_lines_efd.get(row);
+        let opt_line_nfe: Option<&u64> = slice_lines_nfe.get(col as usize);
+
+        if let (Some(&line_efd), Some(&line_nfe)) = (opt_line_efd, opt_line_nfe) {
+            let tuple: (String, u64, u64) = (chave_doc.to_string(), line_efd, line_nfe);
+            //println!("row: {row} ; tuple: {tuple:?}");
+            chaves_valores_itens.push(tuple);
+        }
+    }
+
+    if chaves_valores_itens.is_empty() {
+        None
+    } else {
+        Some(chaves_valores_itens)
+    }
 }
 
 /*
@@ -340,25 +423,6 @@ pub fn get_vec_type<T>(vec_opt_type: Vec<Option<T>>) -> Vec<T>
         .into_iter()
         .map(|opt_type| opt_type.unwrap_or_default())
         .collect()
-}
-
-pub fn get_vec_of_tuples(chave_doc: &str, slice_lines_efd: &[u64], slice_lines_nfe: &[u64], assignments: &[u64]) -> Vec<(String, u64, u64)> {
-
-    let mut chaves_valores_itens: Vec<(String, u64, u64)> = Vec::new();
-
-    for (row, &col) in assignments.iter().enumerate() {
-
-        let opt_line_efd: Option<&u64> = slice_lines_efd.get(row);
-        let opt_line_nfe: Option<&u64> = slice_lines_nfe.get(col as usize);
-
-        if let (Some(&line_efd), Some(&line_nfe)) = (opt_line_efd, opt_line_nfe) {
-            let tuple: (String, u64, u64) = (chave_doc.to_string(), line_efd, line_nfe);
-            //println!("row: {row} ; tuple: {tuple:?}");
-            chaves_valores_itens.push(tuple);
-        }
-    }
-
-    chaves_valores_itens
 }
 
 #[allow(dead_code)]

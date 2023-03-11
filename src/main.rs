@@ -11,18 +11,16 @@ use std::{
 
 use join_with_assignments::{
     Config,
+    VecTuples,
     clear_terminal_screen,
     get_lazyframe_from_csv,
     round_series,
-    get_vec_type,
-    get_vec_of_tuples,
-    munkres_assignments,
+    get_opt_vectuples,
+    get_option_assignments,
     formatar_chave_eletronica,
     write_csv,
     write_pqt,
 };
-
-type VecTuples = Vec<(String, u64, u64)>;
 
 fn main() -> Result<(), Box<dyn Error>> {
 
@@ -196,36 +194,14 @@ fn join_lazyframes (lazyframe_a: LazyFrame, lazyframe_b: LazyFrame) -> Result<Da
                     // MultiZip is an iterator that zips up a tuple of parallel iterators to produce tuples of their items.
                     let vec_series: Vec<Option<Series>> = (vec_opt_series_efd, vec_opt_series_nfe)
                         .into_par_iter() // rayon: parallel iterator
-                        .map(|(opt_series_efd, opt_series_nfe)| 
-                            {
-                                match (opt_series_efd, opt_series_nfe) {
-                                    (Some(series_efd), Some(series_nfe)) => {
-
-                                        let result_chunckedarray_f64_efd: Result<&ChunkedArray<Float64Type>, PolarsError> = series_efd.f64();
-                                        let result_chunckedarray_f64_nfe: Result<&ChunkedArray<Float64Type>, PolarsError> = series_nfe.f64();
-
-                                        match (result_chunckedarray_f64_efd, result_chunckedarray_f64_nfe) {
-                                            (Ok(chunckedarray_f64_efd), Ok(chunckedarray_f64_nfe)) => {
-                                                let vec_opt_f64_efd: Vec<Option<f64>> = chunckedarray_f64_efd.into_iter().collect();
-                                                let vec_opt_f64_nfe: Vec<Option<f64>> = chunckedarray_f64_nfe.into_iter().collect();
-
-                                                let vec_float64_efd: Vec<f64> = get_vec_type(vec_opt_f64_efd);
-                                                let vec_float64_nfe: Vec<f64> = get_vec_type(vec_opt_f64_nfe);
-
-                                                Some(munkres_assignments(&vec_float64_efd, &vec_float64_nfe))
-                                            },
-                                            _ => {
-                                                println!("Float64Type PolarsError!");
-                                                println!("series_efd.dtype(): {} ; series_efd: {series_efd:?}", series_efd.dtype());
-                                                println!("series_nfe.dtype(): {} ; series_nfe: {series_nfe:?}", series_nfe.dtype());
-                                                None
-                                            },
-                                        }
-                                    },
-                                    _ => None,
-                                }
+                        .map(|(opt_series_efd, opt_series_nfe)| {
+                            match (opt_series_efd, opt_series_nfe) {
+                                (Some(series_efd), Some(series_nfe)) => {
+                                    get_option_assignments(series_efd, series_nfe)
+                                },
+                                _ => None,
                             }
-                        )
+                        })
                         .collect();
 
                     let new_series = Series::new("New", vec_series);
@@ -269,42 +245,14 @@ fn get_vec_from_assignments (dataframe: DataFrame) -> Result<Vec<Option<VecTuple
     // MultiZip is an iterator that zips up a tuple of parallel iterators to produce tuples of their items.
     let vec_opt_vec_tuples: Vec<Option<VecTuples>> = (vec_opt_chave_doc, vec_opt_series_efd, vec_opt_series_nfe, vec_opt_series_asg)
         .into_par_iter() // rayon: parallel iterator
-        .map(|(opt_chave_doc, opt_series_efd, opt_series_nfe, opt_series_asg)| 
-            {
-                match (opt_chave_doc, opt_series_efd, opt_series_nfe, opt_series_asg) {
-                    (Some(chave_doc), Some(series_efd), Some(series_nfe), Some(series_asg)) =>
-                        {
-                            let result_chunckedarray_u64_efd: Result<&ChunkedArray<UInt64Type>, PolarsError> = series_efd.u64();
-                            let result_chunckedarray_u64_nfe: Result<&ChunkedArray<UInt64Type>, PolarsError> = series_nfe.u64();
-                            let result_chunckedarray_u64_asg: Result<&ChunkedArray<UInt64Type>, PolarsError> = series_asg.u64();
-
-                            match (result_chunckedarray_u64_efd, result_chunckedarray_u64_nfe, result_chunckedarray_u64_asg) {
-                                (Ok(chunckedarray_u64_efd), Ok(chunckedarray_u64_nfe), Ok(chunckedarray_u64_asg)) => {
-
-                                    let vec_opt_u64_efd: Vec<Option<u64>> = chunckedarray_u64_efd.into_iter().collect();
-                                    let vec_opt_u64_nfe: Vec<Option<u64>> = chunckedarray_u64_nfe.into_iter().collect();
-                                    let vec_opt_u64_asg: Vec<Option<u64>> = chunckedarray_u64_asg.into_iter().collect();
-
-                                    let vec_float64_efd: Vec<u64> = get_vec_type(vec_opt_u64_efd);
-                                    let vec_float64_nfe: Vec<u64> = get_vec_type(vec_opt_u64_nfe);
-                                    let vec_float64_asg: Vec<u64> = get_vec_type(vec_opt_u64_asg);
-
-                                    Some(get_vec_of_tuples(chave_doc, &vec_float64_efd, &vec_float64_nfe, &vec_float64_asg))
-                                },
-                                _ => {
-                                    println!("UInt64Type PolarsError!");
-                                    println!("chave_doc: {chave_doc}");
-                                    println!("series_efd: {series_efd:?}");
-                                    println!("series_nfe: {series_nfe:?}");
-                                    println!("series_asg: {series_asg:?}");
-                                    None
-                                },
-                            }
-                        },
-                    _ => None
-                }
+        .map(|(opt_chave_doc, opt_series_efd, opt_series_nfe, opt_series_asg)| {
+            match (opt_chave_doc, opt_series_efd, opt_series_nfe, opt_series_asg) {
+                (Some(chave_doc), Some(series_efd), Some(series_nfe), Some(series_asg)) => {
+                    get_opt_vectuples(chave_doc, series_efd, series_nfe, series_asg)
+                },
+                _ => None
             }
-        )
+        })
         .collect();
 
     drop(dataframe);
