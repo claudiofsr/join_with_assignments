@@ -361,7 +361,7 @@ pub fn get_opt_vectuples(chave_doc: &str, series_efd: Series, series_nfe: Series
 
 fn line_assignments(chave_doc: &str, slice_lines_efd: &[u64], slice_lines_nfe: &[u64], assignments: &[u64]) -> Option<VecTuples> {
 
-    let mut chaves_valores_itens: VecTuples = Vec::new();
+    let mut chaves_com_linhas_correlacionadas: VecTuples = Vec::new();
 
     for (row, &col) in assignments.iter().enumerate() {
 
@@ -371,14 +371,14 @@ fn line_assignments(chave_doc: &str, slice_lines_efd: &[u64], slice_lines_nfe: &
         if let (Some(&line_efd), Some(&line_nfe)) = (opt_line_efd, opt_line_nfe) {
             let tuple: (String, u64, u64) = (chave_doc.to_string(), line_efd, line_nfe);
             //println!("row: {row} ; tuple: {tuple:?}");
-            chaves_valores_itens.push(tuple);
+            chaves_com_linhas_correlacionadas.push(tuple);
         }
     }
 
-    if chaves_valores_itens.is_empty() {
+    if chaves_com_linhas_correlacionadas.is_empty() {
         None
     } else {
-        Some(chaves_valores_itens)
+        Some(chaves_com_linhas_correlacionadas)
     }
 }
 

@@ -55,7 +55,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let df_correlation: DataFrame = make_df_correlation(vec_opt_vec_tuples)?;
 
     let lf_c: LazyFrame = join_with_interline_correlations(lf_a, lf_b, df_correlation)?;
-    let mut dfd_output: DataFrame = verificar_correlacao_entre_dataframes(lf_c)?;
+    let mut dfd_output: DataFrame = check_correlation_between_dataframes(lf_c)?;
 
     //println!("dfd_output:\n{dfd_output}\n");
     write_csv(&mut dfd_output, ';', "output.csv")?;
@@ -183,22 +183,20 @@ fn join_lazyframes (lazyframe_a: LazyFrame, lazyframe_b: LazyFrame) -> Result<Da
                     let struct_chunked: &StructChunked = s.struct_()?;
 
                     // Get the fields as Series
-                    let series_list_efd: &Series = &struct_chunked.field_by_name("Valores dos Itens da Nota Fiscal EFD")?;
-                    let series_list_nfe: &Series = &struct_chunked.field_by_name("Valores dos Itens da Nota Fiscal NFE")?;
+                    let ser_list_efd: &Series = &struct_chunked.field_by_name("Valores dos Itens da Nota Fiscal EFD")?;
+                    let ser_list_nfe: &Series = &struct_chunked.field_by_name("Valores dos Itens da Nota Fiscal NFE")?;
 
                     // Get rows from columns with into_iter()
-                    let vec_opt_series_efd: Vec<Option<Series>> = series_list_efd.list()?.into_iter().collect();
-                    let vec_opt_series_nfe: Vec<Option<Series>> = series_list_nfe.list()?.into_iter().collect();
+                    let vec_opt_ser_efd: Vec<Option<Series>> = ser_list_efd.list()?.into_iter().collect();
+                    let vec_opt_ser_nfe: Vec<Option<Series>> = ser_list_nfe.list()?.into_iter().collect();
 
                     // https://docs.rs/rayon/latest/rayon/iter/struct.MultiZip.html
                     // MultiZip is an iterator that zips up a tuple of parallel iterators to produce tuples of their items.
-                    let vec_series: Vec<Option<Series>> = (vec_opt_series_efd, vec_opt_series_nfe)
+                    let vec_series: Vec<Option<Series>> = (vec_opt_ser_efd, vec_opt_ser_nfe)
                         .into_par_iter() // rayon: parallel iterator
-                        .map(|(opt_series_efd, opt_series_nfe)| {
-                            match (opt_series_efd, opt_series_nfe) {
-                                (Some(series_efd), Some(series_nfe)) => {
-                                    get_option_assignments(series_efd, series_nfe)
-                                },
+                        .map(|(opt_ser_efd, opt_ser_nfe)| {
+                            match (opt_ser_efd, opt_ser_nfe) {
+                                (Some(ser_efd), Some(ser_nfe)) => get_option_assignments(ser_efd, ser_nfe),
                                 _ => None,
                             }
                         })
@@ -236,20 +234,18 @@ fn get_vec_from_assignments (dataframe: DataFrame) -> Result<Vec<Option<VecTuple
     let column_assignmen: &Series = dataframe.column("Munkres Assignments")?;
 
     // Get rows from columns with into_iter()
-    let vec_opt_chave_doc:  Vec<Option<&str>>   = column_chave_doc.utf8()?.into_iter().collect();
-    let vec_opt_series_efd: Vec<Option<Series>> = column_lines_efd.list()?.into_iter().collect();
-    let vec_opt_series_nfe: Vec<Option<Series>> = column_lines_nfe.list()?.into_iter().collect();
-    let vec_opt_series_asg: Vec<Option<Series>> = column_assignmen.list()?.into_iter().collect();
+    let vec_opt_chave_doc: Vec<Option<&str>> = column_chave_doc.utf8()?.into_iter().collect();
+    let vec_opt_ser_efd: Vec<Option<Series>> = column_lines_efd.list()?.into_iter().collect();
+    let vec_opt_ser_nfe: Vec<Option<Series>> = column_lines_nfe.list()?.into_iter().collect();
+    let vec_opt_ser_asg: Vec<Option<Series>> = column_assignmen.list()?.into_iter().collect();
 
     // https://docs.rs/rayon/latest/rayon/iter/struct.MultiZip.html
     // MultiZip is an iterator that zips up a tuple of parallel iterators to produce tuples of their items.
-    let vec_opt_vec_tuples: Vec<Option<VecTuples>> = (vec_opt_chave_doc, vec_opt_series_efd, vec_opt_series_nfe, vec_opt_series_asg)
+    let vec_opt_vec_tuples: Vec<Option<VecTuples>> = (vec_opt_chave_doc, vec_opt_ser_efd, vec_opt_ser_nfe, vec_opt_ser_asg)
         .into_par_iter() // rayon: parallel iterator
-        .map(|(opt_chave_doc, opt_series_efd, opt_series_nfe, opt_series_asg)| {
-            match (opt_chave_doc, opt_series_efd, opt_series_nfe, opt_series_asg) {
-                (Some(chave_doc), Some(series_efd), Some(series_nfe), Some(series_asg)) => {
-                    get_opt_vectuples(chave_doc, series_efd, series_nfe, series_asg)
-                },
+        .map(|(opt_chave_doc, opt_ser_efd, opt_ser_nfe, opt_ser_asg)| {
+            match (opt_chave_doc, opt_ser_efd, opt_ser_nfe, opt_ser_asg) {
+                (Some(chave_doc), Some(ser_efd), Some(ser_nfe), Some(ser_asg)) => get_opt_vectuples(chave_doc, ser_efd, ser_nfe, ser_asg),
                 _ => None
             }
         })
@@ -323,7 +319,7 @@ fn join_with_interline_correlations (lf_a: LazyFrame, lf_b: LazyFrame, df_correl
     Ok(lf_c)
 }
 
-fn verificar_correlacao_entre_dataframes (lazyframe: LazyFrame) -> Result<DataFrame, PolarsError> {
+fn check_correlation_between_dataframes (lazyframe: LazyFrame) -> Result<DataFrame, PolarsError> {
 
     let coluna_deverificacao = "Verificação dos Valores: EFD x Docs Fiscais";
     let valor_do_item_da_efd = "Valor Total do Item";
