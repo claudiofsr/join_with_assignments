@@ -66,6 +66,44 @@ impl Config {
     }
 }
 
+// https://doc.rust-lang.org/rust-by-example/error/multiple_error_types/define_error_type.html
+#[derive(Debug, PartialEq)]
+pub struct MyError;
+impl fmt::Display for MyError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "found None value!")
+    }
+}
+
+/// flatten_all removes the intermediate Option and displays error messages if None.
+/// Another alternative is to use .into_iter().flatten(), but without error messages.
+pub fn flatten_all<T>(vec_opt_type: Vec<Option<T>>) -> Result<Vec<T>, MyError>
+    where T: default::Default + fmt::Debug + ?Sized
+{
+    let result_vec: Result<Vec<T>, MyError> = vec_opt_type
+        .into_iter()
+        .map(get_type)
+        .collect();
+
+    result_vec
+}
+
+// https://stackoverflow.com/questions/26368288/how-do-i-stop-iteration-and-return-an-error-when-iteratormap-returns-a-result
+fn get_type<T>(opt_type: Option<T>) -> Result<T, MyError> 
+    where T: default::Default + fmt::Debug + ?Sized
+{
+    match opt_type {
+        Some(value) => Ok(value),
+        None => {
+            let generic_type_name: &str = any::type_name::<T>();
+            println!("\n\tError when executing function flatten_all().");
+            println!("\tAll values are expected to be Some({generic_type_name}).");
+            println!("\tBut at least one value was None!\n");
+            Err(MyError)
+        },
+    }
+}
+
 pub fn clear_terminal_screen() {
     if cfg!(target_os = "windows") {
         Command::new("cls").status().unwrap();
@@ -425,44 +463,6 @@ fn download_file_from_the_internet(url: &str, output_file: &str) {
     println!("download '{output_file}' from '{url}'.");
 }
 */
-
-// https://doc.rust-lang.org/rust-by-example/error/multiple_error_types/define_error_type.html
-#[derive(Debug, Clone, PartialEq)]
-pub struct MyError;
-impl fmt::Display for MyError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "found None value!")
-    }
-}
-
-/// flatten_all removes the intermediate option and displays error messages if None.
-/// Another alternative is to use .into_iter().flatten(), but without error messages.
-pub fn flatten_all<T>(vec_opt_type: Vec<Option<T>>) -> Result<Vec<T>, MyError>
-    where T: default::Default + fmt::Debug + ?Sized
-{
-    let result_vec: Result<Vec<T>, MyError> = vec_opt_type
-        .into_iter()
-        .map(get_type)
-        .collect();
-
-    result_vec
-}
-
-// https://stackoverflow.com/questions/26368288/how-do-i-stop-iteration-and-return-an-error-when-iteratormap-returns-a-result
-fn get_type<T>(opt_type: Option<T>) -> Result<T, MyError> 
-    where T: default::Default + fmt::Debug + ?Sized
-{
-    match opt_type {
-        Some(value) => Ok(value),
-        None => {
-            let generic_type_name: &str = any::type_name::<T>();
-            println!("\n\tError when executing function flatten_all().");
-            println!("\tAll values are expected to be Some({generic_type_name}).");
-            println!("\tBut at least one value was None!\n");
-            Err(MyError)
-        },
-    }
-}
 
 #[allow(dead_code)]
 fn make_schema(side: &str) -> Schema {
