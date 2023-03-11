@@ -282,12 +282,16 @@ pub fn get_option_assignments(series_efd: Series, series_nfe: Series) -> Option<
             let vec_opt_f64_efd: Vec<Option<f64>> = chunckedarray_f64_efd.into_iter().collect();
             let vec_opt_f64_nfe: Vec<Option<f64>> = chunckedarray_f64_nfe.into_iter().collect();
 
-            let vec_float64_efd: Vec<f64> = get_vec_type(vec_opt_f64_efd).unwrap();
-            let vec_float64_nfe: Vec<f64> = get_vec_type(vec_opt_f64_nfe).unwrap();
+            let result_vec_float64_efd: Result<Vec<f64>, String> = flatten_all(vec_opt_f64_efd);
+            let result_vec_float64_nfe: Result<Vec<f64>, String> = flatten_all(vec_opt_f64_nfe);
 
-            let vec_assignments: Vec<u64> = munkres_assignments(&vec_float64_efd, &vec_float64_nfe);
-
-            Some(Series::new("New", vec_assignments))
+            match (result_vec_float64_efd, result_vec_float64_nfe) {
+                (Ok(vec_float64_efd), Ok(vec_float64_nfe)) => {
+                    let vec_assignments: Vec<u64> = munkres_assignments(&vec_float64_efd, &vec_float64_nfe);
+                    Some(Series::new("New", vec_assignments))
+                },
+                _ => None,
+            }
         },
         _ => {
             println!("Float64Type PolarsError!");
@@ -342,11 +346,16 @@ pub fn get_opt_vectuples(chave_doc: &str, series_efd: Series, series_nfe: Series
             let vec_opt_u64_nfe: Vec<Option<u64>> = chunckedarray_u64_nfe.into_iter().collect();
             let vec_opt_u64_asg: Vec<Option<u64>> = chunckedarray_u64_asg.into_iter().collect();
 
-            let vec_float64_efd: Vec<u64> = get_vec_type(vec_opt_u64_efd).unwrap();
-            let vec_float64_nfe: Vec<u64> = get_vec_type(vec_opt_u64_nfe).unwrap();
-            let vec_float64_asg: Vec<u64> = get_vec_type(vec_opt_u64_asg).unwrap();
+            let result_vec_u64_efd: Result<Vec<u64>, String> = flatten_all(vec_opt_u64_efd);
+            let result_vec_u64_nfe: Result<Vec<u64>, String> = flatten_all(vec_opt_u64_nfe);
+            let result_vec_u64_asg: Result<Vec<u64>, String> = flatten_all(vec_opt_u64_asg);
 
-            line_assignments(chave_doc, &vec_float64_efd, &vec_float64_nfe, &vec_float64_asg)
+            match (result_vec_u64_efd, result_vec_u64_nfe, result_vec_u64_asg) {
+                (Ok(vec_u64_efd), Ok(vec_u64_nfe), Ok(vec_u64_asg)) => {
+                    line_assignments(chave_doc, &vec_u64_efd, &vec_u64_nfe, &vec_u64_asg)
+                },
+                _ => None,
+            }
         },
         _ => {
             println!("UInt64Type PolarsError!");
@@ -414,17 +423,17 @@ fn download_file_from_the_internet(url: &str, output_file: &str) {
 }
 */
 
-/// get_vec_type removes the intermediate option and displays error messages if None.
+/// flatten_all removes the intermediate option and displays error messages if None.
 /// Another alternative is to use .into_iter().flatten(), but without error messages.
-pub fn get_vec_type<T>(vec_opt_type: Vec<Option<T>>) -> Result<Vec<T>, String>
+pub fn flatten_all<T>(vec_opt_type: Vec<Option<T>>) -> Result<Vec<T>, String>
     where T: std::default::Default + std::fmt::Debug + ?Sized
 {
-    let items: Result<Vec<T>, String> = vec_opt_type
+    let result_vec: Result<Vec<T>, String> = vec_opt_type
         .into_iter()
         .map(get_type)
         .collect();
 
-    items
+    result_vec
 }
 
 // https://stackoverflow.com/questions/26368288/how-do-i-stop-iteration-and-return-an-error-when-iteratormap-returns-a-result
@@ -435,8 +444,8 @@ fn get_type<T>(opt_type: Option<T>) -> Result<T, String>
         Some(value) => Ok(value),
         None => {
             let generic_type_name: &str = std::any::type_name::<T>();
-            println!("\n\tError when executing function get_vec_type().");
-            println!("\tExpected all values of type {generic_type_name}.");
+            println!("\n\tError when executing function flatten_all().");
+            println!("\tAll values are expected to be Some({generic_type_name}).");
             println!("\tBut at least one value was None!\n");
             Err(format!("Found {opt_type:?} value!"))
         },
@@ -803,8 +812,8 @@ mod test_functions {
     }
 
     #[test]
-    fn get_vec_type_versus_flatten() -> Result<(), Box<dyn Error>> {
-        vec_of_option()?;
+    fn flatten_all_versus_flatten() -> Result<(), Box<dyn Error>> {
+        vec_option_u32()?;
         Ok(())
     }
 
@@ -873,7 +882,7 @@ pub fn df_multiple_values() -> Result<(), Box<dyn Error>> {
         )
         .collect();
 
-    let vec_series: Vec<Series> = get_vec_type(series_formatted).unwrap();
+    let vec_series: Vec<Series> = flatten_all(series_formatted).unwrap();
 
     let vec_lines: Vec<Vec<f64>> = vec_series
         .par_iter() // rayon: parallel iterator
@@ -881,7 +890,7 @@ pub fn df_multiple_values() -> Result<(), Box<dyn Error>> {
         .map(|series| {
             let chunkedarray_f64: &ChunkedArray<Float64Type> = series.f64().unwrap();
             let vec_opt_f64: Vec<Option<f64>>= chunkedarray_f64.into_iter().collect();
-            let vec_f64: Vec<f64>= get_vec_type(vec_opt_f64).unwrap();
+            let vec_f64: Vec<f64>= flatten_all(vec_opt_f64).unwrap();
             vec_f64
         })
         .collect();
@@ -908,18 +917,18 @@ fn black_box(a: f64, b: f64) -> (f64, f64, f64) {
     (a+b, 5.4 * a - 2.1 * b, a*b)
 }
 
-pub fn vec_of_option() -> Result<(), Box<dyn Error>> {
+pub fn vec_option_u32() -> Result<(), Box<dyn Error>> {
 
-    let options: Vec<Option<u32>> = vec![Some(123), Some(321), None, Some(231)];
+    let options: Vec<Option<u32>> = vec![Some(123), Some(321), None, Some(231), None, Some(57)];
     println!("options: {options:?}");
 
     // Flattening works on any IntoIterator type, including Option and Result:
     let values_flattened: Vec<u32> = options.clone().into_iter().flatten().collect();
     println!("values_flattened: {values_flattened:?}");
-    assert_eq!(values_flattened, vec![123, 321, 231]);
+    assert_eq!(values_flattened, vec![123, 321, 231, 57]);
 
-    let values_verified: Result<Vec<u32>, String> = get_vec_type(options);
-    println!("values_verified: {values_verified:?}");
+    let result_vec: Result<Vec<u32>, String> = flatten_all(options);
+    assert_eq!(result_vec.err(), Some("Found None value!".to_string()));
 
     Ok(())
 }
