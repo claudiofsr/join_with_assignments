@@ -1,6 +1,5 @@
 use chrono::{DateTime, Local};
 use polars::prelude::*;
-//use polars_core::utils::{ _split_offsets, split_ca, split_series};
 use polars::datatypes::DataType;
 use rayon::prelude::*;
 use std::{
@@ -217,8 +216,8 @@ fn join_lazyframes (lazyframe_a: LazyFrame, lazyframe_b: LazyFrame) -> Result<Da
                                             },
                                             _ => {
                                                 println!("Float64Type PolarsError!");
-                                                println!("series_efd: {series_efd:?}");
-                                                println!("series_nfe: {series_nfe:?}");
+                                                println!("series_efd.dtype(): {} ; series_efd: {series_efd:?}", series_efd.dtype());
+                                                println!("series_nfe.dtype(): {} ; series_nfe: {series_nfe:?}", series_nfe.dtype());
                                                 None
                                             },
                                         }

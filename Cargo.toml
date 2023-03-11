@@ -33,7 +33,6 @@ polars = { version = "*", features = [
     "dtype-datetime",
     "dtype-categorical",
 ] }
-#polars-core = "*" # split_ca
 
 [profile.release]
 # https://doc.rust-lang.org/cargo/reference/profiles.html

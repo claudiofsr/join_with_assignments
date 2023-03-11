@@ -75,6 +75,21 @@ fn round_f64(x: f64, decimals: u32) -> f64 {
     (x * y).round() / y
 }
 
+/// See polars-core-0.27.2/src/utils/mod.rs and macro_rules! split_array {...}
+pub fn split_series(series: &Series) -> PolarsResult<Vec<Series>> {
+
+    let vec_series: Vec<Series> = (0..series.len())
+        .into_par_iter() // rayon: parallel iterator
+        .map(|i| series
+            .slice(i as i64, 1)
+            .explode()
+            .unwrap()
+        )
+        .collect();
+
+    Ok(vec_series)
+}
+
 /* --- munkres --- */
 /* ---- start ---- */
 
