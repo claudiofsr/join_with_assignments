@@ -282,8 +282,8 @@ pub fn get_option_assignments(series_efd: Series, series_nfe: Series) -> Option<
             let vec_opt_f64_efd: Vec<Option<f64>> = chunckedarray_f64_efd.into_iter().collect();
             let vec_opt_f64_nfe: Vec<Option<f64>> = chunckedarray_f64_nfe.into_iter().collect();
 
-            let vec_float64_efd: Vec<f64> = get_vec_type(vec_opt_f64_efd);
-            let vec_float64_nfe: Vec<f64> = get_vec_type(vec_opt_f64_nfe);
+            let vec_float64_efd: Vec<f64> = get_vec_type(vec_opt_f64_efd).unwrap();
+            let vec_float64_nfe: Vec<f64> = get_vec_type(vec_opt_f64_nfe).unwrap();
 
             let vec_assignments: Vec<u64> = munkres_assignments(&vec_float64_efd, &vec_float64_nfe);
 
@@ -342,9 +342,9 @@ pub fn get_opt_vectuples(chave_doc: &str, series_efd: Series, series_nfe: Series
             let vec_opt_u64_nfe: Vec<Option<u64>> = chunckedarray_u64_nfe.into_iter().collect();
             let vec_opt_u64_asg: Vec<Option<u64>> = chunckedarray_u64_asg.into_iter().collect();
 
-            let vec_float64_efd: Vec<u64> = get_vec_type(vec_opt_u64_efd);
-            let vec_float64_nfe: Vec<u64> = get_vec_type(vec_opt_u64_nfe);
-            let vec_float64_asg: Vec<u64> = get_vec_type(vec_opt_u64_asg);
+            let vec_float64_efd: Vec<u64> = get_vec_type(vec_opt_u64_efd).unwrap();
+            let vec_float64_nfe: Vec<u64> = get_vec_type(vec_opt_u64_nfe).unwrap();
+            let vec_float64_asg: Vec<u64> = get_vec_type(vec_opt_u64_asg).unwrap();
 
             line_assignments(chave_doc, &vec_float64_efd, &vec_float64_nfe, &vec_float64_asg)
         },
@@ -414,15 +414,33 @@ fn download_file_from_the_internet(url: &str, output_file: &str) {
 }
 */
 
-/// Remove intermadiate Option
-pub fn get_vec_type<T>(vec_opt_type: Vec<Option<T>>) -> Vec<T> 
-    where T: std::default::Default
+/// get_vec_type removes the intermediate option and displays error messages if None.
+/// Another alternative is to use .into_iter().flatten(), but without error messages.
+pub fn get_vec_type<T>(vec_opt_type: Vec<Option<T>>) -> Result<Vec<T>, String>
+    where T: std::default::Default + std::fmt::Debug + ?Sized
 {
-    vec_opt_type
-        //.into_no_null_iter() // if we are certain we don't have missing values
+    let items: Result<Vec<T>, String> = vec_opt_type
         .into_iter()
-        .map(|opt_type| opt_type.unwrap_or_default())
-        .collect()
+        .map(get_type)
+        .collect();
+
+    items
+}
+
+// https://stackoverflow.com/questions/26368288/how-do-i-stop-iteration-and-return-an-error-when-iteratormap-returns-a-result
+fn get_type<T>(opt_type: Option<T>) -> Result<T, String> 
+    where T: std::default::Default + std::fmt::Debug + ?Sized
+{
+    match opt_type {
+        Some(value) => Ok(value),
+        None => {
+            let generic_type_name: &str = std::any::type_name::<T>();
+            println!("\n\tError when executing function get_vec_type().");
+            println!("\tExpected all values of type {generic_type_name}.");
+            println!("\tBut at least one value was None!\n");
+            Err(format!("Found {opt_type:?} value!"))
+        },
+    }
 }
 
 #[allow(dead_code)]
@@ -772,6 +790,8 @@ fn retain_only_digits(opt_str: Option<&str>) -> Option<String> {
 #[cfg(test)]
 mod test_functions {
     // cargo test -- --help
+    // cargo test -- --nocapture
+    // cargo test -- --nocapture flatten
     // cargo test -- --show-output
     // cargo test -- --show-output multiple_values
     use super::*;
@@ -779,6 +799,12 @@ mod test_functions {
     #[test]
     fn function_returning_multiple_values() -> Result<(), Box<dyn Error>> {
         df_multiple_values()?;
+        Ok(())
+    }
+
+    #[test]
+    fn get_vec_type_versus_flatten() -> Result<(), Box<dyn Error>> {
+        vec_of_option()?;
         Ok(())
     }
 
@@ -847,7 +873,7 @@ pub fn df_multiple_values() -> Result<(), Box<dyn Error>> {
         )
         .collect();
 
-    let vec_series: Vec<Series> = get_vec_type(series_formatted);
+    let vec_series: Vec<Series> = get_vec_type(series_formatted).unwrap();
 
     let vec_lines: Vec<Vec<f64>> = vec_series
         .par_iter() // rayon: parallel iterator
@@ -855,7 +881,7 @@ pub fn df_multiple_values() -> Result<(), Box<dyn Error>> {
         .map(|series| {
             let chunkedarray_f64: &ChunkedArray<Float64Type> = series.f64().unwrap();
             let vec_opt_f64: Vec<Option<f64>>= chunkedarray_f64.into_iter().collect();
-            let vec_f64: Vec<f64>= get_vec_type(vec_opt_f64);
+            let vec_f64: Vec<f64>= get_vec_type(vec_opt_f64).unwrap();
             vec_f64
         })
         .collect();
@@ -880,6 +906,22 @@ pub fn df_multiple_values() -> Result<(), Box<dyn Error>> {
 /// Your function that takes 2 argument and returns 3
 fn black_box(a: f64, b: f64) -> (f64, f64, f64) {
     (a+b, 5.4 * a - 2.1 * b, a*b)
+}
+
+pub fn vec_of_option() -> Result<(), Box<dyn Error>> {
+
+    let options: Vec<Option<u32>> = vec![Some(123), Some(321), None, Some(231)];
+    println!("options: {options:?}");
+
+    // Flattening works on any IntoIterator type, including Option and Result:
+    let values_flattened: Vec<u32> = options.clone().into_iter().flatten().collect();
+    println!("values_flattened: {values_flattened:?}");
+    assert_eq!(values_flattened, vec![123, 321, 231]);
+
+    let values_verified: Result<Vec<u32>, String> = get_vec_type(options);
+    println!("values_verified: {values_verified:?}");
+
+    Ok(())
 }
 
 // https://blog.logrocket.com/implementing-data-parallelism-rayon-rust/
