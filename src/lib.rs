@@ -21,7 +21,10 @@ use std::num::ParseFloatError;
 use pathfinding::prelude::{Matrix, kuhn_munkres_min};
 use rayon::prelude::*;
 use std::{
+    any,
     cmp,
+    fmt,
+    default,
     error::Error,
     fs::File,
     process, // process::exit(1)
@@ -282,8 +285,8 @@ pub fn get_option_assignments(series_efd: Series, series_nfe: Series) -> Option<
             let vec_opt_f64_efd: Vec<Option<f64>> = chunckedarray_f64_efd.into_iter().collect();
             let vec_opt_f64_nfe: Vec<Option<f64>> = chunckedarray_f64_nfe.into_iter().collect();
 
-            let result_vec_float64_efd: Result<Vec<f64>, String> = flatten_all(vec_opt_f64_efd);
-            let result_vec_float64_nfe: Result<Vec<f64>, String> = flatten_all(vec_opt_f64_nfe);
+            let result_vec_float64_efd: Result<Vec<f64>, MyError> = flatten_all(vec_opt_f64_efd);
+            let result_vec_float64_nfe: Result<Vec<f64>, MyError> = flatten_all(vec_opt_f64_nfe);
 
             match (result_vec_float64_efd, result_vec_float64_nfe) {
                 (Ok(vec_float64_efd), Ok(vec_float64_nfe)) => {
@@ -346,9 +349,9 @@ pub fn get_opt_vectuples(chave_doc: &str, series_efd: Series, series_nfe: Series
             let vec_opt_u64_nfe: Vec<Option<u64>> = chunckedarray_u64_nfe.into_iter().collect();
             let vec_opt_u64_asg: Vec<Option<u64>> = chunckedarray_u64_asg.into_iter().collect();
 
-            let result_vec_u64_efd: Result<Vec<u64>, String> = flatten_all(vec_opt_u64_efd);
-            let result_vec_u64_nfe: Result<Vec<u64>, String> = flatten_all(vec_opt_u64_nfe);
-            let result_vec_u64_asg: Result<Vec<u64>, String> = flatten_all(vec_opt_u64_asg);
+            let result_vec_u64_efd: Result<Vec<u64>, MyError> = flatten_all(vec_opt_u64_efd);
+            let result_vec_u64_nfe: Result<Vec<u64>, MyError> = flatten_all(vec_opt_u64_nfe);
+            let result_vec_u64_asg: Result<Vec<u64>, MyError> = flatten_all(vec_opt_u64_asg);
 
             match (result_vec_u64_efd, result_vec_u64_nfe, result_vec_u64_asg) {
                 (Ok(vec_u64_efd), Ok(vec_u64_nfe), Ok(vec_u64_asg)) => {
@@ -423,12 +426,21 @@ fn download_file_from_the_internet(url: &str, output_file: &str) {
 }
 */
 
+// https://doc.rust-lang.org/rust-by-example/error/multiple_error_types/define_error_type.html
+#[derive(Debug, Clone, PartialEq)]
+pub struct MyError;
+impl fmt::Display for MyError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "found None value!")
+    }
+}
+
 /// flatten_all removes the intermediate option and displays error messages if None.
 /// Another alternative is to use .into_iter().flatten(), but without error messages.
-pub fn flatten_all<T>(vec_opt_type: Vec<Option<T>>) -> Result<Vec<T>, String>
-    where T: std::default::Default + std::fmt::Debug + ?Sized
+pub fn flatten_all<T>(vec_opt_type: Vec<Option<T>>) -> Result<Vec<T>, MyError>
+    where T: default::Default + fmt::Debug + ?Sized
 {
-    let result_vec: Result<Vec<T>, String> = vec_opt_type
+    let result_vec: Result<Vec<T>, MyError> = vec_opt_type
         .into_iter()
         .map(get_type)
         .collect();
@@ -437,17 +449,17 @@ pub fn flatten_all<T>(vec_opt_type: Vec<Option<T>>) -> Result<Vec<T>, String>
 }
 
 // https://stackoverflow.com/questions/26368288/how-do-i-stop-iteration-and-return-an-error-when-iteratormap-returns-a-result
-fn get_type<T>(opt_type: Option<T>) -> Result<T, String> 
-    where T: std::default::Default + std::fmt::Debug + ?Sized
+fn get_type<T>(opt_type: Option<T>) -> Result<T, MyError> 
+    where T: default::Default + fmt::Debug + ?Sized
 {
     match opt_type {
         Some(value) => Ok(value),
         None => {
-            let generic_type_name: &str = std::any::type_name::<T>();
+            let generic_type_name: &str = any::type_name::<T>();
             println!("\n\tError when executing function flatten_all().");
             println!("\tAll values are expected to be Some({generic_type_name}).");
             println!("\tBut at least one value was None!\n");
-            Err(format!("Found {opt_type:?} value!"))
+            Err(MyError)
         },
     }
 }
@@ -927,8 +939,8 @@ pub fn vec_option_u32() -> Result<(), Box<dyn Error>> {
     println!("values_flattened: {values_flattened:?}");
     assert_eq!(values_flattened, vec![123, 321, 231, 57]);
 
-    let result_vec: Result<Vec<u32>, String> = flatten_all(options);
-    assert_eq!(result_vec.err(), Some("Found None value!".to_string()));
+    let result_vec: Result<Vec<u32>, MyError> = flatten_all(options);
+    assert_eq!(result_vec.err(), Some(MyError));
 
     Ok(())
 }
