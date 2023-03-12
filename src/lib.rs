@@ -740,10 +740,10 @@ fn round_series_float64(series: Series, decimals: u32) -> Series {
     let vec_option_f64: Vec<Option<f64>> = chunked_array.into_iter().collect();
 
     let series: Series = vec_option_f64
-        .par_iter() // rayon: parallel iterator
+        .into_par_iter() // rayon: parallel iterator
         //.into_iter()
-        .map(|opt_f64|
-            opt_f64.map(|f64| round_f64(f64, decimals))
+        .map(|opt_f64: Option<f64>| 
+            get_opt_from_f64(opt_f64, &series, decimals)
         )
         .collect::<Float64Chunked>()
         .into_series();
@@ -753,19 +753,40 @@ fn round_series_float64(series: Series, decimals: u32) -> Series {
 
 fn round_series_utf8(series: Series, decimals: u32) -> Series {
 
-    let series_formatted: Series = series
-        .utf8()
-        .unwrap()
-        .par_iter() // rayon: parallel iterator
+    let chunked_array: &ChunkedArray<Utf8Type> = series.utf8().unwrap();
+
+    let vec_option_str: Vec<Option<&str>> = chunked_array.into_iter().collect();
+
+    let series: Series = vec_option_str
+        .into_par_iter() // rayon: parallel iterator
         //.into_iter()
-        .map(|opt_str: Option<&str>| retain_only_float64(opt_str, &series, decimals))
+        .map(|opt_str: Option<&str>| 
+            get_opt_from_str(opt_str, &series, decimals)
+        )
         .collect::<Float64Chunked>()
         .into_series();
 
-    series_formatted
+    series
 }
 
-fn retain_only_float64(opt_str: Option<&str>, series: &Series, decimals: u32) -> Option<f64> {
+fn get_opt_from_f64(opt_f64: Option<f64>, series: &Series, decimals: u32) -> Option<f64> {
+
+    let opt_float64: Option<f64> = match opt_f64 {
+        Some(float64) => { 
+            Some(round_f64(float64, decimals))
+        },
+        None => {
+            println!("fn get_opt_from_f64()");
+            println!("Encontrado valor vazio na coluna:");
+            println!("series: {series}\n");
+            None
+        },
+    };
+
+    opt_float64
+}
+
+fn get_opt_from_str(opt_str: Option<&str>, series: &Series, decimals: u32) -> Option<f64> {
 
     let opt_float64: Option<f64> = match opt_str {
         Some(str) => { 
@@ -785,6 +806,7 @@ fn retain_only_float64(opt_str: Option<&str>, series: &Series, decimals: u32) ->
             }
         },
         None => {
+            println!("fn get_opt_from_str()");
             println!("Encontrado valor vazio na coluna:");
             println!("series: {series}\n");
             None
