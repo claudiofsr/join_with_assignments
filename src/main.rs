@@ -2,6 +2,12 @@ use chrono::{DateTime, Local};
 use polars::prelude::*;
 use polars::datatypes::DataType;
 use rayon::prelude::*;
+
+use sysinfo::{
+    System,
+    SystemExt,
+};
+
 use std::{
     env,
     process, // process::exit(1)
@@ -26,6 +32,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     configure_the_environment();
     clear_terminal_screen();
+    show_sysinfo();
 
     let args: Vec<String> = env::args().collect();
     let config = Config::build(&args).unwrap_or_else(|err| {
@@ -39,9 +46,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let lf_a: LazyFrame = get_lazyframe_from_csv(config.csv_a, config.dlm_a, "left" )?.with_row_count("Linhas EFD", Some(0u32));
     let lf_b: LazyFrame = get_lazyframe_from_csv(config.csv_b, config.dlm_b, "right")?.with_row_count("Linhas NFE", Some(0u32));
 
-    // Formatar colunas para f64 a fim de realizar somas de valores.
-    let lf_a: LazyFrame = format_fazyframe_a(lf_a);
-    let lf_b: LazyFrame = format_fazyframe_b(lf_b);
+    // Formatar colunas a fim de realizar comparações e somas de valores.
+    // Lazy operations don’t execute until we call .collect()?.
+    let lf_a: LazyFrame = format_fazyframe_a(lf_a).collect()?.lazy();
+    let lf_b: LazyFrame = format_fazyframe_b(lf_b).collect()?.lazy();
 
     // Groupby column
     let lazy_groupby_a: LazyFrame = groupby_fazyframe_a(lf_a.clone())?;
@@ -69,6 +77,37 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+// https://pola-rs.github.io/polars/sysinfo/index.html
+fn show_sysinfo() {
+
+    // Please note that we use "new_all" to ensure that all list of
+    // components, network interfaces, disks and users are already
+    // filled!
+    let mut sys = System::new_all();
+
+    // First we update all information of our `System` struct.
+    sys.refresh_all();
+
+    let opt_sys_name: Option<String> = sys.name();
+    let opt_sys_kerv: Option<String> = sys.kernel_version();
+    let opt_sys_osve: Option<String> = sys.os_version();
+    let opt_sys_host: Option<String> = sys.host_name();
+
+    match (opt_sys_name, opt_sys_kerv, opt_sys_osve, opt_sys_host) {
+        (Some(sys_name), Some(sys_kerv), Some(sys_osve), Some(sys_host)) => {
+            // Display system information:
+            println!("System name:           {sys_name}");
+            println!("System kernel version: {sys_kerv}");
+            println!("System OS version:     {sys_osve}");
+            println!("System host name:      {sys_host}");
+        },
+        _ => return,
+    }
+
+    // Number of CPUs:
+    println!("Number of CPUs: {:>9}\n", sys.cpus().len());
+}
+
 fn configure_the_environment() {
     // https://stackoverflow.com/questions/70830241/rust-polars-how-to-show-all-columns/75675569#75675569
     // https://pola-rs.github.io/polars/polars/index.html#config-with-env-vars
@@ -79,6 +118,7 @@ fn configure_the_environment() {
     env::set_var("POLARS_FMT_STR_LEN", "50");    // maximum number of characters printed per string value.
 }
 
+/// Formatar colunas a fim de realizar comparações e somas de valores.
 fn format_fazyframe_a (lazyframe: LazyFrame) -> LazyFrame {
 
     let column_chave:  &str = "Chave do Documento";
@@ -99,6 +139,7 @@ fn format_fazyframe_a (lazyframe: LazyFrame) -> LazyFrame {
     )
 }
 
+/// Formatar colunas a fim de realizar comparações e somas de valores.
 fn format_fazyframe_b (lazyframe: LazyFrame) -> LazyFrame {
 
     let column_chave:  &str = "Chave da Nota Fiscal Eletrônica : NF Item (Todos)";

@@ -841,6 +841,7 @@ dependencies = [
  "polars",
  "rayon",
  "serde",
+ "sysinfo",
 ]
 
 [[package]]
@@ -1846,6 +1847,7 @@ dependencies = [
  "libc",
  "ntapi",
  "once_cell",
+ "rayon",
  "winapi",
 ]
 
