@@ -81,32 +81,40 @@ fn configure_the_environment() {
 
 fn format_fazyframe_a (lazyframe: LazyFrame) -> LazyFrame {
 
+    let column_chave:  &str = "Chave do Documento";
+    let column_number: &str = "Linhas EFD";
+    let column_value:  &str = "Valor Total do Item";
+
     lazyframe // Formatar colunas
     .with_column(
-        col("Linhas EFD").cast(DataType::UInt64)
+        col(column_number).cast(DataType::UInt64)
     )
     .with_column(
-        col("Chave do Documento")
+        col(column_chave)
         .apply(formatar_chave_eletronica, GetOutput::from_type(DataType::Utf8))
     )
     .with_column(
-        col("Valor Total do Item")
+        col(column_value)
         .apply(|series| round_series(series, 2), GetOutput::from_type(DataType::Float64))
     )
 }
 
 fn format_fazyframe_b (lazyframe: LazyFrame) -> LazyFrame {
 
+    let column_chave:  &str = "Chave da Nota Fiscal Eletrônica : NF Item (Todos)";
+    let column_number: &str = "Linhas NFE";
+    let column_value:  &str = "Valor da Nota Proporcional : NF Item (Todos) SOMA";
+
     lazyframe // Formatar colunas
     .with_column(
-        col("Linhas NFE").cast(DataType::UInt64)
+        col(column_number).cast(DataType::UInt64)
     )
     .with_column(
-        col("Chave da Nota Fiscal Eletrônica : NF Item (Todos)")
+        col(column_chave)
         .apply(formatar_chave_eletronica, GetOutput::from_type(DataType::Utf8))
     )
     .with_column(
-        col("Valor da Nota Proporcional : NF Item (Todos) SOMA")
+        col(column_value)
         .apply(|series| round_series(series, 2), GetOutput::from_type(DataType::Float64))
     )
     .with_column(
@@ -117,19 +125,21 @@ fn format_fazyframe_b (lazyframe: LazyFrame) -> LazyFrame {
 
 fn groupby_fazyframe_a (lazyframe: LazyFrame) -> Result<LazyFrame, PolarsError> {
 
-    let column_name:   &str = "Chave do Documento";
+    let column_chave:  &str = "Chave do Documento";
     let column_number: &str = "Linhas EFD";
     let column_value:  &str = "Valor Total do Item";
 
     let lf_groupby: LazyFrame = lazyframe
-    .groupby([col(column_name)])
+    .filter(
+        col(column_chave).is_not_null().and(col(column_value).is_not_null())
+    )
+    .groupby([col(column_chave)])
     .agg([
         col(column_number),
         col(column_value).alias("Valores dos Itens da Nota Fiscal EFD"),
-    ])
-    .filter(col(column_name).is_not_null());
+    ]);
 
-    println!("Group information according to column '{column_name}'");
+    println!("Group information according to column '{column_chave}'");
     println!("groupby_fazyframe_a:\n{}\n", lf_groupby.clone().collect()?);
 
     Ok(lf_groupby)
@@ -137,24 +147,26 @@ fn groupby_fazyframe_a (lazyframe: LazyFrame) -> Result<LazyFrame, PolarsError> 
 
 fn groupby_fazyframe_b (lazyframe: LazyFrame) -> Result<LazyFrame, PolarsError> {
 
-    let column_name:   &str = "Chave da Nota Fiscal Eletrônica : NF Item (Todos)";
+    let column_chave:  &str = "Chave da Nota Fiscal Eletrônica : NF Item (Todos)";
     let column_number: &str = "Linhas NFE";
     let column_value:  &str = "Valor da Nota Proporcional : NF Item (Todos) SOMA";
 
     let lf_groupby: LazyFrame = lazyframe
     .filter(
+        col(column_chave).is_not_null().and(col(column_value).is_not_null())
+    )
+    .filter(
         when(col("Registro de Origem do Item : NF Item (Todos)").eq(lit("NFe")))
         .then(col(column_value).gt(0))
         .otherwise(true)
     )
-    .groupby([col(column_name)])
+    .groupby([col(column_chave)])
     .agg([
         col(column_number),
         col(column_value).alias("Valores dos Itens da Nota Fiscal NFE"),
-    ])
-    .filter(col(column_name).is_not_null());
+    ]);
 
-    println!("Group information according to column '{column_name}'");
+    println!("Group information according to column '{column_chave}'");
     println!("groupby_fazyframe_b:\n{}\n", lf_groupby.clone().collect()?);
 
     Ok(lf_groupby)

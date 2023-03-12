@@ -336,8 +336,32 @@ pub fn get_option_assignments(series_efd: Series, series_nfe: Series) -> Option<
         },
         _ => {
             println!("Float64Type PolarsError!");
-            println!("series_efd.dtype(): {} ; series_efd: {series_efd:?}", series_efd.dtype());
-            println!("series_nfe.dtype(): {} ; series_nfe: {series_nfe:?}", series_nfe.dtype());
+            println!("series_efd.dtype(): {} ; series_efd: {series_efd}", series_efd.dtype());
+            println!("series_nfe.dtype(): {} ; series_nfe: {series_nfe}", series_nfe.dtype());
+            None
+        },
+    }
+}
+
+pub fn get_option_assignments_v2(series_efd: Series, series_nfe: Series) -> Option<Series> {
+
+    let result_chunckedarray_f64_efd: Result<&ChunkedArray<Float64Type>, PolarsError> = series_efd.f64();
+    let result_chunckedarray_f64_nfe: Result<&ChunkedArray<Float64Type>, PolarsError> = series_nfe.f64();
+
+    match (result_chunckedarray_f64_efd, result_chunckedarray_f64_nfe) {
+        (Ok(chunckedarray_f64_efd), Ok(chunckedarray_f64_nfe)) => {
+            
+            // into_no_null_iter(): if we are certain we don't have missing values
+            let vec_float64_efd: Vec<f64> = chunckedarray_f64_efd.into_no_null_iter().collect();
+            let vec_float64_nfe: Vec<f64> = chunckedarray_f64_nfe.into_no_null_iter().collect();
+
+            let vec_assignments: Vec<u64> = munkres_assignments(&vec_float64_efd, &vec_float64_nfe);
+            Some(Series::new("New", vec_assignments))
+        },
+        _ => {
+            println!("Float64Type PolarsError!");
+            println!("series_efd.dtype(): {} ; series_efd: {series_efd}", series_efd.dtype());
+            println!("series_nfe.dtype(): {} ; series_nfe: {series_nfe}", series_nfe.dtype());
             None
         },
     }
@@ -401,9 +425,9 @@ pub fn get_opt_vectuples(chave_doc: &str, series_efd: Series, series_nfe: Series
         _ => {
             println!("UInt64Type PolarsError!");
             println!("chave_doc: {chave_doc}");
-            println!("series_efd.dtype(): {} ; series_efd: {series_efd:?}", series_efd.dtype());
-            println!("series_nfe.dtype(): {} ; series_nfe: {series_nfe:?}", series_nfe.dtype());
-            println!("series_asg.dtype(): {} ; series_asg: {series_asg:?}", series_asg.dtype());
+            println!("series_efd.dtype(): {} ; series_efd: {series_efd}", series_efd.dtype());
+            println!("series_nfe.dtype(): {} ; series_nfe: {series_nfe}", series_nfe.dtype());
+            println!("series_asg.dtype(): {} ; series_asg: {series_asg}", series_asg.dtype());
             None
         },
     }
@@ -734,30 +758,40 @@ fn round_series_utf8(series: Series, decimals: u32) -> Series {
         .unwrap()
         .par_iter() // rayon: parallel iterator
         //.into_iter()
-        .map(|opt_str: Option<&str>| {
-            opt_str.map(|str: &str|
-                {
-                    let result: Result<f64, ParseFloatError> = str
-                    .trim()
-                    .replace('.', "")
-                    .replace(',', ".")
-                    .parse::<f64>();
-
-                    match result {
-                        Ok(float) => round_f64(float, decimals),
-                        Err(why) => {
-                            println!("fn round_series_utf8()");
-                            println!("Error parse f64: {why}");
-                            process::exit(1)
-                        }
-                    }
-                }
-            )
-        })
+        .map(|opt_str: Option<&str>| retain_only_float64(opt_str, &series, decimals))
         .collect::<Float64Chunked>()
         .into_series();
 
     series_formatted
+}
+
+fn retain_only_float64(opt_str: Option<&str>, series: &Series, decimals: u32) -> Option<f64> {
+
+    let opt_float64: Option<f64> = match opt_str {
+        Some(str) => { 
+            let result: Result<f64, ParseFloatError> = str
+            .trim()
+            .replace('.', "")
+            .replace(',', ".")
+            .parse::<f64>();
+
+            match result {
+                Ok(float) => Some(round_f64(float, decimals)),
+                Err(why) => {
+                    println!("fn round_series_utf8()");
+                    println!("Error parse f64: {why}");
+                    process::exit(1)
+                }
+            }
+        },
+        None => {
+            println!("Encontrado valor vazio na coluna:");
+            println!("series: {series}\n");
+            None
+        },
+    };
+
+    opt_float64
 }
 
 pub fn formatar_chave_eletronica(series: Series) -> Result<Option<Series>, PolarsError> {
@@ -820,6 +854,13 @@ mod test_functions {
     #[test]
     fn function_returning_multiple_values() -> Result<(), Box<dyn Error>> {
         df_multiple_values()?;
+        Ok(())
+    }
+
+    #[test]
+    fn collect_values_into_vec() -> Result<(), Box<dyn Error>> {
+        // https://stackoverflow.com/questions/71376935/how-to-get-a-vec-from-polars-series-or-chunkedarray
+        collect_values()?;
         Ok(())
     }
 
@@ -903,6 +944,8 @@ pub fn df_multiple_values() -> Result<(), Box<dyn Error>> {
             let chunkedarray_f64: &ChunkedArray<Float64Type> = series.f64().unwrap();
             let vec_opt_f64: Vec<Option<f64>>= chunkedarray_f64.into_iter().collect();
             let vec_f64: Vec<f64>= flatten_all(vec_opt_f64).unwrap();
+            // into_no_null_iter(): if we are certain we don't have missing values
+            // let vec_f64: Vec<f64>= chunkedarray_f64.into_no_null_iter().collect();
             vec_f64
         })
         .collect();
@@ -941,6 +984,22 @@ pub fn vec_option_u32() -> Result<(), Box<dyn Error>> {
 
     let result_vec: Result<Vec<u32>, MyError> = flatten_all(options);
     assert_eq!(result_vec.err(), Some(MyError));
+
+    Ok(())
+}
+
+pub fn collect_values() -> Result<(), Box<dyn Error>> {
+
+    let series = Series::new("a", 0..10i32);
+    println!("series: {series}");
+
+    let vec_opt_i32: Vec<Option<i32>> = series.i32()?.into_iter().collect();
+    println!("vec_opt_i32: {vec_opt_i32:?}");
+
+    // if we are certain we don't have missing values
+    //let vec_i32: Vec<i32> = s.i32()?.into_no_null_iter().collect();
+
+    assert_eq!(vec_opt_i32[9], Some(9));
 
     Ok(())
 }
