@@ -91,18 +91,23 @@ fn show_sysinfo() {
     let opt_sys_name: Option<String> = sys.name();
     let opt_sys_kerv: Option<String> = sys.kernel_version();
     let opt_sys_osve: Option<String> = sys.os_version();
-    let opt_sys_host: Option<String> = sys.host_name();
 
-    match (opt_sys_name, opt_sys_kerv, opt_sys_osve, opt_sys_host) {
-        (Some(sys_name), Some(sys_kerv), Some(sys_osve), Some(sys_host)) => {
+    match (opt_sys_name, opt_sys_kerv, opt_sys_osve) {
+        (Some(sys_name), Some(sys_kerv), Some(sys_osve)) => {
             // Display system information:
             println!("System name:           {sys_name}");
             println!("System kernel version: {sys_kerv}");
             println!("System OS version:     {sys_osve}");
-            println!("System host name:      {sys_host}");
         },
         _ => return,
     }
+
+    // RAM and swap information
+    // 1 Byte = 8 bits
+    let sys_used_memory : u64 = sys.used_memory()  / (1024 * 1024);
+    let sys_total_memory: u64 = sys.total_memory() / (1024 * 1024);
+
+    println!("Memory used/total: {:>8}/{} Mbytes", sys_used_memory, sys_total_memory);
 
     // Number of CPUs:
     println!("Number of CPUs: {:>9}\n", sys.cpus().len());
