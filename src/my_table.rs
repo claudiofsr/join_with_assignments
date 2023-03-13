@@ -6,19 +6,19 @@
 
 #[derive(Debug, Default)]
 pub struct MyTable {
-    pub columns_a: ColumnsA,
-    pub columns_b: ColumnsB,
+    pub side_a: SideA,
+    pub side_b: SideB,
 }
 
 #[derive(Debug)]
-pub struct ColumnsA {
+pub struct SideA {
     pub column_chave: &'static str,
     pub column_number: &'static str,
     pub column_value: &'static str,
 }
 
 #[derive(Debug)]
-pub struct ColumnsB {
+pub struct SideB {
     pub column_chave: &'static str,
     pub column_number: &'static str,
     pub column_value: &'static str,
@@ -26,20 +26,20 @@ pub struct ColumnsB {
     pub column_registro: &'static str,
 }
 
-impl Default for ColumnsA
+impl Default for SideA
 {
     fn default() -> Self { 
-        ColumnsA {
-        column_chave: "Chave do Documento",
-        column_number: "Linhas EFD",
-        column_value: "Valor Total do Item",
+        SideA {
+            column_chave: "Chave do Documento",
+            column_number: "Linhas EFD",
+            column_value: "Valor Total do Item",
         }
     }
 }
 
-impl Default for ColumnsB {
+impl Default for SideB {
     fn default() -> Self { 
-        ColumnsB {
+        SideB {
             column_chave: "Chave da Nota Fiscal Eletrônica : NF Item (Todos)",
             column_number: "Linhas NFE",
             column_value: "Valor da Nota Proporcional : NF Item (Todos) SOMA",
