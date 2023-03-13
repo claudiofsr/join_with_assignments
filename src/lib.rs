@@ -628,6 +628,7 @@ fn read_csv_lazy(file_path: &str, delimiter_char: char, _side: &str) -> Result<L
         .has_header(true)
         .with_ignore_errors(true)
         .with_null_values(Some(NullValues::AllColumns(null_values)))
+        .with_missing_is_null(true)
         .with_infer_schema_length(Some(50))
         //.with_schema(schema.into())
         .finish()?;
@@ -743,7 +744,7 @@ fn round_series_float64(series: Series, decimals: u32) -> Series {
         .into_par_iter() // rayon: parallel iterator
         //.into_iter()
         .map(|opt_f64: Option<f64>| 
-            get_opt_from_f64(opt_f64, &series, decimals)
+            get_opt_round_f64(opt_f64, &series, decimals)
         )
         .collect::<Float64Chunked>()
         .into_series();
@@ -769,15 +770,15 @@ fn round_series_utf8(series: Series, decimals: u32) -> Series {
     series
 }
 
-fn get_opt_from_f64(opt_f64: Option<f64>, series: &Series, decimals: u32) -> Option<f64> {
+fn get_opt_round_f64(opt_f64: Option<f64>, series: &Series, decimals: u32) -> Option<f64> {
 
     let opt_float64: Option<f64> = match opt_f64 {
         Some(float64) => { 
             Some(round_f64(float64, decimals))
         },
         None => {
-            println!("fn get_opt_from_f64()");
-            println!("Encontrado valor vazio na coluna:");
+            println!("fn get_opt_round_f64()");
+            println!("Found None value in column:");
             println!("series: {series}\n");
             None
         },
@@ -807,7 +808,7 @@ fn get_opt_from_str(opt_str: Option<&str>, series: &Series, decimals: u32) -> Op
         },
         None => {
             println!("fn get_opt_from_str()");
-            println!("Encontrado valor vazio na coluna:");
+            println!("Found None value in column:");
             println!("series: {series}\n");
             None
         },

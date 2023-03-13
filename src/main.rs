@@ -28,12 +28,16 @@ use join_with_assignments::{
     write_pqt,
 };
 
+mod my_table;
+use my_table::MyTable;
+
 fn main() -> Result<(), Box<dyn Error>> {
 
     configure_the_environment();
     clear_terminal_screen();
     show_sysinfo();
 
+    let my_table = MyTable::default();
     let args: Vec<String> = env::args().collect();
     let config = Config::build(&args).unwrap_or_else(|err| {
         println!("Problem parsing arguments: {err}");
@@ -43,27 +47,29 @@ fn main() -> Result<(), Box<dyn Error>> {
     let time = Instant::now();
 
     // Read LazyFrame from CSV file
-    let lf_a: LazyFrame = get_lazyframe_from_csv(config.csv_a, config.dlm_a, "left" )?.with_row_count("Linhas EFD", Some(0u32));
-    let lf_b: LazyFrame = get_lazyframe_from_csv(config.csv_b, config.dlm_b, "right")?.with_row_count("Linhas NFE", Some(0u32));
+    let lf_a: LazyFrame = get_lazyframe_from_csv(config.csv_a, config.dlm_a, "left" )?
+        .with_row_count(my_table.columns_a.column_number, Some(0u32));
+    let lf_b: LazyFrame = get_lazyframe_from_csv(config.csv_b, config.dlm_b, "right")?
+        .with_row_count(my_table.columns_b.column_number, Some(0u32));
 
     // Formatar colunas a fim de realizar comparações e somas de valores.
     // Lazy operations don’t execute until we call .collect()?.
-    let lf_a: LazyFrame = format_fazyframe_a(lf_a).collect()?.lazy();
-    let lf_b: LazyFrame = format_fazyframe_b(lf_b).collect()?.lazy();
+    let lf_a: LazyFrame = format_fazyframe_a(lf_a, &my_table).collect()?.lazy();
+    let lf_b: LazyFrame = format_fazyframe_b(lf_b, &my_table).collect()?.lazy();
 
     // Groupby column
-    let lazy_groupby_a: LazyFrame = groupby_fazyframe_a(lf_a.clone())?;
-    let lazy_groupby_b: LazyFrame = groupby_fazyframe_b(lf_b.clone())?;
+    let lazy_groupby_a: LazyFrame = groupby_fazyframe_a(lf_a.clone(), &my_table)?;
+    let lazy_groupby_b: LazyFrame = groupby_fazyframe_b(lf_b.clone(), &my_table)?;
 
-    let dataframe_joinned: DataFrame = join_lazyframes(lazy_groupby_a, lazy_groupby_b)?;
+    let dataframe_joinned: DataFrame = join_lazyframes(lazy_groupby_a, lazy_groupby_b, &my_table)?;
 
     //print_column_and_schema(dataframe_joinned.clone());
 
-    let vec_opt_vec_tuples: Vec<Option<VecTuples>> = get_vec_from_assignments(dataframe_joinned)?;
-    let df_correlation: DataFrame = make_df_correlation(vec_opt_vec_tuples)?;
+    let vec_opt_vec_tuples: Vec<Option<VecTuples>> = get_vec_from_assignments(dataframe_joinned, &my_table)?;
+    let df_correlation: DataFrame = make_df_correlation(vec_opt_vec_tuples, &my_table)?;
 
-    let lf_c: LazyFrame = join_with_interline_correlations(lf_a, lf_b, df_correlation)?;
-    let mut dfd_output: DataFrame = check_correlation_between_dataframes(lf_c)?;
+    let lf_c: LazyFrame = join_with_interline_correlations(lf_a, lf_b, df_correlation, &my_table)?;
+    let mut dfd_output: DataFrame = check_correlation_between_dataframes(lf_c, &my_table)?;
 
     //println!("dfd_output:\n{dfd_output}\n");
     write_csv(&mut dfd_output, ';', "output.csv")?;
@@ -124,11 +130,11 @@ fn configure_the_environment() {
 }
 
 /// Formatar colunas a fim de realizar comparações e somas de valores.
-fn format_fazyframe_a (lazyframe: LazyFrame) -> LazyFrame {
+fn format_fazyframe_a (lazyframe: LazyFrame, my_table: &MyTable) -> LazyFrame {
 
-    let column_chave:  &str = "Chave do Documento";
-    let column_number: &str = "Linhas EFD";
-    let column_value:  &str = "Valor Total do Item";
+    let column_chave:  &str = my_table.columns_a.column_chave;  // "Chave do Documento";
+    let column_number: &str = my_table.columns_a.column_number; // "Linhas EFD";
+    let column_value:  &str = my_table.columns_a.column_value;  // "Valor Total do Item";
 
     lazyframe // Formatar colunas
     .with_column(
@@ -145,11 +151,12 @@ fn format_fazyframe_a (lazyframe: LazyFrame) -> LazyFrame {
 }
 
 /// Formatar colunas a fim de realizar comparações e somas de valores.
-fn format_fazyframe_b (lazyframe: LazyFrame) -> LazyFrame {
+fn format_fazyframe_b (lazyframe: LazyFrame, my_table: &MyTable) -> LazyFrame {
 
-    let column_chave:  &str = "Chave da Nota Fiscal Eletrônica : NF Item (Todos)";
-    let column_number: &str = "Linhas NFE";
-    let column_value:  &str = "Valor da Nota Proporcional : NF Item (Todos) SOMA";
+    let column_chave:  &str = my_table.columns_b.column_chave;  // "Chave da Nota Fiscal Eletrônica : NF Item (Todos)";
+    let column_number: &str = my_table.columns_b.column_number; // "Linhas NFE";
+    let column_value:  &str = my_table.columns_b.column_value;  // "Valor da Nota Proporcional : NF Item (Todos) SOMA";
+    let column_bc_icms: &str = my_table.columns_b.column_bc_icms; // "ICMS: Base de Cálculo : NF Item (Todos) SOMA"
 
     lazyframe // Formatar colunas
     .with_column(
@@ -164,16 +171,16 @@ fn format_fazyframe_b (lazyframe: LazyFrame) -> LazyFrame {
         .apply(|series| round_series(series, 2), GetOutput::from_type(DataType::Float64))
     )
     .with_column(
-        col("ICMS: Base de Cálculo : NF Item (Todos) SOMA")
+        col(column_bc_icms)
         .apply(|series| round_series(series, 2), GetOutput::from_type(DataType::Float64))
     )
 }
 
-fn groupby_fazyframe_a (lazyframe: LazyFrame) -> Result<LazyFrame, PolarsError> {
+fn groupby_fazyframe_a (lazyframe: LazyFrame, my_table: &MyTable) -> Result<LazyFrame, PolarsError> {
 
-    let column_chave:  &str = "Chave do Documento";
-    let column_number: &str = "Linhas EFD";
-    let column_value:  &str = "Valor Total do Item";
+    let column_chave:  &str = my_table.columns_a.column_chave;  // "Chave do Documento";
+    let column_number: &str = my_table.columns_a.column_number; // "Linhas EFD";
+    let column_value:  &str = my_table.columns_a.column_value;  // "Valor Total do Item";
 
     let lf_groupby: LazyFrame = lazyframe
     .filter(
@@ -191,18 +198,19 @@ fn groupby_fazyframe_a (lazyframe: LazyFrame) -> Result<LazyFrame, PolarsError> 
     Ok(lf_groupby)
 }
 
-fn groupby_fazyframe_b (lazyframe: LazyFrame) -> Result<LazyFrame, PolarsError> {
+fn groupby_fazyframe_b (lazyframe: LazyFrame, my_table: &MyTable) -> Result<LazyFrame, PolarsError> {
 
-    let column_chave:  &str = "Chave da Nota Fiscal Eletrônica : NF Item (Todos)";
-    let column_number: &str = "Linhas NFE";
-    let column_value:  &str = "Valor da Nota Proporcional : NF Item (Todos) SOMA";
+    let column_chave:  &str = my_table.columns_b.column_chave;  // "Chave da Nota Fiscal Eletrônica : NF Item (Todos)";
+    let column_number: &str = my_table.columns_b.column_number; // "Linhas NFE";
+    let column_value:  &str = my_table.columns_b.column_value;  // "Valor da Nota Proporcional : NF Item (Todos) SOMA";
+    let column_registro: &str = my_table.columns_b.column_registro; // "Registro de Origem do Item : NF Item (Todos)"
 
     let lf_groupby: LazyFrame = lazyframe
     .filter(
         col(column_chave).is_not_null().and(col(column_value).is_not_null())
     )
     .filter(
-        when(col("Registro de Origem do Item : NF Item (Todos)").eq(lit("NFe")))
+        when(col(column_registro).eq(lit("NFe")))
         .then(col(column_value).gt(0))
         .otherwise(true)
     )
@@ -218,10 +226,10 @@ fn groupby_fazyframe_b (lazyframe: LazyFrame) -> Result<LazyFrame, PolarsError> 
     Ok(lf_groupby)
 }
 
-fn join_lazyframes (lazyframe_a: LazyFrame, lazyframe_b: LazyFrame) -> Result<DataFrame, PolarsError> {
+fn join_lazyframes (lazyframe_a: LazyFrame, lazyframe_b: LazyFrame, my_table: &MyTable) -> Result<DataFrame, PolarsError> {
 
     let dataframe: DataFrame = lazyframe_a
-    .join(lazyframe_b, [col("Chave do Documento")], [col("Chave da Nota Fiscal Eletrônica : NF Item (Todos)")], JoinType::Inner)
+    .join(lazyframe_b, [col(my_table.columns_a.column_chave)], [col(my_table.columns_b.column_chave)], JoinType::Inner)
     // An inner join produces a DataFrame that contains only the rows where the join key exists in both DataFrames.
     // Caso fosse utilizado JoinType::left, dado uma chave EFD de 44 digitos, estas seriam as chaves NFE de mesmos digitos não encontradas!
     //.filter(col("Valores dos Itens da Nota Fiscal NFE").not_null())
@@ -283,12 +291,12 @@ fn print_column_and_schema (dataframe: DataFrame) {
     println!("schema: {schema:#?}");
 }
 
-fn get_vec_from_assignments (dataframe: DataFrame) -> Result<Vec<Option<VecTuples>>, PolarsError> {
+fn get_vec_from_assignments (dataframe: DataFrame, my_table: &MyTable) -> Result<Vec<Option<VecTuples>>, PolarsError> {
 
     // Get columns from dataframe
-    let column_chave_doc: &Series = dataframe.column("Chave do Documento")?;
-    let column_lines_efd: &Series = dataframe.column("Linhas EFD")?;
-    let column_lines_nfe: &Series = dataframe.column("Linhas NFE")?;
+    let column_chave_doc: &Series = dataframe.column(my_table.columns_a.column_chave)?;
+    let column_lines_efd: &Series = dataframe.column(my_table.columns_a.column_number)?;
+    let column_lines_nfe: &Series = dataframe.column(my_table.columns_b.column_number)?;
     let column_assignmen: &Series = dataframe.column("Munkres Assignments")?;
 
     // Get rows from columns with into_iter()
@@ -314,7 +322,7 @@ fn get_vec_from_assignments (dataframe: DataFrame) -> Result<Vec<Option<VecTuple
     Ok(vec_opt_vec_tuples)
 }
 
-fn make_df_correlation(vec_opt_vec_tuples:Vec<Option<VecTuples>>) -> Result<DataFrame, PolarsError> {
+fn make_df_correlation(vec_opt_vec_tuples:Vec<Option<VecTuples>>, my_table: &MyTable) -> Result<DataFrame, PolarsError> {
 
     // Transform a vector of tuples into many vectors
     let mut col_chaves: Vec<String> = Vec::new();
@@ -330,9 +338,9 @@ fn make_df_correlation(vec_opt_vec_tuples:Vec<Option<VecTuples>>) -> Result<Data
     }
 
     let df_correlation: DataFrame = df! {
-        "Chave do Documento" => &col_chaves,
-        "Linhas EFD" => &col_lines_efd,
-        "Linhas NFE" => &col_lines_nfe,
+        my_table.columns_a.column_chave => &col_chaves,
+        my_table.columns_a.column_number => &col_lines_efd,
+        my_table.columns_b.column_number => &col_lines_nfe,
     }?;
 
     println!("df_correlation:\n{df_correlation}\n");
@@ -341,9 +349,9 @@ fn make_df_correlation(vec_opt_vec_tuples:Vec<Option<VecTuples>>) -> Result<Data
     Ok(df_correlation)
 }
 
-fn join_with_interline_correlations (lf_a: LazyFrame, lf_b: LazyFrame, df_correlation: DataFrame) -> Result<LazyFrame, PolarsError> {
+fn join_with_interline_correlations (lf_a: LazyFrame, lf_b: LazyFrame, df_correlation: DataFrame, my_table: &MyTable) -> Result<LazyFrame, PolarsError> {
 
-    let columns = ("Chave do Documento", "Linhas NFE");
+    let columns = (my_table.columns_a.column_chave, my_table.columns_b.column_number);
     let common_a = [col(columns.0), col(columns.1)];
     let common_b = [col(columns.0), col(columns.1)];
 
@@ -353,7 +361,7 @@ fn join_with_interline_correlations (lf_a: LazyFrame, lf_b: LazyFrame, df_correl
     );
 
     let lf_b_solution: LazyFrame = df_correlation.lazy().join(lf_b, common_a, common_b, JoinType::Left)
-    .drop_columns(["Linhas NFE"]);
+    .drop_columns([my_table.columns_b.column_number]);
 
 
     // add two empty columns to lazyframe
@@ -367,22 +375,22 @@ fn join_with_interline_correlations (lf_a: LazyFrame, lf_b: LazyFrame, df_correl
             ]
         );
 
-    let columns = ("Chave do Documento", "Linhas EFD");
+    let columns = (my_table.columns_a.column_chave, my_table.columns_a.column_number);
     let common_a = [col(columns.0), col(columns.1)];
     let common_b = [col(columns.0), col(columns.1)];
 
     let lf_c: LazyFrame = lf_a.join(lf_b_solution, common_a, common_b, JoinType::Left)
-    .drop_columns(["Linhas EFD"]);
+    .drop_columns([my_table.columns_a.column_number]);
 
     Ok(lf_c)
 }
 
-fn check_correlation_between_dataframes (lazyframe: LazyFrame) -> Result<DataFrame, PolarsError> {
+fn check_correlation_between_dataframes (lazyframe: LazyFrame, my_table: &MyTable) -> Result<DataFrame, PolarsError> {
 
-    let coluna_deverificacao = "Verificação dos Valores: EFD x Docs Fiscais";
-    let valor_do_item_da_efd = "Valor Total do Item";
-    let valor_da_nota_proporcional_nfe = "Valor da Nota Proporcional : NF Item (Todos) SOMA";
-    let valor_da_base_calculo_icms_nfe = "ICMS: Base de Cálculo : NF Item (Todos) SOMA";
+    let coluna_deverificacao: &str = "Verificação dos Valores: EFD x Docs Fiscais";
+    let valor_do_item_da_efd: &str = my_table.columns_a.column_value;             // "Valor Total do Item";
+    let valor_da_nota_proporcional_nfe: &str = my_table.columns_b.column_value;   // "Valor da Nota Proporcional : NF Item (Todos) SOMA";
+    let valor_da_base_calculo_icms_nfe: &str = my_table.columns_b.column_bc_icms; // "ICMS: Base de Cálculo : NF Item (Todos) SOMA"
 
     let valores_iguais_nota_prop = col(valor_do_item_da_efd).eq(col(valor_da_nota_proporcional_nfe));
     let valores_iguais_base_icms = col(valor_do_item_da_efd).eq(col(valor_da_base_calculo_icms_nfe));
