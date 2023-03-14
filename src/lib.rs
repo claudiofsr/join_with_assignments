@@ -43,8 +43,8 @@ pub struct Config {
     // https://doc.rust-lang.org/book/ch12-03-improving-error-handling-and-modularity.html
     pub csv_a: Option<String>,
     pub csv_b: Option<String>,
-    pub dlm_a: Option<String>,
-    pub dlm_b: Option<String>,
+    pub delimiter_a: Option<String>,
+    pub delimiter_b: Option<String>,
 }
 
 impl Config {
@@ -64,10 +64,10 @@ impl Config {
 
         let csv_a: Option<String> = args.get(1).map(|s| s.to_string());
         let csv_b: Option<String> = args.get(2).map(|s| s.to_string());
-        let dlm_a: Option<String> = args.get(3).map(|s| s.to_string());
-        let dlm_b: Option<String> = args.get(4).map(|s| s.to_string());
+        let delimiter_a: Option<String> = args.get(3).map(|s| s.to_string());
+        let delimiter_b: Option<String> = args.get(4).map(|s| s.to_string());
 
-        Ok(Config {csv_a, csv_b, dlm_a, dlm_b})
+        Ok(Config {csv_a, csv_b, delimiter_a, delimiter_b})
     }
 }
 

@@ -12,27 +12,27 @@ pub struct MyTable {
 
 #[derive(Debug)]
 pub struct SideA {
-    pub column_chave: &'static str,
-    pub column_number: &'static str,
-    pub column_value: &'static str,
+    pub column_aggregation: &'static str,
+    pub column_count_lines: &'static str,
+    pub column_item_values: &'static str,
 }
 
 #[derive(Debug)]
 pub struct SideB {
-    pub column_chave: &'static str,
-    pub column_number: &'static str,
-    pub column_value: &'static str,
-    pub column_bc_icms: &'static str,
-    pub column_registro: &'static str,
+    pub column_aggregation: &'static str,
+    pub column_count_lines: &'static str,
+    pub column_item_values: &'static str,
+    pub column_bscalc_icms: &'static str,
+    pub column_origem_regi: &'static str,
 }
 
 impl Default for SideA
 {
     fn default() -> Self { 
         SideA {
-            column_chave: "Chave do Documento",
-            column_number: "Linhas EFD",
-            column_value: "Valor Total do Item",
+            column_aggregation: "Chave do Documento",
+            column_count_lines: "Linhas EFD",
+            column_item_values: "Valor Total do Item",
         }
     }
 }
@@ -40,11 +40,11 @@ impl Default for SideA
 impl Default for SideB {
     fn default() -> Self { 
         SideB {
-            column_chave: "Chave da Nota Fiscal Eletrônica : NF Item (Todos)",
-            column_number: "Linhas NFE",
-            column_value: "Valor da Nota Proporcional : NF Item (Todos) SOMA",
-            column_bc_icms: "ICMS: Base de Cálculo : NF Item (Todos) SOMA",
-            column_registro: "Registro de Origem do Item : NF Item (Todos)",
+            column_aggregation: "Chave da Nota Fiscal Eletrônica : NF Item (Todos)",
+            column_count_lines: "Linhas NFE",
+            column_item_values: "Valor da Nota Proporcional : NF Item (Todos) SOMA",
+            column_bscalc_icms: "ICMS: Base de Cálculo : NF Item (Todos) SOMA",
+            column_origem_regi: "Registro de Origem do Item : NF Item (Todos)",
         }
     }
 }
