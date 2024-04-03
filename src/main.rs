@@ -20,6 +20,8 @@ Example of use:
     rm -v  ~/.config/join_with_assignments/default-config.toml
     join_with_assignments -1 'Info do Contribuinte EFD Contribuicoes.csv' -2 nfe_float64.csv -a '|' -b ';' -d ';' -c true -p true
 
+    cargo run -- -1 'Dados - Au/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Au/nfe_float64.csv' -c true -p true -r true -s 201708 -f 202312
+
     cargo run -- -1 'Dados - Ar/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Ar/nfe_float64.csv' -c true -p true -r true -s 202110 -f 202309
     cargo run -- -1 'Dados - Bo/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Bo/nfe_float64.csv' -c true -p true -r true -s 202010 -f 202012
     cargo run -- -1 'Dados - Br/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Br/nfe_float64.csv' -c true -p true -r true -s 202109 -f 202303
