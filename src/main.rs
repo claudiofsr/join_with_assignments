@@ -37,16 +37,8 @@ Example of use:
     join_with_assignments -1 'Dados - Pg/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Pg/nfe_float64.csv' -c true -p true -r true -s 201907 -f 202206
 
     // Verificação dos arquivos:
-    b3sum df* "Dados - Au/"df*
-
-    sha512sum df* "Dados - Au/"df*
+    b3sum df* "Dados - Ar/"df*
     sha512sum df* "Dados - Ar/"df*
-    sha512sum df* "Dados - Bo/"df*
-    sha512sum df* "Dados - Br/"df*
-    sha512sum df* "Dados - Da/"df*
-    sha512sum df* "Dados - Le/"df*
-    sha512sum df* "Dados - Pg/"df*
-
     meld df_consolidacao_natureza_da_bcalc_result.csv "Dados - Ar/df_consolidacao_natureza_da_bcalc_result.csv"&
 
     // Boring Data Tool (bdt): <https://github.com/andygrove/bdt>
