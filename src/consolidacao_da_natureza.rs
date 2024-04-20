@@ -218,7 +218,7 @@ fn groupby_and_agg_values(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Err
             transferir_valores(2, "RBNC_NTributada"),
             transferir_valores(3, "RBNC_Exportação"),
         ])
-        .drop_columns([ // Remover colunas temporárias
+        .drop([ // Remover colunas temporárias
             "Código do Tipo de Crédito",
         ])
         .group_by([
@@ -572,7 +572,7 @@ fn remover_colunas_temporarias(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dy
             col("RecBrutaCumulativa").sum(),
             col("ReceitaBrutaTotal").sum(),
         ])
-        .drop_columns([ // Remover colunas temporárias
+        .drop([ // Remover colunas temporárias
             "Código Fiscal de Operações e Prestações (CFOP)",
             "Registro",
             "Código NCM",
@@ -1041,9 +1041,12 @@ fn ordenar_colunas(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>> {
                 col("Alíquota de PIS/PASEP (em percentual)"),
                 //col("Registro"), col("Código Fiscal de Operações e Prestações (CFOP)"), col("Código NCM"),
             ],
-            vec![false], // descending: B
-            false,       // nulls_last: bool
-            true         // maintain_order
+            // https://github.com/pola-rs/polars/pull/15590
+            SortMultipleOptions::default()
+                .with_maintain_order(true)
+                .with_multithreaded(true)
+                .with_order_descendings(vec![false])
+                .with_nulls_last(false),
         )
         .with_column(
             when(col(cst).gt(lit(100)))
@@ -1077,7 +1080,7 @@ fn rename_columns(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>> {
         col("RecBrutaCumulativa").alias("Crédito vinculado à Receita Bruta Cumulativa (Valores Excluídos)"),
         col("ReceitaBrutaTotal").alias("Crédito vinculado à Receita Bruta Total"),
     ]);
-    //.drop_columns(selected);
+    //.drop(selected);
 
     Ok(lazyframe)
 }
@@ -1166,7 +1169,7 @@ mod tests {
         let df = df_init
             .lazy()
             .select([col("text").str().split(lit(" ")).alias("tokens")])
-            .with_row_count("row_nr", None)
+            .with_row_index("row_nr", None)
             .explode([col("tokens")])
             .select([col("row_nr"), col("tokens")])
             .collect()?;
@@ -1209,7 +1212,7 @@ mod tests {
             ])
             //.explode([col("contador")]);
             // contador de linhas
-            .with_row_count("contador", Some(1u32));
+            .with_row_index("contador", Some(1u32));
 
         println!("lazyframe: {}\n", lazyframe.clone().collect()?);
 
@@ -1283,7 +1286,7 @@ mod tests {
             // pub fn slice<E, F>(self, offset: E, length: F) -> Expr
             // a_length = 10 * 0.2 = 2
             // b_length = 20 * 0.2 = 4
-            .agg([col("vals").slice(lit(2), count() * lit(0.2))])
+            .agg([col("vals").slice(lit(2), len() * lit(0.2))])
             .collect()?;
 
         println!("dataframe02: {dataframe02}\n");
@@ -1322,9 +1325,11 @@ mod tests {
                     col("c"),
                     // col("a"), // "b" e "c" determina a ordem de "a".
                 ],
-                vec![false], // descending: B
-                false,       // nulls_last: bool
-                true         // maintain_order
+                SortMultipleOptions::default()
+                    .with_maintain_order(true)
+                    .with_multithreaded(true)
+                    .with_order_descendings(vec![false])
+                    .with_nulls_last(false),
             )
             .collect()?;
 
@@ -1432,7 +1437,7 @@ mod tests {
         let df04: DataFrame = df03.clone()
             .lazy()
             .filter(col("Category").is_not_null())
-            .sort("Anular", Default::default())
+            .sort(["Anular"], Default::default())
             .collect()?;
 
         println!("dataframe04: {df04}\n");

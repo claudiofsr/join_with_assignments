@@ -21,7 +21,6 @@ Example of use:
     join_with_assignments -1 'Info do Contribuinte EFD Contribuicoes.csv' -2 nfe_float64.csv -a '|' -b ';' -d ';' -c true -p true
 
     cargo run -- -1 'Dados - Au/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Au/nfe_float64.csv' -c true -p true -r true -s 201708 -f 202312
-
     cargo run -- -1 'Dados - Ar/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Ar/nfe_float64.csv' -c true -p true -r true -s 202110 -f 202309
     cargo run -- -1 'Dados - Bo/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Bo/nfe_float64.csv' -c true -p true -r true -s 202010 -f 202012
     cargo run -- -1 'Dados - Br/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Br/nfe_float64.csv' -c true -p true -r true -s 202109 -f 202303
@@ -37,13 +36,17 @@ Example of use:
     join_with_assignments -1 'Dados - Pg/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Pg/nfe_float64.csv' -c true -p true -r true -s 201907 -f 202206
 
     // Verificação dos arquivos:
-    b3sum df* "Dados - Ar/"df*
+    b3sum df* "Dados - Au/"df*
+
+    sha512sum df* "Dados - Au/"df*
     sha512sum df* "Dados - Ar/"df*
     sha512sum df* "Dados - Bo/"df*
     sha512sum df* "Dados - Br/"df*
     sha512sum df* "Dados - Da/"df*
     sha512sum df* "Dados - Le/"df*
     sha512sum df* "Dados - Pg/"df*
+
+    meld df_consolidacao_natureza_da_bcalc_result.csv "Dados - Ar/df_consolidacao_natureza_da_bcalc_result.csv"&
 
     // Boring Data Tool (bdt): <https://github.com/andygrove/bdt>
     bdt schema df_itens_de_docs_fiscais_result.parquet

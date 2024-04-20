@@ -40,8 +40,8 @@ pub fn adicionar_coluna_de_aliquota_zero(lazyframe: LazyFrame) -> Result<LazyFra
     let boolean_b: Expr = col(side_b[2]).is_not_null(); // .and(operacoes_de_entrada_ou_de_saida());
 
     // Exemplo: 'NCM 2207.10.90 : Alíquota Zero - Lei xxx.'
-    let exp_a: Expr = concat_str([lit("NCM"), col(side_a[0]), lit(":"), col(side_a[2])], " ");
-    let exp_b: Expr = concat_str([lit("NCM"), col(side_b[0]), lit(":"), col(side_b[2])], " ");
+    let exp_a: Expr = concat_str([lit("NCM"), col(side_a[0]), lit(":"), col(side_a[2])], " ", true);
+    let exp_b: Expr = concat_str([lit("NCM"), col(side_b[0]), lit(":"), col(side_b[2])], " ", true);
 
     let lazyframe: LazyFrame = lazyframe
         .with_column( // Adicionar 2 colunas temporárias
@@ -74,7 +74,7 @@ pub fn adicionar_coluna_de_aliquota_zero(lazyframe: LazyFrame) -> Result<LazyFra
                 .otherwise(lit(NULL)) // replace by null
             .alias(columns[1])        // .keep_name() or .name().keep()
         )
-        .drop_columns([ // Remover 2 colunas temporárias
+        .drop([ // Remover 2 colunas temporárias
             side_a[2],
             side_b[2],
         ]);
@@ -534,7 +534,7 @@ mod tests {
                 GetOutput::from_type(DataType::Float64),
                 true,
             )])
-            .sort("cars", Default::default())
+            .sort(["cars"], Default::default())
             .collect()?;
 
         println!("groupby: {groupby}\n");

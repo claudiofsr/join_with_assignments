@@ -30,9 +30,9 @@ pub fn get_dataframe_after_assignments(args: &Arguments) -> Result<DataFrame, Bo
 
     println!("Read LazyFrame from CSV files.");
     let lazyframe_a: LazyFrame = get_lazyframe_from_csv(args.file1.clone(), args.delimiter_input_1, Left)?
-        .with_row_count(coluna(Left, "count_lines"), Some(0u32));
+        .with_row_index(coluna(Left, "count_lines"), Some(0u32));
     let lazyframe_b: LazyFrame = get_lazyframe_from_csv(args.file2.clone(), args.delimiter_input_2, Right)?
-        .with_row_count(coluna(Right, "count_lines"), Some(0u32));
+        .with_row_index(coluna(Right, "count_lines"), Some(0u32));
 
     println!("Format the columns to perform comparisons and sum values.");
     let lazyframe_a: LazyFrame = format_fazyframe_a(lazyframe_a)?;
@@ -309,7 +309,7 @@ fn join_with_interline_correlations(lf_a: LazyFrame, lf_b: LazyFrame, df_correla
         );
 
     let lf_b_solution: LazyFrame = df_correlation.lazy().join(lf_b, common_a, common_b, JoinType::Left.into())
-        .drop_columns([coluna(Right, "count_lines")]);
+        .drop([coluna(Right, "count_lines")]);
 
     // add two empty columns to lazyframe
     let lf_a = lf_a
@@ -323,7 +323,7 @@ fn join_with_interline_correlations(lf_a: LazyFrame, lf_b: LazyFrame, df_correla
     let common_b = [col(columns.0), col(columns.1)];
 
     let lf_c: LazyFrame = lf_a.join(lf_b_solution, common_a, common_b, JoinType::Left.into())
-        .drop_columns([coluna(Left, "count_lines")]);
+        .drop([coluna(Left, "count_lines")]);
 
     Ok(lf_c)
 }
@@ -393,7 +393,7 @@ mod tests {
 
         let dataframe_02: DataFrame = dataframe_01
             .lazy()
-            .with_row_count("count lines", Some(1u32))
+            .with_row_index("count lines", Some(1u32))
             .collect()?;
 
         println!("with new column: {dataframe_02}\n");
@@ -437,9 +437,7 @@ mod tests {
             col("str_2"),
             col("str_3"),
             col("str_4"),
-        ], "*"
-        //, true
-        );
+        ], "*", true);
 
         // Need add .fill_null(lit(""))
         let mensagem_ignore_nulls_false: Expr = concat_str([
@@ -447,9 +445,7 @@ mod tests {
             col("str_2").fill_null(lit("")),
             col("str_3").fill_null(lit("")),
             col("str_4").fill_null(lit("")),
-        ], "*"
-        //, false
-        );
+        ], "*", false);
 
         let dataframe_02: DataFrame = dataframe_01
             .lazy()
@@ -537,15 +533,13 @@ mod tests {
         let situacao: Expr = modulo.eq(lit(0)); // Even Number
 
         let mensagem: Expr = concat_str([
-            col(glosar).fill_null(lit("")),
+            col(glosar),
             lit("Situação 01:"),
             col("integers"),
             lit("is an even"),
             lit("number"),
             lit("&"),
-        ], " "
-        //, true
-        );
+        ], " ", true);
 
         let lazyframe: LazyFrame = lazyframe
             .with_column(

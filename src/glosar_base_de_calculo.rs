@@ -105,7 +105,7 @@ impl LazyFrameExtension for LazyFrame {
         ];
 
         // Remover coluna temporária
-        self.drop_columns(columns)
+        self.drop(columns)
     }
 }
 
@@ -160,12 +160,12 @@ fn analisar_situacao01(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     println!("situacao_01: {situacao_01:?}\n");
 
     let mensagem: Expr = concat_str([
-        col(glosar).fill_null(lit("")),
+        col(glosar),
         lit("Situação 01:"),
         lit("NF-e/CT-e Cancelada (Cláusula 12ª do Ajuste Sinief 07/2005 e Cláusula 14ª"),
         lit("do Ajuste Sinief 09/2007 do CONFAZ e Art. 327 do RIPI - Decreto nº 7.212 de 2010)."),
         lit("&"),
-    ], " ");
+    ], " ", true);
 
     let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_01, mensagem, lit(0))?;
 
@@ -195,17 +195,17 @@ fn analisar_situacao02(lazyframe: LazyFrame, args: &Arguments) -> Result<LazyFra
     println!("situacao_02: {situacao_02:?}\n");
 
     let mensagem: Expr = concat_str([
-        col(glosar).fill_null(lit("")),
+        col(glosar),
         lit("Situação 02:"),
         lit("Crédito extemporâneo."),
         lit("&"),
-    ], " ");
+    ], " ", true);
 
     let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_02, mensagem, lit(0))?;
 
     // Remover 2 colunas temporárias
     let lf_result: LazyFrame = lf_result
-        .drop_columns([
+        .drop([
             pa_ini,
             pa_fim,
         ]);
@@ -274,21 +274,21 @@ fn analisar_situacao03(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     println!("situacao_03: {situacao_03:?}\n");
 
     let mensagem: Expr = concat_str([
-        col(glosar).fill_null(lit("")),
+        col(glosar),
         lit("Situação 03:"),
         lit("Aquisição de bens ou serviços não sujeitos ao pagamento da contribuição."),
         lit("De acordo com o inciso II do § 2º do art. 3º das Leis 10.637/2002 e 10.833/2003, não dará direito"),
         lit("a crédito o valor da aquisição de bens ou serviços não sujeitos ao pagamento da contribuição."),
-        col(columns[1]).fill_null(lit("")),
-        col(columns[3]).fill_null(lit("")),
+        col(columns[1]),
+        col(columns[3]),
         lit("&"),
-    ], " ");
+    ], " ", true);
 
     let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_03, mensagem, lit(0))?;
 
     // Remover coluna temporária
     let lf_result: LazyFrame = lf_result
-        .drop_columns([
+        .drop([
             columns[1],
             columns[3],
         ]);
@@ -319,7 +319,7 @@ fn analisar_situacao05(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     println!("situacao_05: {situacao_05:?}\n");
 
     let mensagem: Expr = concat_str([
-        col(glosar).fill_null(lit("")),
+        col(glosar),
         lit("Situação 05:"),
         lit("Excluir valor do ICMS destacado em Nota Fiscal da Base de Cálculo das Contribuições."),
         lit("O valor da Base de Cálculo foi alterado de"),
@@ -327,7 +327,7 @@ fn analisar_situacao05(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
         lit("para"),
         delta.clone().apply(|series| round_series(series, 2), GetOutput::from_type(DataType::Float64)),
         lit("&"),
-    ], " ");
+    ], " ", true);
 
     let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_05, mensagem, delta)?;
 
@@ -355,11 +355,11 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     println!("situacao_06: {situacao_06:?}\n");
 
     let mensagem: Expr = concat_str([
-        col(glosar).fill_null(lit("")),
+        col(glosar),
         lit("Situação 06:"),
         lit("Item de Documento Fiscal usado em duplicidade."),
         lit("&"),
-    ], " ");
+    ], " ", true);
 
     let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_06, mensagem, lit(0))?;
 
@@ -450,19 +450,19 @@ fn analisar_situacao07(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     println!("situacao_07: {situacao_07:?}\n");
 
     let mensagem: Expr = concat_str([
-        col(glosar).fill_null(lit("")),
+        col(glosar),
         lit("Situação 07:"),
         lit("Fretes sobre Compras cujos insumos NÃO estão sujeitos ao pagamento das Contribuições de PIS/PASEP e COFINS."),
-        col(columns[3]).fill_null(lit("")),
-        col(columns[5]).fill_null(lit("")),
+        col(columns[3]),
+        col(columns[5]),
         lit("&"),
-    ], " ");
+    ], " ", true);
 
     let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_07, mensagem, lit(0))?;
 
     // Remover coluna temporária
     let lf_result: LazyFrame = lf_result
-        .drop_columns([
+        .drop([
             columns[3],
             columns[5],
         ]);
@@ -495,14 +495,14 @@ fn analisar_situacao08(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     println!("situacao_08: {situacao_08:?}\n");
 
     let mensagem: Expr = concat_str([
-        col(glosar).fill_null(lit("")),
+        col(glosar),
         lit("Situação 08:"),
         lit("Frete sobre Vendas, operação de Transferência."),
         lit("Conforme Parecer Normativo Cosit nº 5/2018 e § 2º do art. 176 da IN RFB nº 2121 de 2022:"),
         lit("Não são considerados insumos os serviços de transporte de produtos"),
         lit("acabados realizados em ou entre estabelecimentos da pessoa jurídica."),
         lit("&"),
-    ], " ");
+    ], " ", true);
 
     let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_08, mensagem, lit(0))?;
 
@@ -529,13 +529,13 @@ fn analisar_situacao09(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     println!("situacao_09: {situacao_09:?}\n");
 
     let mensagem: Expr = concat_str([
-        col(glosar).fill_null(lit("")),
+        col(glosar),
         lit("Situação 09:"),
         lit("Serviço de Propaganda e Marketing."),
         lit("Os gastos com Serviço de Propaganda e Marketing não são insumos geradores de crédito das Contribuições"),
         lit("segundo os critérios da Essencialidade ou da Relevância (Ver Parecer Normativo nº 5 de 2018)."),
         lit("&"),
-    ], " ");
+    ], " ", true);
 
     let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_09, mensagem, lit(0))?;
 
@@ -569,11 +569,11 @@ fn analisar_situacao10(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     println!("situacao_10: {situacao_10:?}\n");
 
     let mensagem: Expr = concat_str([
-        col(glosar).fill_null(lit("")),
+        col(glosar),
         lit("Situação 10:"),
         lit("Anulação ou Amostras e Brindes ou Retorno de Vasilhame."),
         lit("&"),
-    ], " ");
+    ], " ", true);
 
     let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_10, mensagem, lit(0))?;
 
@@ -600,14 +600,14 @@ fn analisar_situacao11(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     println!("situacao_11: {situacao_11:?}\n");
 
     let mensagem: Expr = concat_str([
-        col(glosar).fill_null(lit("")),
+        col(glosar),
         lit("Situação 11:"),
         lit("Atividades da Mão de Obra."),
         lit("Conforme Parecer Normativo SRFB n° 5 de 2018, linhas 55 e 168, não são considerados insumos os itens destinados"),
         lit("a viabilizar a atividade da mão de obra empregada pela pessoa jurídica em qualquer de suas áreas, inclusive em"),
         lit("seu processo de produção de bens ou de prestação de serviços, tais como alimentação, vestimenta e transporte."),
         lit("&"),
-    ], " ");
+    ], " ", true);
 
     let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_11, mensagem, lit(0))?;
 
@@ -643,11 +643,11 @@ fn analisar_situacao12(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     println!("situacao_12: {situacao_12:?}\n");
 
     let mensagem: Expr = concat_str([
-        col(glosar).fill_null(lit("")),
+        col(glosar),
         lit("Situação 12:"),
         lit("Créditos Estornados, conforme respostas do Contribuinte às Intimações Fiscais."),
         lit("&"),
-    ], " ");
+    ], " ", true);
 
     let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_12, mensagem, lit(0))?;
 
@@ -693,7 +693,7 @@ acabadas; c) contratação de transportadoras.
 */
 
     let mensagem: Expr = concat_str([
-        col(glosar).fill_null(lit("")),
+        col(glosar),
         lit("Situação 13:"),
         lit("Embalagens."),
         lit("Conforme Parecer Normativo SRFB n° 5 de 2018, linha 42,"),
@@ -701,7 +701,7 @@ acabadas; c) contratação de transportadoras.
         lit("dedicadas à atividade de revenda de bens:"),
         lit("c) embalagens para transporte das mercadorias;"),
         lit("&"),
-    ], " ");
+    ], " ", true);
 
     let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_11, mensagem, lit(0))?;
 
@@ -898,15 +898,15 @@ mod tests {
         println!("situacao_03: {situacao_03:?}");
 
         let mensagem: Expr = concat_str([
-            col(glosar).fill_null(lit("")),
+            col(glosar),
             lit("Situação 03:"),
             lit("Aquisição de bens ou serviços não sujeitos ao pagamento da contribuição."),
             lit("De acordo com o inciso II do § 2º do art. 3º das Leis 10.637/2002 e 10.833/2003, não dará direito"),
             lit("a crédito o valor da aquisição de bens ou serviços não sujeitos ao pagamento da contribuição."),
-            col(columns[1]).fill_null(lit("")),
-            col(columns[3]).fill_null(lit("")),
+            col(columns[1]),
+            col(columns[3]),
             lit("&"),
-        ], " ");
+        ], " ", true);
 
         let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_03, mensagem, lit(0))?;
 
