@@ -122,6 +122,7 @@ pub fn glosar_bc(dataframe: &DataFrame, args: &Arguments) -> Result<DataFrame, B
     let lazyframe: LazyFrame = analisar_situacao01(lazyframe)?;
     let lazyframe: LazyFrame = analisar_situacao02(lazyframe, args)?;
     let lazyframe: LazyFrame = analisar_situacao03(lazyframe)?;
+    let lazyframe: LazyFrame = analisar_situacao04(lazyframe)?;
     // let lazyframe: LazyFrame = analisar_situacao05(lazyframe)?;
     let lazyframe: LazyFrame = analisar_situacao06(lazyframe)?;
     let lazyframe: LazyFrame = analisar_situacao07(lazyframe)?;
@@ -296,18 +297,72 @@ fn analisar_situacao03(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     Ok(lf_result)
 }
 
+fn analisar_situacao04(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>> {
+
+    let glosar: &str = coluna(Middle, "glosar");
+    let valor_total_do_item: &str = coluna(Left, "valor_item");             // "Valor Total do Item"
+    let valor_bc: &str = coluna(Left, "valor_bc");                          // "Valor da Base de Cálculo das Contribuições"
+    let valor_da_nota_proporcional_nfe: &str = coluna(Right, "valor_item"); // "Valor da Nota Proporcional : NF Item (Todos) SOMA"
+
+    let cnpj_base_do_contribuinte = "CNPJ Base do Contribuinte";
+    let cnpj_base_do_remetente = "CNPJ Base do Remetente";
+    let cnpj_base_do_destinatario = "CNPJ Base do Destinatário";
+
+    // "CNPJ Base do Contribuinte" eq "CNPJ Base do Destinatário"
+    // O Contribuinte é o Destinatário das operações.
+    let destinatario_das_operacoes: Expr = equal(cnpj_base_do_contribuinte, cnpj_base_do_destinatario);
+
+    // "CNPJ Base do Remetente"  eq "CNPJ Base do Destinatário": operação de transferência
+    // "CNPJ Base do Remetente" neq "CNPJ Base do Destinatário": operação de compra
+    let cnpjs_distintos: Expr = unequal(cnpj_base_do_remetente, cnpj_base_do_contribuinte);
+
+    let operacao_de_compra: Expr = destinatario_das_operacoes
+        .and(cnpjs_distintos);
+
+    let valores_iguais: Expr = equal(valor_bc, valor_da_nota_proporcional_nfe);
+
+    let delta: Expr = col(valor_bc) - col(valor_total_do_item);
+    let base_calculo_superestimada = delta.clone().gt(lit(10));
+
+    let situacao_04: Expr = operacoes_de_entrada_ou_saida()
+        .and(cst_50_a_66())
+        .and(codigo_nat_01_a_18())
+        .and(valores_iguais)
+        .and(base_calculo_superestimada)
+        .and(operacao_de_compra);
+
+    println!("situacao_04: {situacao_04:?}\n");
+
+    let mensagem: Expr = concat_str([
+        col(glosar),
+        lit("Situação 04:"),
+        lit("Valor do frete adicionado ao valor do insumo acarretando acréscimo indevido"),
+        lit("na Base de Cálculo das Contribuições, tal que o frete fora pago pelo remetente,"),
+        lit("fornecedor do insumo."),
+        lit("O valor da Base de Cálculo foi alterado de"),
+        col(valor_bc).apply(|series| round_series(series, 2), GetOutput::from_type(DataType::Float64)),
+        lit("para"),
+        col(valor_total_do_item).apply(|series| round_series(series, 2), GetOutput::from_type(DataType::Float64)),
+        lit("&"),
+    ], " ", true);
+
+    let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_04, mensagem, col(valor_total_do_item))?;
+
+    Ok(lf_result)
+}
+
 #[allow(dead_code)]
 fn analisar_situacao05(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>> {
 
     let glosar: &str = coluna(Middle, "glosar");
-    let valor_da_bcal_da_efd: &str = coluna(Left, "valor_bc");                    // "Valor da Base de Cálculo das Contribuições";
+    let valor_bc: &str = coluna(Left, "valor_bc");                                // "Valor da Base de Cálculo das Contribuições"
     let valor_da_nota_proporcional_nfe: &str = coluna(Right, "valor_item");       // "Valor da Nota Proporcional : NF Item (Todos) SOMA";
     // let valor_da_base_calculo_icms_nfe: &str = coluna(Right, "valor_bc_icms"); // "ICMS: Base de Cálculo : NF Item (Todos) SOMA"
 
-    let valores_iguais_nota_prop: Expr = equal(valor_da_bcal_da_efd, valor_da_nota_proporcional_nfe);
+    let valores_iguais_nota_prop: Expr = equal(valor_bc, valor_da_nota_proporcional_nfe);
     //let valores_iguais_base_icms: Expr = col(valor_da_bcal_da_efd).eq(col(valor_da_base_calculo_icms_nfe));
 
-    let delta: Expr = col(coluna(Left, "valor_bc")) - col("ICMS: Valor do Tributo : NF Item (Todos) SOMA");
+    let delta: Expr = col(valor_bc) - col("ICMS: Valor do Tributo : NF Item (Todos) SOMA");
     let boolean = col("ICMS: Valor do Tributo : NF Item (Todos) SOMA").gt(lit(0));
 
     let situacao_05: Expr = operacoes_de_entrada_ou_saida()
@@ -323,7 +378,7 @@ fn analisar_situacao05(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
         lit("Situação 05:"),
         lit("Excluir valor do ICMS destacado em Nota Fiscal da Base de Cálculo das Contribuições."),
         lit("O valor da Base de Cálculo foi alterado de"),
-        col(coluna(Left, "valor_bc")).apply(|series| round_series(series, 2), GetOutput::from_type(DataType::Float64)),
+        col(valor_bc).apply(|series| round_series(series, 2), GetOutput::from_type(DataType::Float64)),
         lit("para"),
         delta.clone().apply(|series| round_series(series, 2), GetOutput::from_type(DataType::Float64)),
         lit("&"),
@@ -978,7 +1033,7 @@ mod tests {
         println!("df_itens_de_docs_fiscais_result: {df_itens_de_docs_fiscais_result}\n");
 
         // Get columns from dataframe
-        let bcal_values: &Series = df_itens_de_docs_fiscais_result.column(coluna(Left, "valor_bc"))?;
+        let bcal_values: &Series = df_itens_de_docs_fiscais_result.column(valor_bc)?;
 
         // Get columns with into_iter()
         let vec_opt_bcal_values: Vec<Option<f64>> = bcal_values.f64()?.into_iter().collect();
