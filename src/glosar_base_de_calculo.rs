@@ -303,6 +303,10 @@ fn analisar_situacao04(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     let valor_total_do_item: &str = coluna(Left, "valor_item");             // "Valor Total do Item"
     let valor_bc: &str = coluna(Left, "valor_bc");                          // "Valor da Base de Cálculo das Contribuições"
     let valor_da_nota_proporcional_nfe: &str = coluna(Right, "valor_item"); // "Valor da Nota Proporcional : NF Item (Todos) SOMA"
+    let regime_tributario: &str = coluna(Right, "regime_tributario");       // "CRT : NF (Todos)"
+
+    let tomador1: &str = coluna(Right, "tomador_papel1");
+    let tomador2: &str = coluna(Right, "tomador_papel2");
 
     let cnpj_base_do_contribuinte = "CNPJ Base do Contribuinte";
     let cnpj_base_do_remetente = "CNPJ Base do Remetente";
@@ -321,6 +325,15 @@ fn analisar_situacao04(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
 
     let valores_iguais: Expr = equal(valor_bc, valor_da_nota_proporcional_nfe);
 
+    // O Tomador do CTe é o Remetente
+    let pattern: Expr = lit(r"(?i)Remetente"); // regex
+    let tomador_remetente1: Expr = col(tomador1).str().contains(pattern.clone(), false);
+    let tomador_remetente2: Expr = col(tomador2).str().contains(pattern, false);
+    let tomador_remetente: Expr = tomador_remetente1.or(tomador_remetente2);
+
+    // Código de Regime Tributário - CRT
+    let optante_do_simples_nacional: Expr = col(regime_tributario).eq(lit(1));
+
     let delta: Expr = col(valor_bc) - col(valor_total_do_item);
     let base_calculo_superestimada = delta.clone().gt(lit(10));
 
@@ -328,8 +341,10 @@ fn analisar_situacao04(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
         .and(cst_50_a_66())
         .and(codigo_nat_01_a_18())
         .and(valores_iguais)
-        .and(base_calculo_superestimada)
-        .and(operacao_de_compra);
+        .and(operacao_de_compra)
+        .and(tomador_remetente)
+        .and(optante_do_simples_nacional.not())
+        .and(base_calculo_superestimada);
 
     println!("situacao_04: {situacao_04:?}\n");
 
@@ -338,7 +353,7 @@ fn analisar_situacao04(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
         lit("Situação 04:"),
         lit("Valor do frete adicionado ao valor do insumo acarretando acréscimo indevido"),
         lit("na Base de Cálculo das Contribuições, tal que o frete fora pago pelo remetente,"),
-        lit("fornecedor do insumo."),
+        lit("fornecedor do insumo e tomador (responsável pelo pagamento) do frete."),
         lit("O valor da Base de Cálculo foi alterado de"),
         col(valor_bc).apply(|series| round_series(series, 2), GetOutput::from_type(DataType::Float64)),
         lit("para"),
