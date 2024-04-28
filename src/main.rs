@@ -39,9 +39,9 @@ Example of use:
     join_with_assignments -1 'Dados - Pg/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Pg/nfe_float64.csv' -c true -p true -r true -s 201907 -f 202206
 
     // Verificação dos arquivos:
-    b3sum df* "Dados - Ar/"df*
-    sha512sum df* "Dados - Ar/"df*
-    meld df_consolidacao_natureza_da_bcalc_result.csv "Dados - Ar/df_consolidacao_natureza_da_bcalc_result.csv"&
+    b3sum df* "Dados - Nd/"df*
+    sha512sum df* "Dados - Nd/"df*
+    meld df_consolidacao_natureza_da_bcalc_result.csv "Dados - Nd/df_consolidacao_natureza_da_bcalc_result.csv"&
 
     // Boring Data Tool (bdt): <https://github.com/andygrove/bdt>
     bdt schema df_itens_de_docs_fiscais_result.parquet

@@ -16,7 +16,7 @@ use crate::{
         operacoes_de_entrada_ou_saida
     },
     coluna,
-    Side::{Left, Middle, Right}, operacoes_de_entrada,
+    Side::{Left, Middle, Right},
 };
 
 /// CFOP de Armazenagem de mercadoria
@@ -141,6 +141,35 @@ pub fn glosar_bc(dataframe: &DataFrame, args: &Arguments) -> Result<DataFrame, B
     )
 }
 
+/// Check if the columns are the same
+fn equal(col_a: &str, col_b: &str) -> Expr {
+    // Uma das colunas com campos não nulos!!!
+    col(col_a).is_not_null()
+        .and(col(col_b).is_not_null()) // it is not necessary
+        .and(col(col_a).eq(col(col_b)))
+}
+
+/// Check if the columns are different
+fn unequal(col_a: &str, col_b: &str) -> Expr {
+    col(col_a).is_not_null()
+        .and(col(col_b).is_not_null())
+        .and(col(col_a).neq(col(col_b)))
+}
+
+fn operacoes_de_credito() -> Expr {
+    operacoes_de_entrada_ou_saida()
+        .and(cst_50_a_66())
+        .and(codigo_nat_01_a_18())
+}
+
+fn optante_do_simples_nacional() -> Expr {
+    // Código de Regime Tributário - CRT
+    let regime_tributario: &str = coluna(Right, "regime_tributario"); // "CRT : NF (Todos)"
+    let optante_do_simples_nacional: Expr = col(regime_tributario).eq(lit(1));
+
+    optante_do_simples_nacional
+}
+
 fn analisar_situacao01(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>> {
 
     // /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/polars-plan-0.34.2/src/dsl/string.rs
@@ -152,9 +181,7 @@ fn analisar_situacao01(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     let pattern: Expr = lit(r"(?i)^\s*Sim"); // regex
     let docs_cancelados: Expr = col(cancelada).str().contains(pattern, false);
 
-    let situacao_01: Expr = operacoes_de_entrada_ou_saida()
-        .and(cst_50_a_66())
-        .and(codigo_nat_01_a_18())
+    let situacao_01: Expr = operacoes_de_credito()
         .and(col(cancelada).is_not_null())
         .and(docs_cancelados);
 
@@ -184,9 +211,7 @@ fn analisar_situacao02(lazyframe: LazyFrame, args: &Arguments) -> Result<LazyFra
 
     let lazyframe: LazyFrame = adicionar_coluna_periodo_de_apuracao_inicial_e_final(lazyframe, args)?;
 
-    let situacao_02: Expr = operacoes_de_entrada_ou_saida()
-        .and(cst_50_a_66())
-        .and(codigo_nat_01_a_18())
+    let situacao_02: Expr = operacoes_de_credito()
         .and(col(dia_emissao).is_not_null())
         .and(
             col(dia_emissao).lt(col(pa_ini))
@@ -219,8 +244,7 @@ fn analisar_situacao03(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     let glosar: &str = coluna(Middle, "glosar");
     let cfop: &str = coluna(Right, "cfop");
     let origem_do_item: &str = coluna(Right, "origem"); // "Registro de Origem do Item : NF Item (Todos)"
-    let regime_tributario: &str = coluna(Right, "regime_tributario"); // "CRT : NF (Todos)"
-    
+
     // let aliq_pis: &str = coluna(Right, "aliq_pis");
     // let aliq_cof: &str = coluna(Right, "aliq_cof");
 
@@ -244,15 +268,11 @@ fn analisar_situacao03(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     // Alíquotas de PIS/PASEP e de COFINS iguais a Zero
     // let aliquotas_zero: Expr = col(aliq_pis).eq(lit(0)).and(col(aliq_cof).eq(lit(0)));
 
-    // Código de Regime Tributário - CRT
-    let optante_do_simples_nacional: Expr = col(regime_tributario).eq(lit(1));
-
-    let filter: Expr = operacoes_de_entrada_ou_saida()
+    let filter: Expr = operacoes_de_credito()
+        .and(optante_do_simples_nacional().not())
         .and(cst_50_a_56())
-        .and(codigo_nat_01_a_18())
         .and(nfe)
-        .and(cfop_de_insumos.not())
-        .and(optante_do_simples_nacional.not());
+        .and(cfop_de_insumos.not());
         //.and(aliquotas_zero);
 
     // Adicionar coluna temporária
@@ -303,7 +323,6 @@ fn analisar_situacao04(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     let valor_total_do_item: &str = coluna(Left, "valor_item");             // "Valor Total do Item"
     let valor_bc: &str = coluna(Left, "valor_bc");                          // "Valor da Base de Cálculo das Contribuições"
     let valor_da_nota_proporcional_nfe: &str = coluna(Right, "valor_item"); // "Valor da Nota Proporcional : NF Item (Todos) SOMA"
-    let regime_tributario: &str = coluna(Right, "regime_tributario");       // "CRT : NF (Todos)"
 
     let tomador1: &str = coluna(Right, "tomador_papel1");
     let tomador2: &str = coluna(Right, "tomador_papel2");
@@ -331,19 +350,14 @@ fn analisar_situacao04(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     let tomador_remetente2: Expr = col(tomador2).str().contains(pattern, false);
     let tomador_remetente: Expr = tomador_remetente1.or(tomador_remetente2);
 
-    // Código de Regime Tributário - CRT
-    let optante_do_simples_nacional: Expr = col(regime_tributario).eq(lit(1));
-
     let delta: Expr = col(valor_bc) - col(valor_total_do_item);
     let base_calculo_superestimada = delta.clone().gt(lit(10));
 
-    let situacao_04: Expr = operacoes_de_entrada_ou_saida()
-        .and(cst_50_a_66())
-        .and(codigo_nat_01_a_18())
+    let situacao_04: Expr = operacoes_de_credito()
+        .and(optante_do_simples_nacional().not())
         .and(valores_iguais)
         .and(operacao_de_compra)
         .and(tomador_remetente)
-        .and(optante_do_simples_nacional.not())
         .and(base_calculo_superestimada);
 
     println!("situacao_04: {situacao_04:?}\n");
@@ -380,9 +394,7 @@ fn analisar_situacao05(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     let delta: Expr = col(valor_bc) - col("ICMS: Valor do Tributo : NF Item (Todos) SOMA");
     let boolean = col("ICMS: Valor do Tributo : NF Item (Todos) SOMA").gt(lit(0));
 
-    let situacao_05: Expr = operacoes_de_entrada_ou_saida()
-        .and(cst_50_a_66())
-        .and(codigo_nat_01_a_18())
+    let situacao_05: Expr = operacoes_de_credito()
         .and(valores_iguais_nota_prop)
         .and(boolean);
 
@@ -416,9 +428,7 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     let series: Series = Series::new("n", [654321]);
     let num_doc: Expr = col(num_doc).is_in(lit(series));
 
-    let situacao_06: Expr = operacoes_de_entrada_ou_saida()
-        .and(cst_50_a_66())
-        .and(codigo_nat_01_a_18())
+    let situacao_06: Expr = operacoes_de_credito()
         .and(cnpj)
         .and(num_doc);
 
@@ -434,21 +444,6 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_06, mensagem, lit(0))?;
 
     Ok(lf_result)
-}
-
-/// Check if the columns are the same
-fn equal(col_a: &str, col_b: &str) -> Expr {
-    // Uma das colunas com campos não nulos!!!
-    col(col_a).is_not_null()
-        .and(col(col_b).is_not_null()) // it is not necessary
-        .and(col(col_a).eq(col(col_b)))
-}
-
-/// Check if the columns are different
-fn unequal(col_a: &str, col_b: &str) -> Expr {
-    col(col_a).is_not_null()
-        .and(col(col_b).is_not_null())
-        .and(col(col_a).neq(col(col_b)))
 }
 
 fn analisar_situacao07(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>> {
@@ -492,9 +487,8 @@ fn analisar_situacao07(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     let operacao_de_compra: Expr = destinatario_das_operacoes
         .and(cnpjs_distintos);
 
-    let filter: Expr = operacoes_de_entrada_ou_saida()
+    let filter: Expr = operacoes_de_credito()
         .and(cst_50_a_56())
-        .and(codigo_nat_01_a_18())
         .and(cte)
         .and(cfop_de_insumos.not())
         .and(not_credito_presumido)
@@ -556,9 +550,7 @@ fn analisar_situacao08(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     // "CNPJ Base do Remetente" eq "CNPJ Base do Destinatário"
     let operacao_de_transferencia: Expr = equal(columns[0], columns[1]);
 
-    let situacao_08: Expr = operacoes_de_entrada_ou_saida()
-        .and(cst_50_a_66())
-        .and(codigo_nat_01_a_18())
+    let situacao_08: Expr = operacoes_de_credito()
         .and(frete_sobre_vendas)
         .and(operacao_de_transferencia);
 
@@ -591,9 +583,7 @@ fn analisar_situacao09(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     let condicao1: Expr = col(item_descricao).str().contains(pattern1, false);
     let condicao2: Expr = col(escri_contabil).str().contains(pattern2, false);
 
-    let situacao_09: Expr = operacoes_de_entrada_ou_saida()
-        .and(cst_50_a_66())
-        .and(codigo_nat_01_a_18())
+    let situacao_09: Expr = operacoes_de_credito()
         .and(condicao1.or(condicao2));
 
     println!("situacao_09: {situacao_09:?}\n");
@@ -626,9 +616,7 @@ fn analisar_situacao10(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     let condicao2: Expr = col(descricao_cfop).str().contains(pattern2, false);
     let condicao3: Expr = col(descricao_cfop).str().contains(pattern3, false);
 
-    let situacao_10: Expr = operacoes_de_entrada_ou_saida()
-        .and(cst_50_a_66())
-        .and(codigo_nat_01_a_18())
+    let situacao_10: Expr = operacoes_de_credito()
         .and(condicao1)
         .and(condicao2)
         .and(
@@ -662,9 +650,7 @@ fn analisar_situacao11(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     let condicao1: Expr = col(item_descricao).str().contains(pattern1, false);
     let condicao2: Expr = col(escri_contabil).str().contains(pattern2, false);
 
-    let situacao_11: Expr = operacoes_de_entrada_ou_saida()
-        .and(cst_50_a_66())
-        .and(codigo_nat_01_a_18())
+    let situacao_11: Expr = operacoes_de_credito()
         .and(condicao1.or(condicao2));
 
     println!("situacao_11: {situacao_11:?}\n");
@@ -705,9 +691,7 @@ fn analisar_situacao12(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
 
     let linhas: Expr = col(num_linha).is_in(lit(series));
 
-    let situacao_12: Expr = operacoes_de_entrada_ou_saida()
-        .and(cst_50_a_66())
-        .and(codigo_nat_01_a_18())
+    let situacao_12: Expr = operacoes_de_credito()
         .and(linhas);
 
     println!("situacao_12: {situacao_12:?}\n");
@@ -737,9 +721,7 @@ fn analisar_situacao13(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     let condicao1: Expr = col(item_tipo).str().contains(pattern1, false);
     let condicao2: Expr = col(escri_contabil).str().contains(pattern2, false);
 
-    let situacao_11: Expr = operacoes_de_entrada()
-        .and(cst_50_a_66())
-        .and(codigo_nat_01_a_18())
+    let situacao_11: Expr = operacoes_de_credito()
         .and(condicao1.and(condicao2));
 
     println!("situacao_13: {situacao_11:?}\n");
