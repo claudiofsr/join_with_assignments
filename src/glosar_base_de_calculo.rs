@@ -369,7 +369,7 @@ fn analisar_situacao04(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
         lit("tal que o fornecedor do insumo quem efetuou o pagamento do frete, remetente tomador."),
         lit("Ver colunas: [CTe - Remetente das mercadorias transportadas: CNPJ/CPF de Conhecimento] e [CNPJ Base do Remetente]"),
         lit("e [CNPJ Base do Destinatário] e [Descrição CTe - Indicador do 'papel' do tomador do serviço de Conhecimento]."),
-        lit(". O valor da Base de Cálculo foi alterado de"),
+        lit("O valor da Base de Cálculo foi alterado de"),
         col(valor_bc).apply(|series| round_series(series, 2), GetOutput::from_type(DataType::Float64)),
         lit("para"),
         col(valor_total_do_item).apply(|series| round_series(series, 2), GetOutput::from_type(DataType::Float64)),
