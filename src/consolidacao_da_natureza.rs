@@ -1039,7 +1039,7 @@ fn ordenar_colunas(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>> {
                 col("Natureza da Base de Cálculo dos Créditos"),
                 col("Alíquota de COFINS (em percentual)"),
                 col("Alíquota de PIS/PASEP (em percentual)"),
-                //col("Registro"), col("Código Fiscal de Operações e Prestações (CFOP)"), col("Código NCM"),
+                col("Valor da Base de Cálculo das Contribuições"),
             ],
             // https://github.com/pola-rs/polars/pull/15590
             SortMultipleOptions::default()
