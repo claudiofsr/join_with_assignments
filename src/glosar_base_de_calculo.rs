@@ -383,7 +383,7 @@ fn analisar_situacao04(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     let tomador_remetente: Expr = tomador_remetente1.or(tomador_remetente2);
 
     let delta: Expr = col(valor_bc) - col(valor_total_do_item) - col(valor_cte_vinculado);
-    let base_calculo_superestimada = delta.gt_eq(lit(0));
+    let base_calculo_superestimada = delta.gt_eq(lit(-0.2));
     let valor_justo: Expr = col(valor_bc) - col(valor_cte_vinculado);
 
     let situacao_04: Expr = operacoes_de_credito()
