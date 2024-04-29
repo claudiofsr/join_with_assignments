@@ -31,6 +31,26 @@ pub const CFOP_DE_INDUSTRIALIZACAO: [i32; 8] = [
     5124, 5125, 6124, 6125,
 ];
 
+/*
+// ### --- cte_valor.csv --- ###
+let myschema = Schema::from_iter([
+    Field::new("CTe", DataType::String),
+    Field::new("Valor", DataType::Float64),
+]);
+
+let csv_file = "Dados - Nd/cte_valor.csv";
+
+let cte_valor_lazyframe: LazyFrame = LazyCsvReader::new(csv_file)
+    .with_encoding(CsvEncoding::LossyUtf8)
+    .with_separator(b';')
+    .has_header(true)
+    .with_schema(Some(Arc::new(myschema)))
+    .finish()?;
+
+println!("cte_valor_lazyframe: {:?}", cte_valor_lazyframe.collect()?);
+// ### --- cte_valor.csv --- ###
+*/
+
 /// Trait extension to LazyFrame
 pub trait LazyFrameExtension {
     /// Format LazyFrame values
@@ -71,13 +91,20 @@ impl LazyFrameExtension for LazyFrame {
 
     fn adicionar_colunas_auxiliares(self) -> Self {
         let columns: Vec<&str> = vec![
-            coluna(Left, "contribuinte_cnpj"),  // "CNPJ dos Estabelecimentos do Contribuinte"
-            "CNPJ Base do Contribuinte",        // Coluna auxiliar
-            coluna(Right, "remetente_cnpj2"),   // "CTe - Remetente das mercadorias transportadas: CNPJ/CPF de Conhecimento : ConhecimentoInformacaoNFe"
-            "CNPJ Base do Remetente",           // Coluna auxiliar
-            coluna(Right, "destinatario_cnpj"), // "CTe - Informações do Destinatário do CT-e: CNPJ/CPF de Conhecimento : ConhecimentoValoresPrestacaoServico-Componentes"
-            "CNPJ Base do Destinatário",        // Coluna auxiliar
+            coluna(Left, "contribuinte_cnpj"),    // "CNPJ dos Estabelecimentos do Contribuinte"
+            "CNPJ Base do Contribuinte",          // Coluna auxiliar
+            coluna(Right, "remetente_cnpj2"),     // "CTe - Remetente das mercadorias transportadas: CNPJ/CPF de Conhecimento : ConhecimentoInformacaoNFe"
+            "CNPJ Base do Remetente",             // Coluna auxiliar
+            coluna(Right, "destinatario_cnpj"),   // "CTe - Informações do Destinatário do CT-e: CNPJ/CPF de Conhecimento : ConhecimentoValoresPrestacaoServico-Componentes"
+            "CNPJ Base do Destinatário",          // Coluna auxiliar
+            coluna(Right, "chave_de_acesso"),     // "Inf. NFe - Chave de acesso da NF-e : ConhecimentoInformacaoNFe"
+            "Valor Total do Documento Vinculado", // Coluna auxiliar
         ];
+
+        // CTe: 123, 2 NFes: [123, 123] de valor total = 345.85
+        // NFe: 123, 2 CTes: [123, 123] de valor total = 217.01
+        // https://docs.pola.rs/user-guide/expressions/strings/#extract-a-pattern
+        let pattern: Expr = lit(r"(?i)valor total = (.*)"); // regex
 
         self
             .with_columns([
@@ -91,6 +118,9 @@ impl LazyFrameExtension for LazyFrame {
                 col(columns[4])
                     .apply(get_cnpj_base, GetOutput::from_type(DataType::String))
                     .alias(columns[5]), // Coluna auxiliar
+                col(columns[6])
+                    .str().extract(pattern, 1).cast(DataType::Float64)
+                    .alias(columns[7]), // Coluna auxiliar
             ])
     }
 
@@ -102,6 +132,7 @@ impl LazyFrameExtension for LazyFrame {
             "CNPJ Base do Contribuinte",
             "CNPJ Base do Remetente",
             "CNPJ Base do Destinatário",
+            "Valor Total do Documento Vinculado",
         ];
 
         // Remover coluna temporária
@@ -330,6 +361,7 @@ fn analisar_situacao04(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     let cnpj_base_do_contribuinte = "CNPJ Base do Contribuinte";
     let cnpj_base_do_remetente = "CNPJ Base do Remetente";
     let cnpj_base_do_destinatario = "CNPJ Base do Destinatário";
+    let ctes_valor_total = "Valor Total do Documento Vinculado";
 
     // "CNPJ Base do Contribuinte" eq "CNPJ Base do Destinatário"
     // O Contribuinte é o Destinatário das operações.
@@ -350,8 +382,9 @@ fn analisar_situacao04(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     let tomador_remetente2: Expr = col(tomador2).str().contains(pattern, false);
     let tomador_remetente: Expr = tomador_remetente1.or(tomador_remetente2);
 
-    let delta: Expr = col(valor_bc) - col(valor_total_do_item);
-    let base_calculo_superestimada = delta.clone().gt(lit(10));
+    let delta: Expr = col(valor_bc) - col(valor_total_do_item) - col(ctes_valor_total);
+    let base_calculo_superestimada = delta.gt_eq(lit(0));
+    let valor_justo: Expr = col(valor_bc) - col(ctes_valor_total);
 
     let situacao_04: Expr = operacoes_de_credito()
         .and(optante_do_simples_nacional().not())
@@ -367,16 +400,19 @@ fn analisar_situacao04(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
         lit("Situação 04:"),
         lit("Valor do frete adicionado ao valor do insumo acarretando acréscimo indevido na Base de Cálculo das Contribuições,"),
         lit("tal que o fornecedor do insumo quem efetuou o pagamento do frete, remetente tomador."),
-        lit("Ver colunas: [CTe - Remetente das mercadorias transportadas: CNPJ/CPF de Conhecimento] e [CNPJ Base do Remetente]"),
-        lit("e [CNPJ Base do Destinatário] e [Descrição CTe - Indicador do 'papel' do tomador do serviço de Conhecimento]."),
-        lit("O valor da Base de Cálculo foi alterado de"),
+        lit("Ver colunas: [CTe - Remetente das mercadorias transportadas: CNPJ/CPF de Conhecimento] e"),
+        lit("[Descrição CTe - Indicador do 'papel' do tomador do serviço de Conhecimento] e"),
+        lit("[CNPJ Base do Remetente] e [CNPJ Base do Destinatário] e [Valor Total do Documento Vinculado]."),
+        lit("Valor da Base de Cálculo = "),
         col(valor_bc).apply(|series| round_series(series, 2), GetOutput::from_type(DataType::Float64)),
-        lit("para"),
-        col(valor_total_do_item).apply(|series| round_series(series, 2), GetOutput::from_type(DataType::Float64)),
+        lit("-"),
+        col(ctes_valor_total).apply(|series| round_series(series, 2), GetOutput::from_type(DataType::Float64)),
+        lit("="),
+        valor_justo.clone().apply(|series| round_series(series, 2), GetOutput::from_type(DataType::Float64)),
         lit("&"),
     ], " ", true);
 
-    let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_04, mensagem, col(valor_total_do_item))?;
+    let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_04, mensagem, valor_justo)?;
 
     Ok(lf_result)
 }
