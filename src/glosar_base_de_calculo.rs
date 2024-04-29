@@ -361,7 +361,7 @@ fn analisar_situacao04(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     let cnpj_base_do_contribuinte = "CNPJ Base do Contribuinte";
     let cnpj_base_do_remetente = "CNPJ Base do Remetente";
     let cnpj_base_do_destinatario = "CNPJ Base do Destinatário";
-    let ctes_valor_total = "Valor Total de Documentos Vinculados";
+    let valor_cte_vinculado = "Valor Total de Documentos Vinculados";
 
     // "CNPJ Base do Contribuinte" eq "CNPJ Base do Destinatário"
     // O Contribuinte é o Destinatário das operações.
@@ -382,9 +382,9 @@ fn analisar_situacao04(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     let tomador_remetente2: Expr = col(tomador2).str().contains(pattern, false);
     let tomador_remetente: Expr = tomador_remetente1.or(tomador_remetente2);
 
-    let delta: Expr = col(valor_bc) - col(valor_total_do_item) - col(ctes_valor_total);
+    let delta: Expr = col(valor_bc) - col(valor_total_do_item) - col(valor_cte_vinculado);
     let base_calculo_superestimada = delta.gt_eq(lit(0));
-    let valor_justo: Expr = col(valor_bc) - col(ctes_valor_total);
+    let valor_justo: Expr = col(valor_bc) - col(valor_cte_vinculado);
 
     let situacao_04: Expr = operacoes_de_credito()
         .and(optante_do_simples_nacional().not())
@@ -406,7 +406,7 @@ fn analisar_situacao04(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
         lit("Valor da Base de Cálculo = "),
         col(valor_bc).apply(|series| round_series(series, 2), GetOutput::from_type(DataType::Float64)),
         lit("-"),
-        col(ctes_valor_total).apply(|series| round_series(series, 2), GetOutput::from_type(DataType::Float64)),
+        col(valor_cte_vinculado).apply(|series| round_series(series, 2), GetOutput::from_type(DataType::Float64)),
         lit("="),
         valor_justo.clone().apply(|series| round_series(series, 2), GetOutput::from_type(DataType::Float64)),
         lit("&"),
