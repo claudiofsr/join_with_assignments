@@ -382,8 +382,9 @@ fn analisar_situacao04(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     let tomador_remetente2: Expr = col(tomador2).str().contains(pattern, false);
     let tomador_remetente: Expr = tomador_remetente1.or(tomador_remetente2);
 
+    let cte_valor_minimo = col(valor_cte_vinculado).gt(lit(10));
     let delta: Expr = col(valor_bc) - col(valor_total_do_item) - col(valor_cte_vinculado);
-    let base_calculo_superestimada = delta.gt_eq(lit(-0.05));
+    let base_calculo_superestimada = delta.gt_eq(lit(-0.02));
     let valor_justo: Expr = col(valor_bc) - col(valor_cte_vinculado);
 
     let situacao_04: Expr = operacoes_de_credito()
@@ -391,6 +392,7 @@ fn analisar_situacao04(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
         .and(valores_iguais)
         .and(operacao_de_compra)
         .and(tomador_remetente)
+        .and(cte_valor_minimo)
         .and(base_calculo_superestimada);
 
     println!("situacao_04: {situacao_04:?}\n");
