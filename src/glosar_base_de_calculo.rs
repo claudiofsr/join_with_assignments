@@ -161,8 +161,9 @@ pub fn glosar_bc(dataframe: &DataFrame, args: &Arguments) -> Result<DataFrame, B
     let lazyframe: LazyFrame = analisar_situacao09(lazyframe)?;
     let lazyframe: LazyFrame = analisar_situacao10(lazyframe)?;
     let lazyframe: LazyFrame = analisar_situacao11(lazyframe)?;
-    // let lazyframe: LazyFrame = analisar_situacao12(lazyframe)?;
+    let lazyframe: LazyFrame = analisar_situacao12(lazyframe)?;
     // let lazyframe: LazyFrame = analisar_situacao13(lazyframe)?;
+    // let lazyframe: LazyFrame = analisar_situacao14(lazyframe)?;
 
     Ok(
         lazyframe
@@ -669,6 +670,7 @@ fn analisar_situacao10(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
         col(glosar),
         lit("Situação 10:"),
         lit("Anulação ou Amostras e Brindes ou Retorno de Vasilhame."),
+        lit("Ver coluna <Descrição CFOP : NF Item (Todos)>."),
         lit("&"),
     ], " ", true);
 
@@ -709,8 +711,44 @@ fn analisar_situacao11(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     Ok(lf_result)
 }
 
-#[allow(dead_code)]
 fn analisar_situacao12(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>> {
+
+    let glosar: &str = coluna(Middle, "glosar");
+    let chave: &str = coluna(Left, "chave"); // "Chave do Documento"
+
+    let series: Series = [
+        // CTe:
+        "35180553284634000180570020000017561000098993",
+        "43141210683982000117570000000025191064579201",
+        "43141210683982000117570000000025241131183998",
+        "43150110683982000117570000000025841756840610",
+        "43150110683982000117570000000026021786253020",
+        "43150110683982000117570000000026111551067357",
+        "43150110683982000117570000000026131094958062",
+        "43170410683982000117570000000066751423453025",
+    ].iter().map(|doc| doc.to_string()).collect();
+
+    let chave_inexistente: Expr = col(chave).is_in(lit(series));
+
+    let situacao_12: Expr = operacoes_de_credito()
+        .and(chave_inexistente);
+
+    println!("situacao_12: {situacao_12:?}\n");
+
+    let mensagem: Expr = concat_str([
+        col(glosar),
+        lit("Situação 12:"),
+        lit("Documento Fiscal inexistente conforme www.nfe.fazenda.gov.br ou www.cte.fazenda.gov.br"),
+        lit("&"),
+    ], " ", true);
+
+    let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_12, mensagem, lit(0))?;
+
+    Ok(lf_result)
+}
+
+#[allow(dead_code)]
+fn analisar_situacao13(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>> {
 
     let glosar: &str = coluna(Middle, "glosar");
     let num_linha: &str = coluna(Left, "num_linha"); // "Linhas"
@@ -730,25 +768,25 @@ fn analisar_situacao12(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
 
     let linhas: Expr = col(num_linha).is_in(lit(series));
 
-    let situacao_12: Expr = operacoes_de_credito()
+    let situacao_13: Expr = operacoes_de_credito()
         .and(linhas);
 
-    println!("situacao_12: {situacao_12:?}\n");
+    println!("situacao_13: {situacao_13:?}\n");
 
     let mensagem: Expr = concat_str([
         col(glosar),
-        lit("Situação 12:"),
+        lit("Situação 13:"),
         lit("Créditos Estornados, conforme respostas do Contribuinte às Intimações Fiscais."),
         lit("&"),
     ], " ", true);
 
-    let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_12, mensagem, lit(0))?;
+    let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_13, mensagem, lit(0))?;
 
     Ok(lf_result)
 }
 
 #[allow(dead_code)]
-fn analisar_situacao13(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>> {
+fn analisar_situacao14(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>> {
 
     let glosar: &str = coluna(Middle, "glosar");
     let item_tipo: &str = coluna(Left, "item_tipo");
@@ -760,10 +798,10 @@ fn analisar_situacao13(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     let condicao1: Expr = col(item_tipo).str().contains(pattern1, false);
     let condicao2: Expr = col(escri_contabil).str().contains(pattern2, false);
 
-    let situacao_11: Expr = operacoes_de_credito()
+    let situacao_14: Expr = operacoes_de_credito()
         .and(condicao1.and(condicao2));
 
-    println!("situacao_13: {situacao_11:?}\n");
+    println!("situacao_14: {situacao_14:?}\n");
 
 /*
 PARECER NORMATIVO Nº 5, DE 17 DE DEZEMBRO DE 2018
@@ -785,7 +823,7 @@ acabadas; c) contratação de transportadoras.
 
     let mensagem: Expr = concat_str([
         col(glosar),
-        lit("Situação 13:"),
+        lit("Situação 14:"),
         lit("Embalagens."),
         lit("Conforme Parecer Normativo SRFB n° 5 de 2018, linha 42,"),
         lit("não constituem insumos geradores de créditos para pessoas jurídicas"),
@@ -794,7 +832,7 @@ acabadas; c) contratação de transportadoras.
         lit("&"),
     ], " ", true);
 
-    let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_11, mensagem, lit(0))?;
+    let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_14, mensagem, lit(0))?;
 
     Ok(lf_result)
 }
