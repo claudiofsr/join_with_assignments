@@ -66,6 +66,7 @@ pub trait LazyFrameExtension {
     fn adicionar_colunas_auxiliares(self) -> Self;
 
     /// Remover colunas auxiliares das situações de glosa.
+    #[allow(dead_code)]
     fn remover_colunas_auxiliares(self) -> Self;
 }
 

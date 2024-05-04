@@ -76,8 +76,8 @@ pub fn write_xlsx(args: &Arguments, dfs: &[DataFrame]) -> PolarsResult<()> {
 
     for (df, sheet_name) in [
         (&joined, "Itens de Docs Fiscais"),
-        (&df_consolidacao_natureza_da_bcalc, "EFD (original)"),
-        (&df_consolidacao_natureza_da_bcalc_result, "EFD (após auditoria)"),
+        (df_consolidacao_natureza_da_bcalc, "EFD (original)"),
+        (df_consolidacao_natureza_da_bcalc_result, "EFD (após auditoria)"),
     ] {
         let number_of_rows = df.height();
         let number_of_sheet = number_of_rows.div_ceil(MAX_NUMBER_OF_ROWS);
@@ -339,7 +339,7 @@ fn auto_color(df: &DataFrame, worksheet: &mut Worksheet, sheet_name: &str) -> Po
         if col_name == "Crédito vinculado à Receita Bruta Não Cumulativa" {
             for (row_num, data) in series.iter().enumerate() {
                 match data {
-                    AnyValue::Float64(value) if selected_rows.get(&row_num).is_some() => {
+                    AnyValue::Float64(value) if selected_rows.contains_key(&row_num) => {
                         worksheet.write_with_format(row_num as u32 + 1, col_num as u16, value, &format_credito_nao_cumulativo)?;
                     },
                     _ => continue,
