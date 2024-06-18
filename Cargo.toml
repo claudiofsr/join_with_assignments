@@ -3,7 +3,7 @@ name = "join_with_assignments"
 authors = ["Claudio F S Rodrigues <claudiofsrodrigues@gmail.com>"]
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.78"
+rust-version = "1.79"
 homepage = "https://github.com/claudiofsr/join_with_assignments"
 repository = "https://github.com/claudiofsr/join_with_assignments"
 description = """
@@ -29,11 +29,11 @@ readme = "README.md"
 anstyle = "1.0"
 cc = { version = "1.0", features = ["parallel"] }
 chrono = { version = "0.4", features = [ "serde" ] }
-claudiofsr_lib = "0.5"
+claudiofsr_lib = "0.8"
 colored = "2.1"
 confy = "0.6"
 once_cell = "1.19"
-pathfinding = "4.9"
+pathfinding = "4.10"
 rayon = "1.10"
 regex = "1.10"
 serde = { version = "1.0", features = [ "derive" ] }
@@ -54,9 +54,8 @@ features = [
 version = "0.39.2"
 # git = "https://github.com/pola-rs/polars.git"
 # rev = "d01c4bf4"
-# https://github.com/pola-rs/polars/releases/tag/rs-0.37.0
-# https://github.com/pola-rs/polars/releases/tag/rs-0.38.0
 # https://github.com/pola-rs/polars/releases/tag/rs-0.39.0
+# https://github.com/pola-rs/polars/releases/tag/rs-0.40.0
 features = [
     "abs",        # Convert all values to their absolute/positive value.
     "concat_str", # Concat string data in linear time
@@ -80,13 +79,14 @@ features = [
 ]
 
 [dependencies.rust_xlsxwriter]
-# version = "0.64.2"
+# version = "0.67.0"
 # git = "https://github.com/jmcnamara/rust_xlsxwriter.git"
 # Change polars version dependencies to "0.39.2":
-path = "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/rust_xlsxwriter-0.64.2"
+path = "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/rust_xlsxwriter-0.67.0b"
 features = [
     "chrono",
     "polars",
+    "ryu",
     "zlib",
 ]
 

@@ -35,6 +35,8 @@ pub fn obter_consolidacao_nat(dataframe: &DataFrame, auditar: bool) -> Result<Da
         parallel: true,
         rechunk: true,
         to_supertypes: true,
+        //diagonal: false,
+        //from_partitioned_ds: false,
     };
 
     let lazyframe: LazyFrame = dataframe.clone().lazy();

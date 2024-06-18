@@ -38,7 +38,7 @@ pub fn get_dataframe_after_assignments(args: &Arguments) -> Result<DataFrame, Bo
     let lazyframe_a: LazyFrame = format_fazyframe_a(lazyframe_a)?;
     let lazyframe_b: LazyFrame = format_fazyframe_b(lazyframe_b)?;
 
-    // Groupby column
+    println!("Groupby column.");
     let lazy_groupby_a: LazyFrame = groupby_fazyframe_a(lazyframe_a.clone())?;
     let lazy_groupby_b: LazyFrame = groupby_fazyframe_b(lazyframe_b.clone())?;
 
@@ -72,12 +72,17 @@ fn format_fazyframe_a(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>>
         coluna(Left, "valor_bc"),
     ];
 
+    let count_lines = coluna(Left, "count_lines");
+    let chave = coluna(Left, "chave");
+
+    //println!("lazyframe_a 1:");
+
     let lz = lazyframe // Formatar colunas
         .with_column(
-            col(coluna(Left, "count_lines")).cast(DataType::UInt64)
+            col(count_lines).cast(DataType::UInt64)
         )
         .with_column(
-            col(coluna(Left, "chave"))
+            col(chave)
             .apply(formatar_chave_eletronica, GetOutput::from_type(DataType::String))
         )
         .with_columns([
@@ -87,12 +92,16 @@ fn format_fazyframe_a(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>>
             //.apply(|series| round_float64_columns(series, 2), GetOutput::same_type())
         ]);
 
+    //println!("lazyframe_a 2:");
+
     // Lazy operations don’t execute until we call .collect()?.
     // Using the select method is the recommended way to sort columns in polars.
     let lazyframe: LazyFrame = lz
         .collect()?
         .select(Column::get_columns().get_names(Left))? // sort columns
         .lazy();
+
+    //println!("lazyframe_a 3:");
 
     Ok(lazyframe)
 }
@@ -107,12 +116,15 @@ fn format_fazyframe_b(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>>
         coluna(Right, "valor_icms"),
     ];
 
+    let count_lines = coluna(Right, "count_lines");
+    let chave = coluna(Right, "chave");
+
     let lz = lazyframe // Formatar colunas
         .with_column(
-            col(coluna(Right, "count_lines")).cast(DataType::UInt64)
+            col(count_lines).cast(DataType::UInt64)
         )
         .with_column(
-            col(coluna(Right, "chave"))
+            col(chave)
             .apply(formatar_chave_eletronica, GetOutput::from_type(DataType::String))
         )
         .with_columns([
