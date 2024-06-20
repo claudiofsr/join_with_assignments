@@ -385,8 +385,8 @@ fn read_csv_lazy(file_path: Option<PathBuf>, delimiter: Option<char>, side: Side
         .with_try_parse_dates(false) // use regex
         .with_separator(delimiter.unwrap() as u8)
         .with_quote_char(Some(b'"'))
-        .with_has_header(true)
-        //.has_header(true)
+        //.with_has_header(true)
+        .has_header(true)
         .with_ignore_errors(true)
         .with_null_values(Some(NullValues::AllColumns(null_values)))
         .with_missing_is_null(true)
