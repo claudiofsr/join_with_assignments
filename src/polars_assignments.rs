@@ -34,17 +34,15 @@ pub fn get_dataframe_after_assignments(args: &Arguments) -> Result<DataFrame, Bo
     let lazyframe_b: LazyFrame = get_lazyframe_from_csv(args.file2.clone(), args.delimiter_input_2, Right)?
         .with_row_index(coluna(Right, "count_lines"), Some(0u32));
 
-    println!("Format the columns to perform comparisons and sum values.");
+    println!("Format the columns to perform comparisons and sum values:");
     let lazyframe_a: LazyFrame = format_fazyframe_a(lazyframe_a)?;
     let lazyframe_b: LazyFrame = format_fazyframe_b(lazyframe_b)?;
 
-    println!("Groupby column.");
+    println!("Groupby columns:");
     let lazy_groupby_a: LazyFrame = groupby_fazyframe_a(lazyframe_a.clone())?;
     let lazy_groupby_b: LazyFrame = groupby_fazyframe_b(lazyframe_b.clone())?;
 
     let dataframe_joinned: DataFrame = join_lazyframes(lazy_groupby_a, lazy_groupby_b)?;
-
-    //print_column_and_schema(dataframe_joinned.clone());
 
     let vec_opt_vec_tuples: Vec<Option<VecTuples>> = get_vec_from_assignments(dataframe_joinned)?;
     let df_correlation: DataFrame = make_df_correlation(vec_opt_vec_tuples)?;
@@ -75,12 +73,8 @@ fn format_fazyframe_a(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>>
     let count_lines = coluna(Left, "count_lines");
     let chave = coluna(Left, "chave");
 
-    //println!("lazyframe_a 1:");
-
     let lz = lazyframe // Formatar colunas
-        .with_column(
-            col(count_lines).cast(DataType::UInt64)
-        )
+        .with_column(col(count_lines).cast(DataType::UInt64))
         .with_column(
             col(chave)
             .apply(formatar_chave_eletronica, GetOutput::from_type(DataType::String))
@@ -92,16 +86,12 @@ fn format_fazyframe_a(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>>
             //.apply(|series| round_float64_columns(series, 2), GetOutput::same_type())
         ]);
 
-    //println!("lazyframe_a 2:");
-
     // Lazy operations don’t execute until we call .collect()?.
     // Using the select method is the recommended way to sort columns in polars.
     let lazyframe: LazyFrame = lz
         .collect()?
         .select(Column::get_columns().get_names(Left))? // sort columns
         .lazy();
-
-    //println!("lazyframe_a 3:");
 
     Ok(lazyframe)
 }
@@ -120,9 +110,7 @@ fn format_fazyframe_b(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>>
     let chave = coluna(Right, "chave");
 
     let lz = lazyframe // Formatar colunas
-        .with_column(
-            col(count_lines).cast(DataType::UInt64)
-        )
+        .with_column(col(count_lines).cast(DataType::UInt64))
         .with_column(
             col(chave)
             .apply(formatar_chave_eletronica, GetOutput::from_type(DataType::String))
@@ -146,19 +134,23 @@ fn format_fazyframe_b(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>>
 
 fn groupby_fazyframe_a(lazyframe: LazyFrame) -> Result<LazyFrame, PolarsError> {
 
+    let count_lines = coluna(Left, "count_lines");
+    let chave = coluna(Left, "chave");
+    let valor_item = coluna(Left, "valor_item");
+
     let lf_groupby: LazyFrame = lazyframe
         .filter(
-            col(coluna(Left, "chave")).is_not_null()
-            .and(col(coluna(Left, "valor_item")).is_not_null())
+            col(chave).is_not_null()
+            .and(col(valor_item).is_not_null())
         )
-        .group_by([col(coluna(Left, "chave"))])
+        .group_by([col(chave)])
         .agg([
             //count(),
-            col(coluna(Left, "count_lines")),
-            col(coluna(Left, "valor_item")).alias("Valores dos Itens da Nota Fiscal EFD"),
+            col(count_lines),
+            col(valor_item).alias("Valores dos Itens da Nota Fiscal EFD"),
         ]);
 
-    println!("Group information according to column '{}'", coluna(Left, "chave"));
+    println!("Group information according to column '{}'", chave);
     println!("groupby_fazyframe_a:\n{}\n", lf_groupby.clone().collect()?);
 
     Ok(lf_groupby)
@@ -166,30 +158,43 @@ fn groupby_fazyframe_a(lazyframe: LazyFrame) -> Result<LazyFrame, PolarsError> {
 
 fn groupby_fazyframe_b(lazyframe: LazyFrame) -> Result<LazyFrame, PolarsError> {
 
+    let count_lines = coluna(Right, "count_lines");
+    let chave = coluna(Right, "chave");
+    let valor_item = coluna(Right, "valor_item");
+    let origem = coluna(Right, "origem");
+
     let lf_groupby: LazyFrame = lazyframe
         .filter(
-            col(coluna(Right, "chave")).is_not_null()
-            .and(col(coluna(Right, "valor_item")).is_not_null())
+            col(chave).is_not_null()
+            .and(col(valor_item).is_not_null())
         )
         .filter(
-            when(col(coluna(Right, "origem")).eq(lit("NFe")))
-            .then(col(coluna(Right, "valor_item")).gt(0))
+            when(col(origem).eq(lit("NFe")))
+            .then(col(valor_item).gt(0))
             .otherwise(true)
         )
-        .group_by([col(coluna(Right, "chave"))])
+        .group_by([col(chave)])
         .agg([
             //count(),
-            col(coluna(Right, "count_lines")),
-            col(coluna(Right, "valor_item")).alias("Valores dos Itens da Nota Fiscal NFE"),
+            col(count_lines),
+            col(valor_item).alias("Valores dos Itens da Nota Fiscal NFE"),
         ]);
 
-    println!("Group information according to column '{}'", coluna(Right, "chave"));
+    println!("Group information according to column '{}'", chave);
     println!("groupby_fazyframe_b:\n{}\n", lf_groupby.clone().collect()?);
 
     Ok(lf_groupby)
 }
 
 fn join_lazyframes(lazyframe_a: LazyFrame, lazyframe_b: LazyFrame) -> Result<DataFrame, PolarsError> {
+
+    /*
+    let number_of_rows = lazyframe_b.clone().collect()?.height();
+    if number_of_rows == 0 {
+        println!("dataframe_joinned ... lazyframe_b is empty!\n");
+        return lazyframe_a.collect()
+    }
+    */
 
     let dataframe: DataFrame = lazyframe_a
         .join(lazyframe_b, [col(coluna(Left, "chave"))], [col(coluna(Right, "chave"))], JoinType::Inner.into())
@@ -240,14 +245,6 @@ fn join_lazyframes(lazyframe_a: LazyFrame, lazyframe_b: LazyFrame) -> Result<Dat
     println!("dataframe_joinned = lazyframe_a.join(lazyframe_b, [...], JoinType::Inner)\n{dataframe}\n");
 
     Ok(dataframe)
-}
-
-#[allow(dead_code)]
-fn print_column_and_schema(dataframe: DataFrame) {
-    let column_names = dataframe.get_column_names();
-    let schema = dataframe.schema();
-    println!("column_names: {column_names:#?}");
-    println!("schema: {schema:#?}");
 }
 
 fn get_vec_from_assignments(dataframe: DataFrame) -> Result<Vec<Option<VecTuples>>, PolarsError> {

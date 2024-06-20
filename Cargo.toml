@@ -79,7 +79,7 @@ features = [
 ]
 
 [dependencies.rust_xlsxwriter]
-# version = "0.67.0"
+# version = "0.68.0"
 # git = "https://github.com/jmcnamara/rust_xlsxwriter.git"
 # Change polars version dependencies to "0.39.2":
 path = "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/rust_xlsxwriter-0.68.0b"
