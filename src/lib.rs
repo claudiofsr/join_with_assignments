@@ -527,22 +527,22 @@ fn cnpj_base(series: Series) -> PolarsResult<Option<Series>> {
         .str()?
         .into_iter()
         .map(|option_str: Option<&str>| {
-            let cnpj_base = option_str.map(|text| {
+            option_str
+                .and_then(|text| {
+                    let mut cnpjs: Vec<String> = extract_cnpjs(text);
 
-                let mut cnpjs: Vec<String> = extract_cnpjs(text);
+                    cnpjs.sort_unstable();
+                    cnpjs.dedup(); // Removes consecutive repeated elements
 
-                cnpjs.sort_unstable();
-                cnpjs.dedup(); // Removes consecutive repeated elements
+                    // Capturar apenas CNPJ base iguais
+                    // Capturar apenas o primeiro CNPJ
 
-                // Capturar apenas CNPJ base iguais:
-                match cnpjs.len() {
-                    1 => cnpjs.first().cloned(), // first item
-                    _ => None,
-                }
-            });
-
-            // Converts from Option<Option<T>> to Option<T>.
-            cnpj_base.flatten()
+                    if cnpjs.len() == 1 {
+                        cnpjs.first().cloned()
+                    } else {
+                        None
+                    }
+                })
         })
         .collect::<StringChunked>()
         .into_series();
@@ -764,39 +764,28 @@ $     the end of text (or end-of-line with multi-line mode)
 
 \B    not a Unicode word boundary
 
-\d     digit
+\d, \D: ANY ONE digit/non-digit character. Digits are [0-9]
 
-\D     not digit
+\w, \W: ANY ONE word/non-word character. For ASCII, word characters are [a-zA-Z0-9_]
 
 (?:exp) non-capturing group
 
-Fonts:
-
-<https://docs.randomhacks.net/subtitles-rs/regex/index.html>
-
-<https://rust-lang-nursery.github.io/rust-cookbook/text/regex.html>
-
-<https://github.com/rust-lang/regex/issues/630>
-
-<https://docs.rs/fancy-regex>
-
-<https://www.regular-expressions.info/charclass.html>
 */
 pub fn extract_cnpjs(input: &str) -> Vec<String> {
 
     static FIND_CNPJS: Lazy<Regex> = Lazy::new(|| {
         Regex::new(r"(?x)
-            (?:\A|\D) # beginning of text or not digit ; or (?:^|\D)
-            (\d{2})   # capture 2 digits
+            (?:\A|\W) # beginning of text or not word ; or (?:^|\W)
+            (\w{2})   # capture 2 alphanumeric
             \.?
-            (\d{3})   # capture 3 digits
+            (\w{3})   # capture 3 alphanumeric
             \.?
-            (\d{3})   # capture 3 digits
+            (\w{3})   # capture 3 alphanumeric
             \/?
-            \d{4}     # check 4 digits
+            \w{4}     # check 4 alphanumeric
             -?
             \d{2}     # check 2 digits
-            (?:\z|\D) # end of text or not digit ; or (?:$|\D)
+            (?:\z|\W) # end of text or not digit ; or (?:$|\W)
         ").unwrap()
     });
 
@@ -804,7 +793,7 @@ pub fn extract_cnpjs(input: &str) -> Vec<String> {
         .captures_iter(input)
         .map(|caps| caps.extract())
         .map(|(_full, [a, b, c])| {
-            [a, ".", b, ".", c].join("")
+            [a, ".", b, ".", c].concat()
         })
         .collect()
 }
@@ -828,9 +817,9 @@ mod test_functions {
 
         let text_0 = "12.345.678/0009-23";
 
-        let text_1 = "<N/D> [Info do CT-e: 12.345.678/0009-23] [Info do CT-e: <N/D>] [Info do CT-e: 12.345.679/0009-66] [Info do CT-e: 12.345.678/0009-23]";
+        let text_1 = "<N/D> [Info do CT-e: 12.ABC.678/0009-23] [Info do CT-e: <N/D>] [Info do CT-e: 12.ABC.679/0009-66] [Info do CT-e: 12.ABC.678/0009-23]";
 
-        let text_2 = "<N/D> [Info do CT-e: 12.345.678/0009-23] [Info do CT-e: <N/D>] [Info do CT-e: 12345678/1234-88] [Info do CT-e: 12345678901234] 123456789012345";
+        let text_2 = "<N/D> [Info do CT-e: 12.345.CDE/0009-23] [Info do CT-e: <N/D>] [Info do CT-e: 12345CDE/1234-88] [Info do CT-e: 12345CDE901234] 12345CDE9012345";
 
         let text_3 = "02.345.678/12345-12 123456781234123 foo 012.345.678/1234-23";
 
@@ -840,36 +829,36 @@ mod test_functions {
 
             println!("text_{index}: {option_str:?}");
 
-            let opt_cnpj_base = option_str.map(|text| {
+            let cnpj_base: Option<String> = option_str
+                .and_then(|text| {
+                    let mut cnpjs: Vec<String> = extract_cnpjs(text);
 
-                let mut cnpjs: Vec<String> = extract_cnpjs(text);
+                    println!("cnpjs: {cnpjs:?}");
 
-                println!("cnpjs: {cnpjs:?}");
+                    cnpjs.sort_unstable();
+                    cnpjs.dedup(); // Removes consecutive repeated elements
 
-                cnpjs.sort_unstable();
-                cnpjs.dedup(); // Removes consecutive repeated elements
+                    println!("cnpjs uniques: {cnpjs:?}");
 
-                println!("cnpjs uniques: {cnpjs:?}");
-
-                // Capturar apenas CNPJ base iguais:
-                match cnpjs.len() {
-                    1 => cnpjs.first().cloned(), // first item
-                    _ => None,
-                }
-            });
-
-            // Converts from Option<Option<T>> to Option<T>.
-            let cnpj_base = opt_cnpj_base.flatten();
+                    // Capturar apenas CNPJ base iguais
+                    // Capturar apenas o primeiro CNPJ
+                    
+                    if cnpjs.len() == 1 {
+                        cnpjs.first().cloned()
+                    } else {
+                        None
+                    }
+                });
 
             println!("cnpj_base: {cnpj_base:?}\n");
 
             result.push(cnpj_base);
         }
 
-        let valid = vec![
+        let valid: Vec<Option<String>> = vec![
             Some("12.345.678".to_string()),
             None,
-            Some("12.345.678".to_string()),
+            Some("12.345.CDE".to_string()),
             None,
             None,
         ];
@@ -878,9 +867,13 @@ mod test_functions {
 
         let series: Series = Series::new("CNPJ do Remetente", &option_strs);
 
+        println!("series: {series:?}\n");
+
         let s = get_cnpj_base(series)?;
 
-        println!("series: {s:?}\n");
+        println!("s: {s:?}\n");
+
+        assert_eq!(Some(Series::new("", &valid)), s);
 
         Ok(())
     }

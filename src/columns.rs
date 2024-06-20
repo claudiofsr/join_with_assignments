@@ -28,9 +28,9 @@ impl Column {
         let side = Side::Left;
         [
             Column {side, nick: "count_lines", name: "Linhas EFD", dtype: DataType::UInt64}, // Coluna Temporária
-            Column {side, nick: "num_linha", name: "Linhas", dtype: DataType::Int64},
+            Column {side, nick: "num_linha", name: "Linhas", dtype: DataType::UInt64},
             Column {side, nick: "efd_arquivo", name: "Arquivo da EFD Contribuições", dtype: DataType::String},
-            Column {side, nick: "efd_linha", name: "Nº da Linha da EFD", dtype: DataType::Int64},
+            Column {side, nick: "efd_linha", name: "Nº da Linha da EFD", dtype: DataType::UInt64},
             Column {side, nick: "contribuinte_cnpj", name: "CNPJ dos Estabelecimentos do Contribuinte", dtype: DataType::String},
             Column {side, nick: "contribuinte_nome", name: "Nome do Contribuinte", dtype: DataType::String},
             Column {side, nick: "pa", name: "Período de Apuração", dtype: DataType::String},

@@ -34,11 +34,10 @@ pub fn get_dataframe_after_assignments(args: &Arguments) -> Result<DataFrame, Bo
     let lazyframe_b: LazyFrame = get_lazyframe_from_csv(args.file2.clone(), args.delimiter_input_2, Right)?
         .with_row_index(coluna(Right, "count_lines"), Some(0u32));
 
-    println!("Format the columns to perform comparisons and sum values:");
+    println!("Format the columns to perform comparisons and sum values.");
     let lazyframe_a: LazyFrame = format_fazyframe_a(lazyframe_a)?;
     let lazyframe_b: LazyFrame = format_fazyframe_b(lazyframe_b)?;
 
-    println!("Groupby columns:");
     let lazy_groupby_a: LazyFrame = groupby_fazyframe_a(lazyframe_a.clone())?;
     let lazy_groupby_b: LazyFrame = groupby_fazyframe_b(lazyframe_b.clone())?;
 
