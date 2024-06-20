@@ -3,15 +3,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //
 // Copyright 2023-2024, John McNamara, jmcnamara@cpan.org
+//
+// git clone https://github.com/jmcnamara/polars_excel_writer.git
 
 use std::io::{Seek, Write};
 use std::path::Path;
 
 use polars::export::arrow::temporal_conversions::{
-    date32_to_date,
-    time64ns_to_time,
-    timestamp_ms_to_datetime,
-    timestamp_ns_to_datetime,
+    date32_to_date, time64ns_to_time, timestamp_ms_to_datetime, timestamp_ns_to_datetime,
     timestamp_us_to_datetime,
 };
 use polars::prelude::*;
@@ -127,6 +126,36 @@ impl PolarsXlsxWriter {
         self
     }
 
+    pub fn set_zoom(&mut self, zoom: u16) -> &mut PolarsXlsxWriter {
+        self.options.zoom = zoom;
+        self
+    }
+
+    pub fn set_screen_gridlines(&mut self, enable: bool) -> &mut PolarsXlsxWriter {
+        self.options.screen_gridlines = enable;
+
+        self
+    }
+
+    pub fn set_freeze_panes(&mut self, row: u32, col: u16) -> &mut PolarsXlsxWriter {
+        self.options.freeze_cell = (row, col);
+
+        self
+    }
+
+    pub fn set_freeze_panes_top_cell(&mut self, row: u32, col: u16) -> &mut PolarsXlsxWriter {
+        self.options.top_cell = (row, col);
+
+        self
+    }
+
+    pub fn set_autofilter(&mut self, enable: bool) -> &mut PolarsXlsxWriter {
+        let table = self.options.table.clone().set_autofilter(enable);
+        self.options.table = table;
+
+        self
+    }
+
     pub fn set_table(&mut self, table: &Table) -> &mut PolarsXlsxWriter {
         self.options.table = table.clone();
         self
@@ -143,6 +172,7 @@ impl PolarsXlsxWriter {
 
     pub fn add_worksheet(&mut self) -> &mut PolarsXlsxWriter {
         self.workbook.add_worksheet();
+
         self
     }
 
@@ -192,6 +222,8 @@ impl PolarsXlsxWriter {
     ) -> Result<(), PolarsError> {
         let header_offset = u32::from(options.table.has_header_row());
 
+        //println!("worksheet.name(): {}", worksheet.name());
+
         // Iterate through the dataframe column by column.
         for (col_num, column) in df.get_columns().iter().enumerate() {
             let col_num = col_offset + col_num as u16;
@@ -200,6 +232,8 @@ impl PolarsXlsxWriter {
             if options.table.has_header_row() {
                 worksheet.write(row_offset, col_num, column.name())?;
             }
+
+            //println!("column: {column}");
 
             // Write the row data for each column/type.
             for (row_num, data) in column.iter().enumerate() {
@@ -330,6 +364,16 @@ impl PolarsXlsxWriter {
             worksheet.autofit();
         }
 
+        // Set the zoom level.
+        worksheet.set_zoom(options.zoom);
+
+        // Set the screen gridlines.
+        worksheet.set_screen_gridlines(options.screen_gridlines);
+
+        // Set the worksheet panes.
+        worksheet.set_freeze_panes(options.freeze_cell.0, options.freeze_cell.1)?;
+        worksheet.set_freeze_panes_top_cell(options.top_cell.0, options.top_cell.1)?;
+
         Ok(())
     }
 }
@@ -348,6 +392,10 @@ pub(crate) struct WriterOptions {
     pub(crate) datetime_format: Format,
     pub(crate) null_string: Option<String>,
     pub(crate) table: Table,
+    pub(crate) zoom: u16,
+    pub(crate) screen_gridlines: bool,
+    pub(crate) freeze_cell: (u32, u16),
+    pub(crate) top_cell: (u32, u16),
 }
 
 impl Default for WriterOptions {
@@ -365,7 +413,12 @@ impl WriterOptions {
             datetime_format: "yyyy\\-mm\\-dd\\ hh:mm:ss".into(),
             null_string: None,
             float_format: Format::default(),
+            //float_format: Format::new().set_num_format("$#,##0.0000"),
             table: Table::new(),
+            zoom: 100,
+            screen_gridlines: true,
+            freeze_cell: (0, 0),
+            top_cell: (0, 0),
         }
     }
 }

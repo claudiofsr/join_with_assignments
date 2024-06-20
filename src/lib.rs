@@ -56,7 +56,6 @@ pub use self::{
 use claudiofsr_lib::round_f64;
 use columns::Extensions;
 use once_cell::sync::Lazy;
-use rayon::prelude::*;
 use regex::Regex;
 
 use std::{
@@ -386,8 +385,8 @@ fn read_csv_lazy(file_path: Option<PathBuf>, delimiter: Option<char>, side: Side
         .with_try_parse_dates(false) // use regex
         .with_separator(delimiter.unwrap() as u8)
         .with_quote_char(Some(b'"'))
-        //.with_has_header(true)
-        .has_header(true)
+        .with_has_header(true)
+        //.has_header(true)
         .with_ignore_errors(true)
         .with_null_values(Some(NullValues::AllColumns(null_values)))
         .with_missing_is_null(true)
@@ -487,6 +486,7 @@ pub fn write_pqt(df: &DataFrame, basename: &str) -> PolarsResult<()> {
 
     ParquetWriter::new(&mut output_parquet)
         .with_statistics(true)
+        //.with_statistics(StatisticsOptions::default())
         .set_parallel(true)
         //.with_compression(ParquetCompression::Lz4Raw)
         .finish( &mut df_formated)?;
@@ -610,6 +610,7 @@ pub fn round_float64_columns(series: Series, decimals: u32) -> PolarsResult<Opti
 
 pub fn round_series(series: Series, decimals: u32) -> PolarsResult<Option<Series>> {
     match series.dtype() {
+        // DataType::Float64 => Ok(Some(series.round(decimals)?)), <-- Bug panicking::panic_fmt
         DataType::Float64 => round_series_f64(series, decimals),
         DataType::String  => round_series_str(series, decimals),
         _ => {
@@ -628,27 +629,6 @@ pub fn round_series(series: Series, decimals: u32) -> PolarsResult<Option<Series
 
 fn round_series_f64(series: Series, decimals: u32) -> PolarsResult<Option<Series>> {
 
-    let chunkedarray_floatf64 = series
-        .f64()?
-        .into_iter()
-        .collect::<Float64Chunked>();
-
-    let vec_opt_f64: Vec<Option<f64>> = chunkedarray_floatf64
-        .into_iter()
-        .collect();
-
-    // No sorting required as rayon collects already sorted!
-
-    let new_series: Series = vec_opt_f64
-        //.into_iter()
-        .into_par_iter() // rayon: parallel iterator
-        .map(|opt_f64: Option<f64>|
-            opt_f64.map(|float64| round_f64(float64, decimals))
-        )
-        .collect::<Float64Chunked>()
-        .into_series();
-
-    /*
     let new_series: Series = series
         .f64()?
         .into_iter()
@@ -657,7 +637,6 @@ fn round_series_f64(series: Series, decimals: u32) -> PolarsResult<Option<Series
         )
         .collect::<Float64Chunked>()
         .into_series();
-    */
 
     Ok(Some(new_series))
 }

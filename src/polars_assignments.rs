@@ -81,8 +81,6 @@ fn format_fazyframe_a(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>>
         .with_columns([
             cols(columns_with_float64)
             .apply(|series| round_series(series, 2), GetOutput::from_type(DataType::Float64))
-            //all()
-            //.apply(|series| round_float64_columns(series, 2), GetOutput::same_type())
         ]);
 
     // Lazy operations don’t execute until we call .collect()?.

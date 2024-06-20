@@ -51,7 +51,7 @@ features = [
 ]
 
 [dependencies.polars]
-version = "0.39.2"
+version = "0.40.0"
 # git = "https://github.com/pola-rs/polars.git"
 # rev = "d01c4bf4"
 # https://github.com/pola-rs/polars/releases/tag/rs-0.39.0
@@ -79,10 +79,10 @@ features = [
 ]
 
 [dependencies.rust_xlsxwriter]
-# version = "0.68.0"
+version = "0.68.0"
 # git = "https://github.com/jmcnamara/rust_xlsxwriter.git"
 # Change polars version dependencies to "0.39.2":
-path = "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/rust_xlsxwriter-0.68.0b"
+# path = "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/rust_xlsxwriter-0.68.0b"
 features = [
     "chrono",
     "polars",
