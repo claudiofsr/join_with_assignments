@@ -713,7 +713,7 @@ fn format_digits(series: Series) -> PolarsResult<Option<Series>> {
     Ok(Some(new_series))
 }
 
-/// Use the as_ref method to get a reference to the optional string (opt_str). 
+/// We use the as_ref method to get a reference to the optional string (opt_str). 
 /// 
 /// Then, we use the map method to transform the optional string into an optional string 
 /// containing only the ASCII digit characters.
