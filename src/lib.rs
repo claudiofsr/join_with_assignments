@@ -81,9 +81,9 @@ pub fn configure_the_environment() {
     // https://stackoverflow.com/questions/70830241/rust-polars-how-to-show-all-columns/75675569#75675569
     // https://pola-rs.github.io/polars/polars/index.html#config-with-env-vars
     env::set_var("POLARS_FMT_TABLE_ROUNDED_CORNERS", "1"); // apply rounded corners to UTF8-styled tables.
-    //env::set_var("POLARS_FMT_MAX_COLS", "20"); // maximum number of columns shown when formatting DataFrames.
-    env::set_var("POLARS_FMT_MAX_ROWS", "10");   // maximum number of rows shown when formatting DataFrames.
-    env::set_var("POLARS_FMT_STR_LEN", "52");    // maximum number of characters printed per string value.
+    // env::set_var("POLARS_FMT_MAX_COLS", "32"); // maximum number of columns shown when formatting DataFrames.
+    env::set_var("POLARS_FMT_MAX_ROWS", "10");    // maximum number of rows shown when formatting DataFrames.
+    env::set_var("POLARS_FMT_STR_LEN", "52");     // maximum number of characters printed per string value.
 }
 
 // https://pola-rs.github.io/polars/sysinfo/index.html
@@ -375,6 +375,7 @@ fn read_csv_lazy(file_path: Option<PathBuf>, delimiter: Option<char>, side: Side
 
     // Set values that will be interpreted as missing/null.
     let null_values: Vec<String> = vec![
+        "".to_string(),
         " ".to_string(),
         "<N/D>".to_string(),
         "*DIVERSOS*".to_string(),

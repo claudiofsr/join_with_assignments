@@ -71,6 +71,26 @@ fn format_fazyframe_a(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>>
 
     let count_lines = coluna(Left, "count_lines");
     let chave = coluna(Left, "chave");
+    let valor_item = coluna(Left, "valor_item");
+
+
+    
+
+    println!("df_a 1: {}", lazyframe.clone().collect()?);
+    println!("[chave]: {}", lazyframe.clone().collect()?[chave]);
+    println!("[valor_item]: {}", lazyframe.clone().collect()?[valor_item]);
+
+    // Get columns from dataframe
+    let valores: Series = lazyframe.clone().collect()?.column(valor_item)?.clone();
+
+    // Get columns with into_iter()
+    let vec_opt_valores: Vec<Option<f64>> = valores.f64()?.into_iter().collect();
+
+    let vec_valores: Vec<f64> = vec_opt_valores.into_iter().flatten().filter(|v| *v > 1.0).take(100).collect();
+    println!("valores: {:?}\n", vec_valores);
+
+
+
 
     let lz = lazyframe // Formatar colunas
         .with_column(col(count_lines).cast(DataType::UInt64))
@@ -105,6 +125,27 @@ fn format_fazyframe_b(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>>
 
     let count_lines = coluna(Right, "count_lines");
     let chave = coluna(Right, "chave");
+    let valor_item = coluna(Right, "valor_item");
+
+
+
+
+
+    println!("df_b 1: {}", lazyframe.clone().collect()?);
+    println!("[chave]: {}", lazyframe.clone().collect()?[chave]);
+    println!("[valor_item]: {}", lazyframe.clone().collect()?[valor_item]);
+
+    // Get columns from dataframe
+    let valores: Series = lazyframe.clone().collect()?.column(valor_item)?.clone();
+
+    // Get columns with into_iter()
+    let vec_opt_valores: Vec<Option<f64>> = valores.f64()?.into_iter().collect();
+
+    let vec_valores: Vec<f64> = vec_opt_valores.into_iter().flatten().filter(|v| *v > 1.0).take(100).collect();
+    println!("valores: {:?}\n", vec_valores);
+
+
+
 
     let lz = lazyframe // Formatar colunas
         .with_column(col(count_lines).cast(DataType::UInt64))
@@ -118,7 +159,7 @@ fn format_fazyframe_b(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>>
             //all()
             //.apply(|series| round_float64_columns(series, 2), GetOutput::same_type())
         ]);
-
+    
     // Lazy operations don’t execute until we call .collect()?.
     // Using the select method is the recommended way to sort columns in polars.
     let lazyframe: LazyFrame = lz

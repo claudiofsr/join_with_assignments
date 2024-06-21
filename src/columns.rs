@@ -141,8 +141,8 @@ impl Column {
             Column {side, nick: "valor_bc_ipi", name: "ISS: Base de Cálculo : NF Item (Todos) SOMA", dtype: DataType::Float64},
             Column {side, nick: "valor_ipi", name: "IPI: Valor do Tributo : NF Item (Todos) SOMA", dtype: DataType::Float64},
             Column {side, nick: "valor_iss", name: "ISS: Valor do Tributo : NF Item (Todos) SOMA", dtype: DataType::Float64},
-            Column {side, nick: "valor_bc_icms", name: "ICMS: Base de Cálculo : NF Item (Todos) SOMA", dtype: DataType::Float64},
             Column {side, nick: "aliq_icms", name: "ICMS: Alíquota : NF Item (Todos) NOISE OR", dtype: DataType::Float64},
+            Column {side, nick: "valor_bc_icms", name: "ICMS: Base de Cálculo : NF Item (Todos) SOMA", dtype: DataType::Float64},
             Column {side, nick: "valor_icms", name: "ICMS: Valor do Tributo : NF Item (Todos) SOMA", dtype: DataType::Float64},
             Column {side, nick: "valor_icms_sub", name: "ICMS por Substituição: Valor do Tributo : NF Item (Todos) SOMA", dtype: DataType::Float64},
         ]

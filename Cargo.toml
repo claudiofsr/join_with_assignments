@@ -53,12 +53,15 @@ features = [
 [dependencies.polars]
 version = "0.39.2"
 # git = "https://github.com/pola-rs/polars.git"
-# rev = "d01c4bf4"
+# rev = "8a6bf4b"
 # https://github.com/pola-rs/polars/releases/tag/rs-0.39.0
 # https://github.com/pola-rs/polars/releases/tag/rs-0.40.0
+# git clone https://github.com/pola-rs/polars.git
+# path = "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/polars-0.40.0"
 features = [
     "abs",        # Convert all values to their absolute/positive value.
     "concat_str", # Concat string data in linear time
+    "csv",
     "dtype-array",
     "dtype-date",
     "dtype-struct",
