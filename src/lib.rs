@@ -713,19 +713,19 @@ fn format_digits(series: Series) -> PolarsResult<Option<Series>> {
     Ok(Some(new_series))
 }
 
+/// Use the as_ref method to get a reference to the optional string (opt_str). 
+/// 
+/// Then, we use the map method to transform the optional string into an optional string 
+/// containing only the ASCII digit characters.
 fn retain_only_digits(opt_str: Option<&str>) -> Option<String> {
-    let mut only_digits: String = match opt_str {
-        Some(str) => str.to_string(),
-        None => return None,
-    };
-
-    only_digits.retain(|current_char| current_char.is_ascii_digit());
-
-    if only_digits.is_empty() {
-        None
-    } else {
-        Some(only_digits)
-    }
+    opt_str
+        .as_ref()
+        .map(|string| 
+            string
+                .chars()
+                .filter_map(|c| if c.is_ascii_digit() { Some(c.to_string()) } else { None })
+                .collect::<String>()
+        )
 }
 
 /**

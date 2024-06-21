@@ -185,14 +185,6 @@ fn groupby_fazyframe_b(lazyframe: LazyFrame) -> Result<LazyFrame, PolarsError> {
 
 fn join_lazyframes(lazyframe_a: LazyFrame, lazyframe_b: LazyFrame) -> Result<DataFrame, PolarsError> {
 
-    /*
-    let number_of_rows = lazyframe_b.clone().collect()?.height();
-    if number_of_rows == 0 {
-        println!("dataframe_joinned ... lazyframe_b is empty!\n");
-        return lazyframe_a.collect()
-    }
-    */
-
     let dataframe: DataFrame = lazyframe_a
         .join(lazyframe_b, [col(coluna(Left, "chave"))], [col(coluna(Right, "chave"))], JoinType::Inner.into())
         // An inner join produces a DataFrame that contains only the rows where the join key exists in both DataFrames.

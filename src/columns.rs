@@ -176,7 +176,7 @@ impl Extensions for [Column] {
         let mut schema: Schema = Schema::new();
         self.iter()
             .filter(|col| col.side == side)
-            .filter(|col| col.nick != "count_lines") // coluna temporária não existe no arquivo CSV!
+            .filter(|col| col.nick != "count_lines") // excluir coluna temporária, pois não existe no arquivo CSV!
             .for_each(|col| {
                 schema.with_column(col.name.into(), col.dtype.clone());
             });
