@@ -723,7 +723,7 @@ fn retain_only_digits(opt_str: Option<&str>) -> Option<String> {
         .map(|string| 
             string
                 .chars()
-                .filter_map(|c| if c.is_ascii_digit() { Some(c) } else { None })
+                .filter(|c| c.is_ascii_digit())
                 .collect::<String>()
         )
 }
