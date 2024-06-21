@@ -720,12 +720,18 @@ fn format_digits(series: Series) -> PolarsResult<Option<Series>> {
 fn retain_only_digits(opt_str: Option<&str>) -> Option<String> {
     opt_str
         .as_ref()
-        .map(|string| 
-            string
+        .and_then(|string| {
+            let digits: String = string
                 .chars()
                 .filter(|c| c.is_ascii_digit())
-                .collect::<String>()
-        )
+                .collect::<String>();
+
+            if !digits.is_empty() {
+                Some(digits)
+            } else {
+                None
+            }
+        })
 }
 
 /**
