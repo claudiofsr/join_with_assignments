@@ -53,7 +53,7 @@ pub use self::{
     xlsx_writer::PolarsXlsxWriter,
 };
 
-use claudiofsr_lib::round_f64;
+use claudiofsr_lib::RoundFloat;
 use columns::Extensions;
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -375,7 +375,7 @@ fn read_csv_lazy(file_path: Option<PathBuf>, delimiter: Option<char>, side: Side
 
     // Set values that will be interpreted as missing/null.
     let null_values: Vec<String> = vec![
-        //"".to_string(),
+        "".to_string(), // foo;"";bar --> foo;;bar
         " ".to_string(),
         "<N/D>".to_string(),
         "*DIVERSOS*".to_string(),
@@ -634,7 +634,7 @@ fn round_series_f64(series: Series, decimals: u32) -> PolarsResult<Option<Series
         .f64()?
         .into_iter()
         .map(|opt_f64: Option<f64>|
-            opt_f64.map(|float64| round_f64(float64, decimals))
+            opt_f64.map(|float64| float64.round_float(decimals))
         )
         .collect::<Float64Chunked>()
         .into_series();
@@ -667,7 +667,7 @@ fn get_opt_from_str(opt_str: Option<&str>, series: &Series, decimals: u32) -> Op
                 .parse::<f64>();
 
             match result {
-                Ok(float) => Some(round_f64(float, decimals)),
+                Ok(float) => Some(float.round_float(decimals)),
                 Err(why) => {
                     eprintln!("fn get_opt_from_str()");
                     eprintln!("Error parse f64: {why}");
@@ -906,7 +906,7 @@ mod test_functions {
 
         for number in &numbers {
             let decimals_usize = decimals as usize;
-            let num = round_f64(*number, decimals);
+            let num = number.round_float(decimals);
             println!("round_f64: {num} ; println: {number:.decimals_usize$}");
             rounded_number.push(num);
         }
