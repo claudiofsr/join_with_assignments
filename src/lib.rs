@@ -375,7 +375,7 @@ fn read_csv_lazy(file_path: Option<PathBuf>, delimiter: Option<char>, side: Side
 
     // Set values that will be interpreted as missing/null.
     let null_values: Vec<String> = vec![
-        "".to_string(), // foo;"";bar --> foo;;bar
+        //"".to_string(), // foo;"";bar --> foo;;bar
         " ".to_string(),
         "<N/D>".to_string(),
         "*DIVERSOS*".to_string(),
