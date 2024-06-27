@@ -53,7 +53,7 @@ pub use self::{
     xlsx_writer::PolarsXlsxWriter,
 };
 
-use claudiofsr_lib::RoundFloat;
+use claudiofsr_lib::{RoundFloat, svec};
 use columns::Extensions;
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -374,11 +374,11 @@ fn read_csv_lazy(file_path: Option<PathBuf>, delimiter: Option<char>, side: Side
     };
 
     // Set values that will be interpreted as missing/null.
-    let null_values: Vec<String> = vec![
-        //"".to_string(), // foo;"";bar --> foo;;bar
-        " ".to_string(),
-        "<N/D>".to_string(),
-        "*DIVERSOS*".to_string(),
+    let null_values: Vec<String> = svec![
+        //"", // foo;"";bar --> foo;;bar
+        " ",
+        "<N/D>",
+        "*DIVERSOS*"
     ];
 
     let result_lazyframe: PolarsResult<LazyFrame> = LazyCsvReader::new(file_path.clone().unwrap())
@@ -386,8 +386,8 @@ fn read_csv_lazy(file_path: Option<PathBuf>, delimiter: Option<char>, side: Side
         .with_try_parse_dates(false) // use regex
         .with_separator(delimiter.unwrap() as u8)
         .with_quote_char(Some(b'"'))
-        //.with_has_header(true)
         .has_header(true)
+        //.with_has_header(true)
         .with_ignore_errors(true)
         .with_null_values(Some(NullValues::AllColumns(null_values)))
         .with_missing_is_null(true)
@@ -486,7 +486,7 @@ pub fn write_pqt(df: &DataFrame, basename: &str) -> PolarsResult<()> {
     let mut output_parquet: File = File::create(filepath)?;
 
     ParquetWriter::new(&mut output_parquet)
-        .with_statistics(true)
+        .with_statistics(true)  
         //.with_statistics(StatisticsOptions::default())
         .set_parallel(true)
         //.with_compression(ParquetCompression::Lz4Raw)
