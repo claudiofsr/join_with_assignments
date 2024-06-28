@@ -54,8 +54,8 @@ features = [
 version = "0.39.2"
 # git = "https://github.com/pola-rs/polars.git"
 # rev = "8a6bf4b"
-# https://github.com/pola-rs/polars/releases/tag/rs-0.39.0
 # https://github.com/pola-rs/polars/releases/tag/rs-0.40.0
+# https://github.com/pola-rs/polars/releases/tag/rs-0.41.2
 # git clone https://github.com/pola-rs/polars.git
 # path = "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/polars-0.40.0"
 features = [

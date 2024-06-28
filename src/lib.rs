@@ -378,8 +378,60 @@ fn read_csv_lazy(file_path: Option<PathBuf>, delimiter: Option<char>, side: Side
         //"", // foo;"";bar --> foo;;bar
         " ",
         "<N/D>",
-        "*DIVERSOS*"
+        "*DIVERSOS*",
+        /*
+        "<N/D> [Info da NF-e: SEM INCIDÊNCIA]",
+        "SEM INCIDÊNCIA",
+        "<N/D> [Info da NF-e: SUSPENSÃO]",
+        "SUSPENSÃO",
+        "TRIBUTADO AD VALOREM",
+        "<N/D> [Info da NF-e: TRIBUTADO AD VALOREM]",
+        "TRIBUTADO ALIQ. ZERO",
+        "<N/D> [Info da NF-e: TRIBUTADO ALIQ. ZERO]",
+        "ISENTA",
+        "<N/D> [Info da NF-e: PRESUMIDO/TRIB E NT (MI E EXP)]",
+        "<N/D> [Info da NF-e: ISENTA]",
+        "<N/D> [Info da NF-e: OUTRAS SAIDAS]",
+        "OUTRAS SAIDAS",
+        "<N/D> [Info da NF-e: OUTRAS OPERAÇÕES]",
+        "CRÉDITO/TRIB (MI)",
+        "OUTRAS OPERAÇÕES",
+        "<N/D> [Info da NF-e: OUTRAS ENTRADAS]",
+        "<N/D> [Info da NF-e: AQUISIÇÃO/SEM INCIDENCIA]",
+        "OUTRAS ENTRADAS",
+        "<N/D> [Info da NF-e: TRIBUTADO MONOFÁSICO]",
+        "<N/D> [Info da NF-e: CRÉDITO/TRIB (MI)]",
+        "CRÉDITO/TRIB (EXCL MI)",
+        "PRESUMIDO/TRIB E NT (MI E EXP)",
+        "AQUISIÇÃO/SEM INCIDENCIA",
+        "TRIBUTADO MONOFÁSICO"
+        */
     ];
+
+    /*
+    let parse_options = CsvParseOptions::default()
+        .with_separator(delimiter.unwrap() as u8)
+        .with_quote_char(Some(b'"'))
+        .with_encoding(CsvEncoding::LossyUtf8)
+        .with_null_values(Some(NullValues::AllColumns(null_values)))
+        .with_missing_is_null(true)
+        .with_try_parse_dates(false) // use regex
+        .with_decimal_comma(false);
+
+    let csv_reader = CsvReadOptions::default()
+        //.with_path(file_path)
+        //.has_header(true)
+        .with_has_header(true)
+        .with_ignore_errors(true)
+        //.with_infer_schema_length(Some(150))
+        .with_schema(Some(Arc::new(schema)))
+        .with_parse_options(parse_options);
+
+    let lazyframe = csv_reader
+        .try_into_reader_with_file_path(file_path)?
+        .finish()?
+        .lazy();
+    */
 
     let result_lazyframe: PolarsResult<LazyFrame> = LazyCsvReader::new(file_path.clone().unwrap())
         .with_encoding(CsvEncoding::LossyUtf8)
@@ -390,8 +442,9 @@ fn read_csv_lazy(file_path: Option<PathBuf>, delimiter: Option<char>, side: Side
         //.with_has_header(true)
         .with_ignore_errors(true)
         .with_null_values(Some(NullValues::AllColumns(null_values)))
+        //.with_null_values(None)
         .with_missing_is_null(true)
-        //.with_infer_schema_length(Some(150))
+        //.with_infer_schema_length(Some(200))
         .with_schema(Some(Arc::new(schema)))
         .finish();
 

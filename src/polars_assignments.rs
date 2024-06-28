@@ -125,11 +125,11 @@ fn format_fazyframe_b(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>>
 
     let count_lines = coluna(Right, "count_lines");
     let chave = coluna(Right, "chave");
-    //let valor_item = coluna(Right, "valor_item");
+    let valor_item = coluna(Right, "valor_item");
 
 
 
-    /*
+    //*
     println!("df_b 1: {}", lazyframe.clone().collect()?);
     println!("[chave]: {}", lazyframe.clone().collect()?[chave]);
     println!("[valor_item]: {}", lazyframe.clone().collect()?[valor_item]);
@@ -142,7 +142,7 @@ fn format_fazyframe_b(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>>
 
     let vec_valores: Vec<f64> = vec_opt_valores.into_iter().flatten().filter(|v| *v > 1.0).take(100).collect();
     println!("valores: {:?}\n", vec_valores);
-    */
+    //*/
 
 
 
