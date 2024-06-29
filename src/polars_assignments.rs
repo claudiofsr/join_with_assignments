@@ -681,7 +681,45 @@ mod test_assignments {
 
     #[test]
     /// `cargo test -- --show-output read_csv_file`
-    fn read_csv_file() -> Result<(), Box<dyn Error>> {
+    fn read_csv_file_v1() -> Result<(), Box<dyn Error>> {
+
+        let delimiter = ';';
+        let file = "src/tests/csv_file01";
+        let valor_item = coluna(Right, "valor_item"); // "Valor da Nota Proporcional : NF Item (Todos) SOMA"
+
+        let result_lazyframe: PolarsResult<LazyFrame> = LazyCsvReader::new(file)
+            .with_encoding(CsvEncoding::LossyUtf8)
+            .with_try_parse_dates(true)
+            .with_separator(delimiter as u8)
+            .with_quote_char(Some(b'"'))
+            .has_header(true)
+            //.with_has_header(true)
+            .with_ignore_errors(true)
+            //.with_null_values(Some(NullValues::AllColumns(null_values)))
+            .with_null_values(None)
+            .with_missing_is_null(true)
+            .with_infer_schema_length(Some(10))
+            //.with_schema(Some(Arc::new(schema)))
+            .finish();
+
+        let df_a = result_lazyframe?.collect()?;
+        println!("df_a: {df_a}");
+
+        // Get columns from dataframe
+        let valores_a: &Series = df_a.column(valor_item)?;
+
+        // Get columns with into_iter()
+        let vec_valores_a: Vec<f64> = valores_a.f64()?.into_iter().flatten().collect();
+        println!("valores_a: {:?}\n", vec_valores_a);
+
+        assert_eq!(vec_valores_a, [3623.56, 7379.51, 6783.56, 106.34, 828.98]);
+
+        Ok(())
+    }
+
+    #[test]
+    /// `cargo test -- --show-output read_csv_file`
+    fn read_csv_file_v2() -> Result<(), Box<dyn Error>> {
 
         env::set_var("POLARS_FMT_TABLE_ROUNDED_CORNERS", "1"); // apply rounded corners to UTF8-styled tables.
         env::set_var("POLARS_FMT_MAX_COLS", "60"); // maximum number of columns shown when formatting DataFrames.
