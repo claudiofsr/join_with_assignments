@@ -405,9 +405,8 @@ fn check_correlation_between_dataframes(lazyframe: LazyFrame) -> Result<DataFram
 }
 
 #[cfg(test)]
-mod tests {
+mod test_assignments {
     use std::env;
-
     use super::*;
     use crate::{
         round_float64_columns,
