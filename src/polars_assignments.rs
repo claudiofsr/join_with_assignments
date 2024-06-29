@@ -690,7 +690,7 @@ mod tests {
         env::set_var("POLARS_FMT_STR_LEN", "52");  // maximum number of characters printed per string value.
 
         let delimiter = ';';
-        let file = "csv_file01";
+        let file = "src/tests/csv_file01";
         let valor_item = coluna(Right, "valor_item"); // "Valor da Nota Proporcional : NF Item (Todos) SOMA"
 
         let result_lazyframe: PolarsResult<LazyFrame> = LazyCsvReader::new(file)
