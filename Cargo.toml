@@ -51,7 +51,7 @@ features = [
 ]
 
 [dependencies.polars]
-version = "0.39.2"
+version = "0.41.2"
 # git = "https://github.com/pola-rs/polars.git"
 # rev = "8a6bf4b"
 # https://github.com/pola-rs/polars/releases/tag/rs-0.40.0
