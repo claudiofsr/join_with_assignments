@@ -406,6 +406,8 @@ fn check_correlation_between_dataframes(lazyframe: LazyFrame) -> Result<DataFram
 
 #[cfg(test)]
 mod tests {
+    use std::env;
+
     use super::*;
     use crate::{
         round_float64_columns,
@@ -676,5 +678,44 @@ mod tests {
         (lit(10) * col(name_a) - lit(2))
         //.over("some_group")
         .alias(new)
+    }
+
+    #[test]
+    /// `cargo test -- --show-output read_csv_file`
+    /// 
+    /// <polars-0.41.2/tests/it/io/csv.rs>
+    fn read_csv_file() -> Result<(), Box<dyn Error>> {
+
+        env::set_var("POLARS_FMT_TABLE_ROUNDED_CORNERS", "1"); // apply rounded corners to UTF8-styled tables.
+        env::set_var("POLARS_FMT_MAX_COLS", "60"); // maximum number of columns shown when formatting DataFrames.
+        env::set_var("POLARS_FMT_MAX_ROWS", "10"); // maximum number of rows shown when formatting DataFrames.
+        env::set_var("POLARS_FMT_STR_LEN", "52");  // maximum number of characters printed per string value.
+
+        let delimiter = ';';
+        let file = "csv_file01.csv";
+
+        let result_lazyframe: PolarsResult<LazyFrame> = LazyCsvReader::new(file)
+            .with_encoding(CsvEncoding::LossyUtf8)
+            .with_try_parse_dates(false) // use regex
+            .with_separator(delimiter as u8)
+            .with_quote_char(Some(b'"'))
+            .has_header(true)
+            //.with_has_header(true)
+            .with_ignore_errors(true)
+            //.with_null_values(Some(NullValues::AllColumns(null_values)))
+            .with_null_values(None)
+            .with_missing_is_null(true)
+            .with_infer_schema_length(Some(10))
+            //.with_schema(Some(Arc::new(schema)))
+            .finish();
+
+        println!("df 1: {}", result_lazyframe?.collect()?);
+
+        let lazyframe_b: LazyFrame = get_lazyframe_from_csv(Some(file.into()), Some(delimiter), Right)?
+            .with_row_index(coluna(Right, "count_lines"), Some(0u32));
+
+        println!("df 2: {}", lazyframe_b.collect()?);
+
+        Ok(())
     }
 }
