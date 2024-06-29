@@ -379,33 +379,6 @@ fn read_csv_lazy(file_path: Option<PathBuf>, delimiter: Option<char>, side: Side
         " ",
         "<N/D>",
         "*DIVERSOS*",
-        /*
-        "<N/D> [Info da NF-e: SEM INCIDÊNCIA]",
-        "SEM INCIDÊNCIA",
-        "<N/D> [Info da NF-e: SUSPENSÃO]",
-        "SUSPENSÃO",
-        "TRIBUTADO AD VALOREM",
-        "<N/D> [Info da NF-e: TRIBUTADO AD VALOREM]",
-        "TRIBUTADO ALIQ. ZERO",
-        "<N/D> [Info da NF-e: TRIBUTADO ALIQ. ZERO]",
-        "ISENTA",
-        "<N/D> [Info da NF-e: PRESUMIDO/TRIB E NT (MI E EXP)]",
-        "<N/D> [Info da NF-e: ISENTA]",
-        "<N/D> [Info da NF-e: OUTRAS SAIDAS]",
-        "OUTRAS SAIDAS",
-        "<N/D> [Info da NF-e: OUTRAS OPERAÇÕES]",
-        "CRÉDITO/TRIB (MI)",
-        "OUTRAS OPERAÇÕES",
-        "<N/D> [Info da NF-e: OUTRAS ENTRADAS]",
-        "<N/D> [Info da NF-e: AQUISIÇÃO/SEM INCIDENCIA]",
-        "OUTRAS ENTRADAS",
-        "<N/D> [Info da NF-e: TRIBUTADO MONOFÁSICO]",
-        "<N/D> [Info da NF-e: CRÉDITO/TRIB (MI)]",
-        "CRÉDITO/TRIB (EXCL MI)",
-        "PRESUMIDO/TRIB E NT (MI E EXP)",
-        "AQUISIÇÃO/SEM INCIDENCIA",
-        "TRIBUTADO MONOFÁSICO"
-        */
     ];
 
     /*

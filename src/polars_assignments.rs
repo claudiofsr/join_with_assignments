@@ -125,11 +125,11 @@ fn format_fazyframe_b(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>>
 
     let count_lines = coluna(Right, "count_lines");
     let chave = coluna(Right, "chave");
-    let valor_item = coluna(Right, "valor_item");
+    //let valor_item = coluna(Right, "valor_item");
 
 
 
-    //*
+    /*
     println!("df_b 1: {}", lazyframe.clone().collect()?);
     println!("[chave]: {}", lazyframe.clone().collect()?[chave]);
     println!("[valor_item]: {}", lazyframe.clone().collect()?[valor_item]);
@@ -142,7 +142,7 @@ fn format_fazyframe_b(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>>
 
     let vec_valores: Vec<f64> = vec_opt_valores.into_iter().flatten().filter(|v| *v > 1.0).take(100).collect();
     println!("valores: {:?}\n", vec_valores);
-    //*/
+    */
 
 
 
@@ -682,8 +682,6 @@ mod tests {
 
     #[test]
     /// `cargo test -- --show-output read_csv_file`
-    /// 
-    /// <polars-0.41.2/tests/it/io/csv.rs>
     fn read_csv_file() -> Result<(), Box<dyn Error>> {
 
         env::set_var("POLARS_FMT_TABLE_ROUNDED_CORNERS", "1"); // apply rounded corners to UTF8-styled tables.
@@ -692,11 +690,12 @@ mod tests {
         env::set_var("POLARS_FMT_STR_LEN", "52");  // maximum number of characters printed per string value.
 
         let delimiter = ';';
-        let file = "csv_file01.csv";
+        let file = "csv_file01";
+        let valor_item = coluna(Right, "valor_item"); // "Valor da Nota Proporcional : NF Item (Todos) SOMA"
 
         let result_lazyframe: PolarsResult<LazyFrame> = LazyCsvReader::new(file)
             .with_encoding(CsvEncoding::LossyUtf8)
-            .with_try_parse_dates(false) // use regex
+            .with_try_parse_dates(true)
             .with_separator(delimiter as u8)
             .with_quote_char(Some(b'"'))
             .has_header(true)
@@ -709,12 +708,32 @@ mod tests {
             //.with_schema(Some(Arc::new(schema)))
             .finish();
 
-        println!("df 1: {}", result_lazyframe?.collect()?);
+        let df_a = result_lazyframe?.collect()?;
+        println!("df_a: {df_a}");
+
+        // Get columns from dataframe
+        let valores_a: &Series = df_a.column(valor_item)?;
+
+        // Get columns with into_iter()
+        let vec_valores_a: Vec<f64> = valores_a.f64()?.into_iter().flatten().collect();
+        println!("valores_a: {:?}\n", vec_valores_a);
+
+        // --- //
 
         let lazyframe_b: LazyFrame = get_lazyframe_from_csv(Some(file.into()), Some(delimiter), Right)?
             .with_row_index(coluna(Right, "count_lines"), Some(0u32));
 
-        println!("df 2: {}", lazyframe_b.collect()?);
+        let df_b = lazyframe_b.collect()?;
+
+        // Get columns from dataframe
+        let valores_b: &Series = df_b.column(valor_item)?;
+
+        // Get columns with into_iter()
+        let vec_valores_b: Vec<f64> = valores_b.f64()?.into_iter().flatten().collect();
+        println!("valores_b: {:?}\n", vec_valores_b);
+
+        assert_eq!(vec_valores_a, [3623.56, 7379.51, 6783.56, 106.34, 828.98]);
+        assert_eq!(vec_valores_a, vec_valores_b);
 
         Ok(())
     }
