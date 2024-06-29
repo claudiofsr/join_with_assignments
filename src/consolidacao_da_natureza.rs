@@ -35,8 +35,8 @@ pub fn obter_consolidacao_nat(dataframe: &DataFrame, auditar: bool) -> Result<Da
         parallel: true,
         rechunk: true,
         to_supertypes: true,
-        diagonal: false,
-        from_partitioned_ds: false,
+        //diagonal: false,
+        //from_partitioned_ds: false,
     };
 
     let lazyframe: LazyFrame = dataframe.clone().lazy();
@@ -1047,8 +1047,8 @@ fn ordenar_colunas(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>> {
             SortMultipleOptions::default()
                 .with_maintain_order(true)
                 .with_multithreaded(true)
-                //.with_order_descendings(vec![false])
-                .with_order_descending(false)
+                .with_order_descendings(vec![false])
+                //.with_order_descending(false)
                 .with_nulls_last(false),
         )
         .with_column(
@@ -1331,8 +1331,8 @@ mod tests {
                 SortMultipleOptions::default()
                     .with_maintain_order(true)
                     .with_multithreaded(true)
-                    //.with_order_descendings(vec![false])
-                    .with_order_descending(false)
+                    .with_order_descendings(vec![false])
+                    //.with_order_descending(false)
                     .with_nulls_last(false),
             )
             .collect()?;

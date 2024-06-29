@@ -307,7 +307,7 @@ pub fn get_lazyframe_from_csv(file_path: Option<PathBuf>, delimiter: Option<char
     }
 
     // Format date
-    let mut lazyframe: LazyFrame = read_csv_lazy(file_path, delimiter, side)?
+    let lazyframe: LazyFrame = read_csv_lazy(file_path, delimiter, side)?
         .with_column(
             col("^(Período|Data|Dia).*$") // regex
             .str()
@@ -411,8 +411,8 @@ fn read_csv_lazy(file_path: Option<PathBuf>, delimiter: Option<char>, side: Side
         .with_try_parse_dates(false) // use regex
         .with_separator(delimiter.unwrap() as u8)
         .with_quote_char(Some(b'"'))
-        //.has_header(true)
-        .with_has_header(true)
+        .has_header(true)
+        //.with_has_header(true)
         .with_ignore_errors(true)
         .with_null_values(Some(NullValues::AllColumns(null_values)))
         //.with_null_values(None)
@@ -512,8 +512,8 @@ pub fn write_pqt(df: &DataFrame, basename: &str) -> PolarsResult<()> {
     let mut output_parquet: File = File::create(filepath)?;
 
     ParquetWriter::new(&mut output_parquet)
-        //.with_statistics(true)  
-        .with_statistics(StatisticsOptions::default())
+        .with_statistics(true)  
+        //.with_statistics(StatisticsOptions::default())
         .set_parallel(true)
         //.with_compression(ParquetCompression::Lz4Raw)
         .finish( &mut df_formated)?;
