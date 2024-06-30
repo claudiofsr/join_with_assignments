@@ -970,13 +970,14 @@ fn adicionar_saldo_de_cred_passivel_de_ressarcimento_cofins(lazyframe: LazyFrame
 /// Aliquotas e valores podem ter precisões distintas.
 fn formatar_valores(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>> {
 
-    let aliquotas = [
-        "Alíquota de PIS/PASEP (em percentual)",
-        "Alíquota de COFINS (em percentual)"
-    ];
+    let aliq_pis = coluna(Left, "aliq_pis"); // "Alíquota de PIS/PASEP (em percentual)"
+    let aliq_cof = coluna(Left, "aliq_cof"); // "Alíquota de COFINS (em percentual)"
+    let valor_bc = coluna(Left, "valor_bc"); // "Valor da Base de Cálculo das Contribuições"
+
+    let aliquotas = [aliq_pis, aliq_cof];
 
     let valores = [
-        "Valor da Base de Cálculo das Contribuições",
+        valor_bc,
         "RBNC_Tributada",
         "RBNC_NTributada",
         "RBNC_Exportação",
