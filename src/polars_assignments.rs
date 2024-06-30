@@ -690,7 +690,7 @@ mod test_assignments {
 
         let delimiter = ';';
         let file = "src/tests/csv_file01";
-        let valor_item = coluna(Right, "valor_item"); // "Valor da Nota Proporcional : NF Item (Todos) SOMA"
+        let valor_item = "Valor da Nota Proporcional : NF Item (Todos) SOMA";
 
         // --- with_infer_schema_length --- //
         println!("\n### --- with_infer_schema_length --- ###\n");
@@ -745,7 +745,7 @@ mod test_assignments {
         
         let result_lazyframe: PolarsResult<LazyFrame> = LazyCsvReader::new(file)
             .with_encoding(CsvEncoding::LossyUtf8)
-            .with_try_parse_dates(true)
+            .with_try_parse_dates(false) // use regex
             .with_separator(delimiter as u8)
             .with_quote_char(Some(b'"'))
             .has_header(true)
@@ -772,7 +772,7 @@ mod test_assignments {
             );
 
         let lazyframe_b: LazyFrame = lazyframe
-            .with_row_index(coluna(Right, "count_lines"), Some(0u32));
+            .with_row_index("Linhas NFE", Some(0u32));
 
         let df_b = lazyframe_b.clone().collect()?;
         println!("df_b: {df_b}\n");
