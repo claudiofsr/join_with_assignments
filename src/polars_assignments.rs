@@ -683,9 +683,17 @@ mod test_assignments {
     /// `cargo test -- --show-output read_csv_file`
     fn read_csv_file_v1() -> Result<(), Box<dyn Error>> {
 
+        env::set_var("POLARS_FMT_TABLE_ROUNDED_CORNERS", "1"); // apply rounded corners to UTF8-styled tables.
+        env::set_var("POLARS_FMT_MAX_COLS", "60"); // maximum number of columns shown when formatting DataFrames.
+        env::set_var("POLARS_FMT_MAX_ROWS", "10"); // maximum number of rows shown when formatting DataFrames.
+        env::set_var("POLARS_FMT_STR_LEN", "52");  // maximum number of characters printed per string value.
+
         let delimiter = ';';
         let file = "src/tests/csv_file01";
         let valor_item = coluna(Right, "valor_item"); // "Valor da Nota Proporcional : NF Item (Todos) SOMA"
+
+        // --- with_infer_schema_length --- //
+        println!("\n### --- with_infer_schema_length --- ###\n");
 
         let result_lazyframe: PolarsResult<LazyFrame> = LazyCsvReader::new(file)
             .with_encoding(CsvEncoding::LossyUtf8)
@@ -695,15 +703,13 @@ mod test_assignments {
             .has_header(true)
             //.with_has_header(true)
             .with_ignore_errors(true)
-            //.with_null_values(Some(NullValues::AllColumns(null_values)))
             .with_null_values(None)
             .with_missing_is_null(true)
             .with_infer_schema_length(Some(10))
-            //.with_schema(Some(Arc::new(schema)))
             .finish();
 
         let df_a = result_lazyframe?.collect()?;
-        println!("df_a: {df_a}");
+        println!("df_a: {df_a}\n");
 
         // Get columns from dataframe
         let valores_a: &Series = df_a.column(valor_item)?;
@@ -712,7 +718,86 @@ mod test_assignments {
         let vec_valores_a: Vec<f64> = valores_a.f64()?.into_iter().flatten().collect();
         println!("valores_a: {:?}\n", vec_valores_a);
 
+       // --- with_schema --- //
+       println!("\n### --- with_schema --- ###\n");
+
+        let name_dtype = [
+            ("Linhas NFE", DataType::UInt64),
+            ("Número da Nota : NF Item (Todos)", DataType::Int64),
+            ("Dia da Emissão : NF Item (Todos)", DataType::String),
+            ("Código CFOP : NF Item (Todos)", DataType::Int64),
+            ("COFINS: Alíquota ad valorem - Atributo : NF Item (Todos)", DataType::Float64),
+            ("PIS: Alíquota ad valorem - Atributo : NF Item (Todos)", DataType::Float64),
+            ("CST COFINS Descrição : NF Item (Todos)", DataType::String),
+            ("CST PIS Descrição : NF Item (Todos)", DataType::String),
+            ("Valor Total : NF (Todos) SOMA", DataType::Float64),
+            ("Valor da Nota Proporcional : NF Item (Todos) SOMA", DataType::Float64),
+            ("IPI: Valor do Tributo : NF Item (Todos) SOMA", DataType::Float64),
+            ("ISS: Valor do Tributo : NF Item (Todos) SOMA", DataType::Float64),
+        ];
+
+        let mut schema: Schema = Schema::new();
+        name_dtype
+            .into_iter()
+            .for_each(|(name, dtype)| {
+                schema.with_column(name.into(), dtype);
+            });
+        
+        let result_lazyframe: PolarsResult<LazyFrame> = LazyCsvReader::new(file)
+            .with_encoding(CsvEncoding::LossyUtf8)
+            .with_try_parse_dates(true)
+            .with_separator(delimiter as u8)
+            .with_quote_char(Some(b'"'))
+            .has_header(true)
+            //.with_has_header(true)
+            .with_ignore_errors(true)
+            .with_null_values(None)
+            .with_missing_is_null(true)
+            .with_schema(Some(Arc::new(schema)))
+            .finish();
+
+        let options = StrptimeOptions {
+            format: Some("%-d/%-m/%Y".into()),
+            strict: false, // If set then polars will return an error if any date parsing fails
+            exact: true,   // If polars may parse matches that not contain the whole string e.g. “foo-2021-01-01-bar” could match “2021-01-01”
+            cache: true,   // use a cache of unique, converted dates to apply the datetime conversion.
+        };
+
+        // Format date
+        let lazyframe: LazyFrame = result_lazyframe?
+            .with_column(
+                col("^(Período|Data|Dia).*$") // regex
+                .str()
+                .to_date(options)
+            );
+
+        let lazyframe_b: LazyFrame = lazyframe
+            .with_row_index(coluna(Right, "count_lines"), Some(0u32));
+
+        let df_b = lazyframe_b.clone().collect()?;
+        println!("df_b: {df_b}\n");
+
+        // Print column names and their respective types
+        // Iterates over the `(&name, &dtype)` pairs in this schema
+        lazyframe_b
+            .schema()?
+            .iter()
+            .enumerate()
+            .for_each(|(index, (column_name, data_type))|{
+                println!("column {:02}: (\"{column_name}\", DataType::{data_type}),", index + 1);
+            });
+        
+        println!();
+
+        // Get columns from dataframe
+        let valores_b: &Series = df_b.column(valor_item)?;
+
+        // Get columns with into_iter()
+        let vec_valores_b: Vec<f64> = valores_b.f64()?.into_iter().flatten().collect();
+        println!("valores_b: {:?}\n", vec_valores_b);
+
         assert_eq!(vec_valores_a, [3623.56, 7379.51, 6783.56, 106.34, 828.98]);
+        assert_eq!(vec_valores_a, vec_valores_b);
 
         Ok(())
     }
@@ -730,6 +815,9 @@ mod test_assignments {
         let file = "src/tests/csv_file01";
         let valor_item = coluna(Right, "valor_item"); // "Valor da Nota Proporcional : NF Item (Todos) SOMA"
 
+        // --- with_infer_schema_length --- //
+        println!("\n### --- with_infer_schema_length --- ###\n");
+
         let result_lazyframe: PolarsResult<LazyFrame> = LazyCsvReader::new(file)
             .with_encoding(CsvEncoding::LossyUtf8)
             .with_try_parse_dates(true)
@@ -746,7 +834,7 @@ mod test_assignments {
             .finish();
 
         let df_a = result_lazyframe?.collect()?;
-        println!("df_a: {df_a}");
+        println!("df_a: {df_a}\n");
 
         // Get columns from dataframe
         let valores_a: &Series = df_a.column(valor_item)?;
@@ -755,7 +843,8 @@ mod test_assignments {
         let vec_valores_a: Vec<f64> = valores_a.f64()?.into_iter().flatten().collect();
         println!("valores_a: {:?}\n", vec_valores_a);
 
-        // --- //
+        // --- with_schema --- //
+        println!("\n### --- with_schema --- ###\n");
 
         let lazyframe_b: LazyFrame = get_lazyframe_from_csv(Some(file.into()), Some(delimiter), Right)?
             .with_row_index(coluna(Right, "count_lines"), Some(0u32));
