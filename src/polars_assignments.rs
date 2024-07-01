@@ -734,7 +734,6 @@ mod test_assignments {
             ("Descrição C", DataType::String),
             ("Value T", DataType::Float64),
             ("Value P", DataType::Float64),
-            ("Value Z", DataType::Float64),
             ("Tributo", DataType::Float64),
         ];
 
@@ -745,44 +744,23 @@ mod test_assignments {
                 schema.with_column(name.into(), dtype);
             });
         
-        // Set values that will be interpreted as missing/null.
-        let null_values: Vec<String> = vec![
-            " ".to_string(),
-            "<N/D>".to_string(),
-        ];
-        
         let result_lazyframe: PolarsResult<LazyFrame> = LazyCsvReader::new(file)
             .with_encoding(CsvEncoding::LossyUtf8)
-            .with_try_parse_dates(false) // use regex
+            .with_try_parse_dates(true)
             .with_separator(delimiter as u8)
             .with_quote_char(Some(b'"'))
             .has_header(true)
             //.with_has_header(true)
             .with_ignore_errors(true)
-            .with_null_values(Some(NullValues::AllColumns(null_values)))
+            .with_null_values(None)
             .with_missing_is_null(true)
             .with_schema(Some(Arc::new(schema)))
             .finish();
 
-        let options = StrptimeOptions {
-            format: Some("%-d/%-m/%Y".into()),
-            strict: false, // If set then polars will return an error if any date parsing fails
-            exact: true,   // If polars may parse matches that not contain the whole string e.g. “foo-2021-01-01-bar” could match “2021-01-01”
-            cache: true,   // use a cache of unique, converted dates to apply the datetime conversion.
-        };
+        // 0.41.2: let mut lazyframe_b
+        let lazyframe_b = result_lazyframe?;
 
-        // Format date
-        let lazyframe: LazyFrame = result_lazyframe?
-            .with_column(
-                col("^(Período|Data|Dia).*$") // regex
-                .str()
-                .to_date(options)
-            );
-
-        let lazyframe_b: LazyFrame = lazyframe
-            .with_row_index("Linhas NFE", Some(0u32));
-
-        let df_b = lazyframe_b.clone().collect()?;
+        let df_b = lazyframe_b.clone().clone().collect()?;
         println!("df_b: {df_b}\n");
 
         // Print column names and their respective types
