@@ -684,9 +684,9 @@ mod test_assignments {
     fn read_csv_file_v1() -> Result<(), Box<dyn Error>> {
 
         env::set_var("POLARS_FMT_TABLE_ROUNDED_CORNERS", "1"); // apply rounded corners to UTF8-styled tables.
-        env::set_var("POLARS_FMT_MAX_COLS", "60"); // maximum number of columns shown when formatting DataFrames.
+        env::set_var("POLARS_FMT_MAX_COLS", "10"); // maximum number of columns shown when formatting DataFrames.
         env::set_var("POLARS_FMT_MAX_ROWS", "10"); // maximum number of rows shown when formatting DataFrames.
-        env::set_var("POLARS_FMT_STR_LEN", "52");  // maximum number of characters printed per string value.
+        env::set_var("POLARS_FMT_STR_LEN", "20");  // maximum number of characters printed per string value.
 
         // wget https://raw.githubusercontent.com/claudiofsr/join_with_assignments/master/src/tests/csv_file01
 
@@ -698,14 +698,11 @@ mod test_assignments {
         println!("\n### --- with_infer_schema_length --- ###\n");
 
         let result_lazyframe: PolarsResult<LazyFrame> = LazyCsvReader::new(file)
-            .with_encoding(CsvEncoding::LossyUtf8)
             .with_try_parse_dates(true)
             .with_separator(delimiter as u8)
-            .with_quote_char(Some(b'"'))
             .has_header(true)
             //.with_has_header(true)
             .with_ignore_errors(true)
-            .with_null_values(None)
             .with_missing_is_null(true)
             .with_infer_schema_length(Some(10))
             .finish();
@@ -718,7 +715,7 @@ mod test_assignments {
 
         // Get columns with into_iter()
         let vec_a: Vec<f64> = values_pa.f64()?.into_iter().flatten().collect();
-        println!("values_pa: {:?}\n", vec_a);
+        println!("values_pa: {:?}", vec_a);
 
        // --- with_schema --- //
        println!("\n### --- with_schema --- ###\n");
@@ -728,10 +725,8 @@ mod test_assignments {
             ("Número", DataType::Int64),
             ("Dia da Emissão", DataType::String),
             ("Alíquota", DataType::Float64),
-            ("Alíquota B", DataType::Float64),
-            ("Descrição A", DataType::String),
+            ("Descrição", DataType::String),
             ("Descrição B", DataType::String),
-            ("Descrição C", DataType::String),
             ("Value T", DataType::Float64),
             ("Value P", DataType::Float64),
             ("Tributo", DataType::Float64),
@@ -745,23 +740,17 @@ mod test_assignments {
             });
         
         let result_lazyframe: PolarsResult<LazyFrame> = LazyCsvReader::new(file)
-            .with_encoding(CsvEncoding::LossyUtf8)
             .with_try_parse_dates(true)
             .with_separator(delimiter as u8)
-            .with_quote_char(Some(b'"'))
             .has_header(true)
             //.with_has_header(true)
             .with_ignore_errors(true)
-            .with_null_values(None)
             .with_missing_is_null(true)
             .with_schema(Some(Arc::new(schema)))
             .finish();
 
         // 0.41.2: let mut lazyframe_b
         let lazyframe_b = result_lazyframe?;
-
-        let df_b = lazyframe_b.clone().clone().collect()?;
-        println!("df_b: {df_b}\n");
 
         // Print column names and their respective types
         // Iterates over the `(&name, &dtype)` pairs in this schema
@@ -775,12 +764,15 @@ mod test_assignments {
         
         println!();
 
+        let df_b = lazyframe_b.collect()?;
+        println!("df_b: {df_b}\n");
+
         // Get columns from dataframe
         let values_pb: &Series = df_b.column(value_p)?;
 
         // Get columns with into_iter()
         let vec_b: Vec<f64> = values_pb.f64()?.into_iter().flatten().collect();
-        println!("values_pb: {:?}\n", vec_b);
+        println!("values_pb: {:?}", vec_b);
 
         assert_eq!(vec_a, [3623.56, 7379.51, 6783.56, 106.34, 828.98]);
         assert_eq!(vec_a, vec_b);
