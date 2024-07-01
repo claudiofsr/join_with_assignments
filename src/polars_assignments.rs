@@ -680,7 +680,7 @@ mod test_assignments {
     }
 
     #[test]
-    /// `cargo test -- --show-output read_csv_file`
+    /// `cargo test -- --show-output read_csv_file_v1`
     fn read_csv_file_v1() -> Result<(), Box<dyn Error>> {
 
         env::set_var("POLARS_FMT_TABLE_ROUNDED_CORNERS", "1"); // apply rounded corners to UTF8-styled tables.
@@ -688,9 +688,11 @@ mod test_assignments {
         env::set_var("POLARS_FMT_MAX_ROWS", "10"); // maximum number of rows shown when formatting DataFrames.
         env::set_var("POLARS_FMT_STR_LEN", "52");  // maximum number of characters printed per string value.
 
+        // wget https://raw.githubusercontent.com/claudiofsr/join_with_assignments/master/src/tests/csv_file01
+
         let delimiter = ';';
         let file = "src/tests/csv_file01";
-        let valor_item = "Valor da Nota Proporcional : NF Item (Todos) SOMA";
+        let value_p = "Value P";
 
         // --- with_infer_schema_length --- //
         println!("\n### --- with_infer_schema_length --- ###\n");
@@ -712,28 +714,28 @@ mod test_assignments {
         println!("df_a: {df_a}\n");
 
         // Get columns from dataframe
-        let valores_a: &Series = df_a.column(valor_item)?;
+        let values_pa: &Series = df_a.column(value_p)?;
 
         // Get columns with into_iter()
-        let vec_valores_a: Vec<f64> = valores_a.f64()?.into_iter().flatten().collect();
-        println!("valores_a: {:?}\n", vec_valores_a);
+        let vec_a: Vec<f64> = values_pa.f64()?.into_iter().flatten().collect();
+        println!("values_pa: {:?}\n", vec_a);
 
        // --- with_schema --- //
        println!("\n### --- with_schema --- ###\n");
 
         let name_dtype = [
             ("Linhas NFE", DataType::UInt64),
-            ("Número da Nota : NF Item (Todos)", DataType::Int64),
-            ("Dia da Emissão : NF Item (Todos)", DataType::String),
-            ("Código CFOP : NF Item (Todos)", DataType::Int64),
-            ("COFINS: Alíquota ad valorem - Atributo : NF Item (Todos)", DataType::Float64),
-            ("PIS: Alíquota ad valorem - Atributo : NF Item (Todos)", DataType::Float64),
-            ("CST COFINS Descrição : NF Item (Todos)", DataType::String),
-            ("CST PIS Descrição : NF Item (Todos)", DataType::String),
-            ("Valor Total : NF (Todos) SOMA", DataType::Float64),
-            ("Valor da Nota Proporcional : NF Item (Todos) SOMA", DataType::Float64),
-            ("IPI: Valor do Tributo : NF Item (Todos) SOMA", DataType::Float64),
-            ("ISS: Valor do Tributo : NF Item (Todos) SOMA", DataType::Float64),
+            ("Número", DataType::Int64),
+            ("Dia da Emissão", DataType::String),
+            ("Alíquota", DataType::Float64),
+            ("Alíquota B", DataType::Float64),
+            ("Descrição A", DataType::String),
+            ("Descrição B", DataType::String),
+            ("Descrição C", DataType::String),
+            ("Value T", DataType::Float64),
+            ("Value P", DataType::Float64),
+            ("Value Z", DataType::Float64),
+            ("Tributo", DataType::Float64),
         ];
 
         let mut schema: Schema = Schema::new();
@@ -743,6 +745,12 @@ mod test_assignments {
                 schema.with_column(name.into(), dtype);
             });
         
+        // Set values that will be interpreted as missing/null.
+        let null_values: Vec<String> = vec![
+            " ".to_string(),
+            "<N/D>".to_string(),
+        ];
+        
         let result_lazyframe: PolarsResult<LazyFrame> = LazyCsvReader::new(file)
             .with_encoding(CsvEncoding::LossyUtf8)
             .with_try_parse_dates(false) // use regex
@@ -751,7 +759,7 @@ mod test_assignments {
             .has_header(true)
             //.with_has_header(true)
             .with_ignore_errors(true)
-            .with_null_values(None)
+            .with_null_values(Some(NullValues::AllColumns(null_values)))
             .with_missing_is_null(true)
             .with_schema(Some(Arc::new(schema)))
             .finish();
@@ -790,14 +798,14 @@ mod test_assignments {
         println!();
 
         // Get columns from dataframe
-        let valores_b: &Series = df_b.column(valor_item)?;
+        let values_pb: &Series = df_b.column(value_p)?;
 
         // Get columns with into_iter()
-        let vec_valores_b: Vec<f64> = valores_b.f64()?.into_iter().flatten().collect();
-        println!("valores_b: {:?}\n", vec_valores_b);
+        let vec_b: Vec<f64> = values_pb.f64()?.into_iter().flatten().collect();
+        println!("values_pb: {:?}\n", vec_b);
 
-        assert_eq!(vec_valores_a, [3623.56, 7379.51, 6783.56, 106.34, 828.98]);
-        assert_eq!(vec_valores_a, vec_valores_b);
+        assert_eq!(vec_a, [3623.56, 7379.51, 6783.56, 106.34, 828.98]);
+        assert_eq!(vec_a, vec_b);
 
         Ok(())
     }
@@ -812,7 +820,7 @@ mod test_assignments {
         env::set_var("POLARS_FMT_STR_LEN", "52");  // maximum number of characters printed per string value.
 
         let delimiter = ';';
-        let file = "src/tests/csv_file01";
+        let file = "src/tests/csv_file02";
         let valor_item = coluna(Right, "valor_item"); // "Valor da Nota Proporcional : NF Item (Todos) SOMA"
 
         // --- with_infer_schema_length --- //
@@ -837,11 +845,11 @@ mod test_assignments {
         println!("df_a: {df_a}\n");
 
         // Get columns from dataframe
-        let valores_a: &Series = df_a.column(valor_item)?;
+        let values_pa: &Series = df_a.column(valor_item)?;
 
         // Get columns with into_iter()
-        let vec_valores_a: Vec<f64> = valores_a.f64()?.into_iter().flatten().collect();
-        println!("valores_a: {:?}\n", vec_valores_a);
+        let vec_a: Vec<f64> = values_pa.f64()?.into_iter().flatten().collect();
+        println!("values_pa: {:?}\n", vec_a);
 
         // --- with_schema --- //
         println!("\n### --- with_schema --- ###\n");
@@ -852,14 +860,14 @@ mod test_assignments {
         let df_b = lazyframe_b.collect()?;
 
         // Get columns from dataframe
-        let valores_b: &Series = df_b.column(valor_item)?;
+        let values_pb: &Series = df_b.column(valor_item)?;
 
         // Get columns with into_iter()
-        let vec_valores_b: Vec<f64> = valores_b.f64()?.into_iter().flatten().collect();
-        println!("valores_b: {:?}\n", vec_valores_b);
+        let vec_b: Vec<f64> = values_pb.f64()?.into_iter().flatten().collect();
+        println!("values_pb: {:?}\n", vec_b);
 
-        assert_eq!(vec_valores_a, [3623.56, 7379.51, 6783.56, 106.34, 828.98]);
-        assert_eq!(vec_valores_a, vec_valores_b);
+        assert_eq!(vec_a, [3623.56, 7379.51, 6783.56, 106.34, 828.98]);
+        assert_eq!(vec_a, vec_b);
 
         Ok(())
     }
