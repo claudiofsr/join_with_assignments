@@ -697,7 +697,7 @@ mod test_assignments {
         // --- with_infer_schema_length --- //
         println!("\n### --- with_infer_schema_length --- ###\n");
 
-        let result_lazyframe: PolarsResult<LazyFrame> = LazyCsvReader::new(file)
+        let result_lazyframe_a: PolarsResult<LazyFrame> = LazyCsvReader::new(file)
             .with_try_parse_dates(true)
             .with_separator(delimiter as u8)
             .has_header(true)
@@ -707,7 +707,7 @@ mod test_assignments {
             .with_infer_schema_length(Some(10))
             .finish();
 
-        let df_a = result_lazyframe?.collect()?;
+        let df_a = result_lazyframe_a?.collect()?;
         println!("df_a: {df_a}\n");
 
         // Get columns from dataframe
@@ -740,8 +740,15 @@ mod test_assignments {
                 schema.with_column(name.into(), dtype);
             });
         
-        let result_lazyframe: PolarsResult<LazyFrame> = LazyCsvReader::new(file)
-            .with_try_parse_dates(true)
+        let options = StrptimeOptions {
+            format: Some("%-d/%-m/%Y".into()),
+            strict: false, // If set then polars will return an error if any date parsing fails
+            exact: true,   // If polars may parse matches that not contain the whole string e.g. “foo-2021-01-01-bar” could match “2021-01-01”
+            cache: true,   // use a cache of unique, converted dates to apply the datetime conversion.
+        };
+        
+        let result_lazyframe_b: PolarsResult<LazyFrame> = LazyCsvReader::new(file)
+            .with_try_parse_dates(false) // use regex
             .with_separator(delimiter as u8)
             .has_header(true)
             //.with_has_header(true)
@@ -751,7 +758,13 @@ mod test_assignments {
             .finish();
 
         // 0.41.2: let mut lazyframe_b
-        let lazyframe_b = result_lazyframe?;
+        let lazyframe_b = result_lazyframe_b?
+            //.with_column(col("Alíquota").cast(DataType::Int64))
+            .with_column(
+                col("^(Período|Data|Dia).*$") // regex
+                .str()
+                .to_date(options)
+            );
 
         // Print column names and their respective types
         // Iterates over the `(&name, &dtype)` pairs in this schema
@@ -777,6 +790,7 @@ mod test_assignments {
 
         assert_eq!(vec_a, [3623.56, 7379.51, 6783.56, 106.34, 828.98]);
         assert_eq!(vec_a, vec_b);
+        assert_eq!(df_a, df_b);
 
         Ok(())
     }
