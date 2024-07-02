@@ -717,19 +717,20 @@ mod test_assignments {
         let vec_a: Vec<f64> = values_pa.f64()?.into_iter().flatten().collect();
         println!("values_pa: {:?}", vec_a);
 
-       // --- with_schema --- //
-       println!("\n### --- with_schema --- ###\n");
+        // --- with_schema --- //
+        println!("\n### --- with_schema --- ###\n");
 
+        // The number or order of columns in the Schema does not need to match the CSV file.
         let name_dtype = [
-            ("Linhas NFE", DataType::UInt64),
-            ("Número", DataType::Int64),
             ("Dia da Emissão", DataType::String),
+            ("Linhas NFE", DataType::UInt64),
             ("Alíquota", DataType::Float64),
             ("Descrição", DataType::String),
             ("Descrição B", DataType::String),
             ("Value T", DataType::Float64),
             ("Value P", DataType::Float64),
             ("Tributo", DataType::Float64),
+            ("Número", DataType::Int64),
         ];
 
         let mut schema: Schema = Schema::new();
