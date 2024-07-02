@@ -805,11 +805,9 @@ mod test_assignments {
             .has_header(true)
             //.with_has_header(true)
             .with_ignore_errors(true)
-            //.with_null_values(Some(NullValues::AllColumns(null_values)))
             .with_null_values(None)
             .with_missing_is_null(true)
             .with_infer_schema_length(Some(10))
-            //.with_schema(Some(Arc::new(schema)))
             .finish();
 
         let df_a = result_lazyframe?.collect()?;
