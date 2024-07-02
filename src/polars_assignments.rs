@@ -722,12 +722,12 @@ mod test_assignments {
 
         // The number or order of columns in the Schema does not need to match the CSV file.
         let name_dtype = [
+            ("Value T", DataType::Float64),
             ("Dia da Emissão", DataType::String),
             ("Linhas NFE", DataType::UInt64),
             ("Alíquota", DataType::Float64),
             ("Descrição", DataType::String),
             ("Descrição B", DataType::String),
-            ("Value T", DataType::Float64),
             ("Value P", DataType::Float64),
             ("Tributo", DataType::Float64),
             ("Número", DataType::Int64),
