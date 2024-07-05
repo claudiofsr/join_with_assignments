@@ -151,12 +151,19 @@ impl Column {
         let columns_middle = Column::set_columns_middle();
         let columns_right  = Column::set_columns_right();
 
-        [&columns_left[..], &columns_middle[..], &columns_right[..]].concat()
+        let cols: Vec<Column> = [
+            &columns_left[..], 
+            &columns_middle[..], 
+            &columns_right[..]
+        ].concat();
+
+        // Verificar unicidade de todas as colunas
+        cols.uniqueness();
+
+        cols
     }
 
     pub fn get_cols_dtype(side: Side) -> HashMap<&'static str, DataType> {
-        let mut unique = HashSet::new();
-
         let cols: Vec<Column> = match side {
             Side::Left   => Column::set_columns_left().to_vec(),
             Side::Middle => Column::set_columns_middle().to_vec(),
@@ -165,20 +172,27 @@ impl Column {
     
         cols
             .iter()
-            .map(|col| {
-                let name = col.name;
-                if !unique.insert(name) {
-                    eprintln!("Coluna '{name}' repetida!");
-                }
-                (name, col.dtype.clone())
-            })
+            .map(|col| (col.name, col.dtype.clone()))
             .collect()
     }
 }
 
 pub trait Extensions {
+    /// Get Column names
     fn get_names(&self, side: Side) -> Vec<&str>;
+    /**
+    HashMap<key, value>
+
+    key: (side, nick)
+    
+    value: column name
+    */
     fn get_hash(&self) -> HashMap<(Side, &'static str), &'static str>;
+
+    /// Verify uniqueness
+    /// 
+    /// Verificar Unicidade
+    fn uniqueness(&self);
 }
 
 impl Extensions for [Column] {
@@ -190,19 +204,38 @@ impl Extensions for [Column] {
     }
 
     fn get_hash(&self) -> HashMap<(Side, &'static str), &'static str> {
-        let mut hash = HashMap::new();
-        let mut unique = HashSet::new();
-        self.iter()
-            .for_each(|col| {
+        self
+            .iter()
+            .map(|col| {
                 let key = (col.side, col.nick);
-                if !unique.insert(key) {
+                let value = col.name;
+                (key, value)
+            })
+            .collect()
+    }
+
+    fn uniqueness(&self) {
+        let mut unique_name = HashSet::new();
+        let mut unique_key = HashSet::new();
+
+        self
+            .iter()
+            .for_each(|col| {
+                let name = col.name;
+                let key = (col.side, col.nick);
+
+                if !unique_name.insert(name) {
+                    eprintln!("col: {col:?}");
+                    eprintln!("Coluna '{name}' repetida!");
+                    panic!("O nome das colunas deve ser único!");
+                }
+
+                if !unique_key.insert(key) {
                     eprintln!("col: {col:?}");
                     eprintln!("key: {key:?} is not unique.");
                     panic!("The key must be unique!");
                 }
-                hash.insert(key, col.name);
             });
-        hash
     }
 }
 
