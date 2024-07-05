@@ -197,7 +197,8 @@ pub trait Extensions {
 
 impl Extensions for [Column] {
     fn get_names(&self, side: Side) -> Vec<&str> {
-        self.iter()
+        self
+            .iter()
             .filter(|col| col.side == side)
             .map(|col| col.name)
             .collect()
