@@ -227,8 +227,8 @@ impl Extensions for [Column] {
 
                 if !unique_name.insert(name) {
                     eprintln!("col: {col:?}");
-                    eprintln!("Coluna '{name}' repetida!");
-                    panic!("O nome das colunas deve ser único!");
+                    eprintln!("Column '{name}' is not unique.");
+                    panic!("The column name must be unique!");
                 }
 
                 if !unique_key.insert(key) {
