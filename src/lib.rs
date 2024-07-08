@@ -336,7 +336,7 @@ fn validate_entries(file_path: Option<PathBuf>, delimiter: Option<char>, side: S
     match file_path {
         Some(p) if p.is_file() => println!("file path: {p:#?}"),
         _ => {
-            eprintln!("fn get_lazyframe_from_csv()");
+            eprintln!("fn validate_entries()");
             eprintln!("file_path: {file_path:?}");
             return Err(PolarsError::InvalidOperation("file_path error!".into()))
         },
@@ -345,7 +345,7 @@ fn validate_entries(file_path: Option<PathBuf>, delimiter: Option<char>, side: S
     match delimiter {
         Some (d) => println!("delimiter: {d:?}"),
         None => {
-            eprintln!("fn get_lazyframe_from_csv()");
+            eprintln!("fn validate_entries()");
             eprintln!("delimiter: {delimiter:?}");
             return Err(PolarsError::InvalidOperation("delimiter error!".into()))
         },
@@ -354,7 +354,7 @@ fn validate_entries(file_path: Option<PathBuf>, delimiter: Option<char>, side: S
     match side {
         Side::Left | Side::Right => println!("side: {side:?}"),
         Side::Middle => {
-            eprintln!("fn get_lazyframe_from_csv()");
+            eprintln!("fn validate_entries()");
             eprintln!("side: {side:?}");
             return Err(PolarsError::InvalidOperation("The middle side is not valid!".into()))
         },
