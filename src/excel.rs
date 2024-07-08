@@ -126,6 +126,7 @@ pub fn make_worksheet(df: &DataFrame, sheet_name: &str) -> PolarsResult<Workshee
         .set_date_format(fmt_date)
         // .set_autofit(true)
         // .set_float_format("#,##0.00")
+        .set_freeze_panes(1, 0)
         .write_dataframe_to_worksheet(&df_to_excel, &mut worksheet, 0, 0)?;
 
     //worksheet.autofit();
@@ -157,8 +158,8 @@ fn format_worksheet(df: &DataFrame, worksheet: &mut Worksheet, sheet_name: &str)
     worksheet
         .set_name(sheet_name)?
         .set_row_format(0, &fmt_header)?
-        .set_row_height(0, 64)?
-        .set_freeze_panes(1, 0)?;
+        //.set_freeze_panes(1, 0)?
+        .set_row_height(0, 64)?;
 
     let regex_cnpj_cpf = Regex::new(r"(?ix)
         ^(:?CNPJ|CPF)
