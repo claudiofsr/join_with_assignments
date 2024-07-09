@@ -36,18 +36,18 @@ pub fn get_dataframe_after_assignments(args: &Arguments) -> Result<DataFrame, Bo
     let df_correlation: DataFrame = make_df_correlation(vec_opt_vec_tuples)?;
 
     let lazyframe_c: LazyFrame = join_with_interline_correlations(lazyframe_a, lazyframe_b, df_correlation)?;
-    let dfd_output: DataFrame = check_correlation_between_dataframes(lazyframe_c)?;
+    let df_final: DataFrame = check_correlation_between_dataframes(lazyframe_c)?;
 
     /*
     // Add filter to reduce dataframe
-    let dfd_output: DataFrame = dfd_output
+    let df_final: DataFrame = df_final
         .lazy()
         .filter(col("Ano do Período de Apuração").eq(lit(2022)))
         .filter(col("Mês do Período de Apuração").eq(lit(6)))
         .collect()?;
     */
 
-    Ok(dfd_output.sort_by_columns(None)?)
+    Ok(df_final.sort_by_columns(None)?)
 }
 
 /// Formatar colunas a fim de realizar comparações e somas de valores.
@@ -89,7 +89,6 @@ fn format_fazyframe_a(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>>
         ]);
 
     // Lazy operations don’t execute until we call .collect()?.
-    // Ok(lz.collect()?.sort_by_columns()?.lazy())
     Ok(lz.collect()?.lazy())
 }
 
@@ -136,7 +135,6 @@ fn format_fazyframe_b(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>>
         ]);
     
     // Lazy operations don’t execute until we call .collect()?.
-    // Ok(lz.collect()?.sort_by_columns()?.lazy())
     Ok(lz.collect()?.lazy())
 }
 
