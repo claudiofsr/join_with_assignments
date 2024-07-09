@@ -133,7 +133,7 @@ fn format_fazyframe_b(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>>
             //all()
             //.apply(|series| round_float64_columns(series, 2), GetOutput::same_type())
         ]);
-    
+
     // Lazy operations don’t execute until we call .collect()?.
     Ok(lz.collect()?.lazy())
 }
@@ -378,9 +378,9 @@ mod test_assignments {
     use std::{collections::HashMap, env};
     use super::*;
     use crate::{
-        configure_the_environment, 
-        get_csv_headers, 
-        glosar_base_de_calculo::LazyFrameExtension, 
+        configure_the_environment,
+        get_csv_headers,
+        glosar_base_de_calculo::LazyFrameExtension,
         round_float64_columns
     };
 
@@ -706,7 +706,7 @@ mod test_assignments {
         let headers = get_csv_headers(file_path, delimiter as u8)?;
         let mut schema: Schema = Schema::new();
 
-        // Colunas adicionadas a Schema de acordo 
+        // Colunas adicionadas a Schema de acordo
         // com a ordem das colunas no arquivo CSV.
         headers
             .into_iter()
@@ -721,14 +721,14 @@ mod test_assignments {
                     }
                 }
             });
-        
+
         let options = StrptimeOptions {
             format: Some("%-d/%-m/%Y".into()),
             strict: false, // If set then polars will return an error if any date parsing fails
             exact: true,   // If polars may parse matches that not contain the whole string e.g. “foo-2021-01-01-bar” could match “2021-01-01”
             cache: true,   // use a cache of unique, converted dates to apply the datetime conversion.
         };
-        
+
         let result_lazyframe_b: PolarsResult<LazyFrame> = LazyCsvReader::new(file_path)
             .with_try_parse_dates(false) // use regex
             .with_separator(delimiter as u8)
@@ -755,7 +755,7 @@ mod test_assignments {
             .for_each(|(index, (column_name, data_type))|{
                 println!("column {:02}: (\"{column_name}\", DataType::{data_type}),", index + 1);
             });
-        
+
         println!();
 
         let df_b = lazyframe_b.collect()?;

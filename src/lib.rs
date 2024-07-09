@@ -59,7 +59,7 @@ use regex::Regex;
 
 use std::{
     any, collections::{HashMap, HashSet}, env,
-    error::Error, fs::File, 
+    error::Error, fs::File,
     num::ParseFloatError,
     path::PathBuf,
     process,
@@ -76,10 +76,10 @@ pub type VecTuples = Vec<(String, u64, u64)>;
 
 pub trait DataFrameExtension {
     /// Using the select method is the recommended way to sort columns in polars.
-    /// 
+    ///
     /// Some messages can be added.
     fn sort_by_columns(&self, msg: Option<&str>) -> Result<Self, PolarsError>
-    where 
+    where
         Self: std::marker::Sized;
 }
 
@@ -460,7 +460,7 @@ fn read_csv_lazy(file_path: Option<PathBuf>, delimiter: Option<char>, side: Side
 
             // headers, nomes das colunas, primeira linha do arquivo CSV.
             if let Ok(headers) = get_csv_headers(&path, separator as u8) {
-                // Colunas adicionadas a Schema de acordo 
+                // Colunas adicionadas a Schema de acordo
                 // com a ordem das colunas no arquivo CSV.
                 headers
                     .into_iter()
@@ -490,16 +490,16 @@ fn read_csv_lazy(file_path: Option<PathBuf>, delimiter: Option<char>, side: Side
                 //.with_infer_schema_length(Some(200))
                 .with_schema(Some(Arc::new(schema)))
                 .finish();
-    
+
             // Add error description
             if result_lazyframe.is_err() {
                 eprintln!("\nError: Failed to read the file {:?}", path);
             }
-        
+
             result_lazyframe
         },
         _ => {
-            panic!("File path or delimiter error!")   
+            panic!("File path or delimiter error!")
         }
     }
 }
@@ -814,9 +814,9 @@ fn format_digits(series: Series) -> PolarsResult<Option<Series>> {
     Ok(Some(new_series))
 }
 
-/// We use the as_ref method to get a reference to the optional string (opt_str). 
-/// 
-/// Then, we use the map method to transform the optional string into an optional string 
+/// We use the as_ref method to get a reference to the optional string (opt_str).
+///
+/// Then, we use the map method to transform the optional string into an optional string
 /// containing only the ASCII digit characters.
 fn retain_only_digits(opt_str: Option<&str>) -> Option<String> {
     opt_str
@@ -928,7 +928,7 @@ mod test_functions {
 
                     // Capturar apenas CNPJ base iguais
                     // Capturar apenas o primeiro CNPJ
-                    
+
                     if cnpjs.len() == 1 {
                         cnpjs.first().cloned()
                     } else {

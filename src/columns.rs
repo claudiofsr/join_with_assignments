@@ -161,8 +161,8 @@ impl Column {
         let columns_right  = Column::set_columns_right();
 
         let cols: Vec<Column> = [
-            &columns_left[..], 
-            &columns_middle[..], 
+            &columns_left[..],
+            &columns_middle[..],
             &columns_right[..]
         ].concat();
 
@@ -178,7 +178,7 @@ impl Column {
             Side::Middle => Column::set_columns_middle().to_vec(),
             Side::Right  => Column::set_columns_right().to_vec(),
         };
-    
+
         cols
             .iter()
             .map(|col| (col.name, col.dtype.clone()))
@@ -194,13 +194,13 @@ pub trait Extensions {
     HashMap<key, value>
 
     key: (side, nick)
-    
+
     value: column name
     */
     fn get_hash(&self) -> HashMap<(Side, &'static str), &'static str>;
 
     /// Verify uniqueness
-    /// 
+    ///
     /// Verificar Unicidade
     fn uniqueness(&self);
 }
