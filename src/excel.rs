@@ -58,22 +58,11 @@ pub fn write_xlsx(args: &Arguments, dfs: &[DataFrame]) -> PolarsResult<()> {
     let df_consolidacao_natureza_da_bcalc = &dataframes[2];
     let df_consolidacao_natureza_da_bcalc_result = &dataframes[3];
 
-    // Column names:
-    let valor_bc: &str = coluna(Left, "valor_bc");
-    let valor_bc_auditado: &str = coluna(Left, "valor_bc_auditado");
-
     // Add column from one dataframe to another.
-    let joined: DataFrame = df_itens_de_docs_fiscais_result
-        .clone()
-        .rename(
-            valor_bc,
-            valor_bc_auditado
-        )?
-        .with_column(
-            // Select a column and copy it to another df
-            df_itens_de_docs_fiscais.column(valor_bc)?.clone()
-        )?
-        .sort_by_columns(Some("write_xlsx sort_by_columns:"))?;
+    let joined: DataFrame = add_column_from_df_to_another(
+        df_itens_de_docs_fiscais_result,
+        df_itens_de_docs_fiscais
+    )?;
 
     // Workbook with worksheets
     let mut workbook = Workbook::new();
@@ -104,6 +93,27 @@ pub fn write_xlsx(args: &Arguments, dfs: &[DataFrame]) -> PolarsResult<()> {
     workbook.save(output)?;
 
     Ok(())
+}
+
+/// Select a column from df and copy it to df_result
+fn add_column_from_df_to_another(df_result: &DataFrame, df: &DataFrame) -> Result<DataFrame, PolarsError> {
+    // Column names:
+    let valor_bc: &str = coluna(Left, "valor_bc");
+    let valor_bc_auditado: &str = coluna(Left, "valor_bc_auditado");
+
+    let joined: DataFrame = df_result
+        .clone()
+        .rename(
+            valor_bc,
+            valor_bc_auditado
+        )?
+        .with_column(
+            // Select a column and copy it to another df
+            df.column(valor_bc)?.clone()
+        )?
+        .sort_by_columns(Some("write_xlsx sort_by_columns:"))?;
+
+    Ok(joined)
 }
 
 /// Write Dataframe to xlsx Excel file
