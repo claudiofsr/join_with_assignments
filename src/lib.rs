@@ -82,17 +82,16 @@ pub trait DataFrameExtension {
 }
 
 impl DataFrameExtension for DataFrame {
-    fn sort_by_columns(&self, msg: Option<&str>) -> Result<DataFrame, PolarsError> {
-        //let columns: Vec<&str> = Column::get_columns().iter().map(|col| col.name).collect();
-        // HashSet can do it in O(1).
-        // Rust Vec vs. HashMap lookup performance
+    fn sort_by_columns(&self, opt_msg: Option<&str>) -> Result<DataFrame, PolarsError> {
+        // Rust: Vec vs. HashSet lookup performance.
+        // HashSet contains() is O(1).
         // https://gist.github.com/daboross/976978d8200caf86e02acb6805961195#file-lib-rs
         let df_columns: HashSet<&str> = self
             .get_column_names()
             .into_iter()
             .collect();
 
-        if let Some(msg) = msg { println!("{msg}") }
+        if let Some(msg) = opt_msg { println!("{msg}") }
         let df_sorted: DataFrame = self
             .select(
                 Column::get_columns()
@@ -102,13 +101,13 @@ impl DataFrameExtension for DataFrame {
                     .enumerate()
                     .map(|(index, col)| {
                         // Print column names and their respective types
-                        if msg.is_some() {
+                        if opt_msg.is_some() {
                             println!("column {:02}: (\"{}\", DataType::{}),", index + 1, col.name, col.dtype);
                         }
                         col.name
                     })
             )?;
-        if msg.is_some() { println!() }
+        if opt_msg.is_some() { println!() }
 
         Ok(df_sorted)
     }
