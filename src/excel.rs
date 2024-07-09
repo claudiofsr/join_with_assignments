@@ -96,7 +96,7 @@ pub fn write_xlsx(args: &Arguments, dfs: &[DataFrame]) -> PolarsResult<()> {
 }
 
 /// Select a column from df and copy it to df_result
-fn add_column_from_df_to_another(df_result: &DataFrame, df: &DataFrame) -> Result<DataFrame, PolarsError> {
+fn add_column_from_df_to_another(df_result: &DataFrame, df_original: &DataFrame) -> Result<DataFrame, PolarsError> {
     // Column names:
     let valor_bc: &str = coluna(Left, "valor_bc");
     let valor_bc_auditado: &str = coluna(Left, "valor_bc_auditado");
@@ -109,7 +109,7 @@ fn add_column_from_df_to_another(df_result: &DataFrame, df: &DataFrame) -> Resul
         )?
         .with_column(
             // Select a column and copy it to another df
-            df.column(valor_bc)?.clone()
+            df_original.column(valor_bc)?.clone()
         )?
         .sort_by_columns(Some("write_xlsx sort_by_columns:"))?;
 
