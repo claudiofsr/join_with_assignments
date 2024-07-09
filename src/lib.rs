@@ -87,8 +87,10 @@ pub trait DataFrameExtension {
 
 impl DataFrameExtension for DataFrame {
     fn sort_by_columns(&self, opt_msg: Option<&str>) -> Result<DataFrame, PolarsError> {
-        // Rust: Vec versus HashSet lookup performance.
+        // Vec versus HashSet lookup performance.
         // HashSet contains() is O(1).
+        // Vec is like an array, searching for the correct String is an O(n) operation. 
+        // HashMap/HashSet is a hash table, searching for the String is an O(1) operation.
         // https://gist.github.com/daboross/976978d8200caf86e02acb6805961195#file-lib-rs
         let df_columns: HashSet<&str> = self
             .get_column_names()
