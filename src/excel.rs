@@ -60,8 +60,8 @@ pub fn write_xlsx(args: &Arguments, dfs: &[DataFrame]) -> PolarsResult<()> {
 
     // Add column from one dataframe to another.
     let joined: DataFrame = add_column_from_df_to_another(
+        df_itens_de_docs_fiscais,
         df_itens_de_docs_fiscais_result,
-        df_itens_de_docs_fiscais
     )?;
 
     // Workbook with worksheets
@@ -95,10 +95,10 @@ pub fn write_xlsx(args: &Arguments, dfs: &[DataFrame]) -> PolarsResult<()> {
     Ok(())
 }
 
-/// Select a column from df and copy it to df_result
+/// Select a column from df_source and copy it to df_result
 fn add_column_from_df_to_another(
-    df_result: &DataFrame, 
-    df_original: &DataFrame
+    df_source: &DataFrame,
+    df_result: &DataFrame
 ) -> Result<DataFrame, PolarsError> {
     // Column names:
     let valor_bc: &str = coluna(Left, "valor_bc");
@@ -107,12 +107,12 @@ fn add_column_from_df_to_another(
     let joined: DataFrame = df_result
         .clone()
         .rename(
-            valor_bc,
-            valor_bc_auditado
+            valor_bc,         // original_name
+            valor_bc_auditado // new_name
         )?
         .with_column(
             // Select a column and copy it to another df
-            df_original.column(valor_bc)?.clone()
+            df_source.column(valor_bc)?.clone()
         )?
         .sort_by_columns(Some("write_xlsx sort_by_columns:"))?;
 
