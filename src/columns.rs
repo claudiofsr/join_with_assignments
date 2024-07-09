@@ -154,7 +154,9 @@ impl Column {
         ]
     }
 
-    // <https://stackoverflow.com/questions/67041830/how-to-concatenate-arrays-of-known-lengths>
+    /// Get all columns after checking uniqueness.
+    /// 
+    /// <https://stackoverflow.com/questions/67041830/how-to-concatenate-arrays-of-known-lengths>
     pub fn get_columns() -> Vec<Column> {
         let columns_left   = Column::set_columns_left();
         let columns_middle = Column::set_columns_middle();
@@ -172,6 +174,7 @@ impl Column {
         cols
     }
 
+    /// HashMap<Column_Name, DataType>
     pub fn get_cols_dtype(side: Side) -> HashMap<&'static str, DataType> {
         let cols: Vec<Column> = match side {
             Side::Left   => Column::set_columns_left().to_vec(),
