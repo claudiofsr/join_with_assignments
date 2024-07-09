@@ -438,7 +438,7 @@ mod test_functions {
     use std::error::Error;
 
     #[test]
-    /// cargo test -- --show-output teste_remove_null_columns
+    /// `cargo test -- --show-output teste_remove_null_columns`
     fn teste_remove_null_columns() -> Result<(), Box<dyn Error>> {
         let dataframe: DataFrame = df!(
             "integers"  => &[1, 2, 3, 4],
