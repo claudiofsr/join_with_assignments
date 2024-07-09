@@ -290,9 +290,8 @@ mod tests {
     // cargo test -- --show-output
 
     #[test]
+    /// `cargo test -- --show-output column_names`
     fn column_names() {
-        // cargo test -- --show-output column_names
-
         let cols: Vec<Column> = Column::get_columns();
 
         let names_left: Vec<&str> = cols.get_names(Left);
@@ -303,9 +302,8 @@ mod tests {
     }
 
     #[test]
+    /// `cargo test -- --show-output  column_hash`
     fn column_hash() {
-        // cargo test -- --show-output column_hash
-
         let hash = Column::get_columns().get_hash();
         println!("hash: {hash:#?}");
 
@@ -314,9 +312,8 @@ mod tests {
     }
 
     #[test]
+    /// `cargo test -- --show-output sort_names`
     fn sort_names() {
-        // cargo test -- --show-output sort_names
-
         println!("Not sorted:");
 
         for (key, value) in KEY_NAME.iter() {
@@ -352,9 +349,8 @@ mod tests {
     }
 
     #[test]
+    /// `cargo test -- --show-output get_column_from_hash`
     fn get_column_from_hash() {
-        // cargo test -- --show-output get_column_from_hash
-
         assert_eq!(coluna(Left, "efd_arquivo"), "Arquivo da EFD Contribuições");
         assert_eq!(coluna(Middle, "glosar"), "Glosar Base de Cálculo de PIS/PASEP e COFINS");
         assert_eq!(coluna(Left, "chave"), "Chave do Documento");
