@@ -74,6 +74,36 @@ use sysinfo::System;
 
 pub type VecTuples = Vec<(String, u64, u64)>;
 
+pub trait DataFrameExtension {
+    /// Using the select method is the recommended way to sort columns in polars.
+    fn sort_by_columns(&self, msg: Option<&str>) -> Result<Self, PolarsError>
+    where 
+        Self: std::marker::Sized;
+}
+
+impl DataFrameExtension for DataFrame {
+    fn sort_by_columns(&self, msg: Option<&str>) -> Result<DataFrame, PolarsError> {
+        if let Some(msg) = msg { println!("{msg}") }
+        let df_sorted: DataFrame = self
+            .select(
+                Column::get_columns()
+                    .iter()
+                    .enumerate()
+                    .filter(|(_index, col)| self.column(col.name).is_ok())
+                    .map(|(index, col)| {
+                        // Print column names and their respective types
+                        if msg.is_some() {
+                            println!("column {:02}: (\"{}\", DataType::{}),", index + 1, col.name, col.dtype);
+                        }
+                        col.name
+                    })
+            )?;
+        if msg.is_some() { println!() }
+
+        Ok(df_sorted)
+    }
+}
+
 /// Polar arguments with ENV vars
 pub fn configure_the_environment() {
     // https://stackoverflow.com/questions/70830241/rust-polars-how-to-show-all-columns/75675569#75675569

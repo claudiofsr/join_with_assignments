@@ -13,6 +13,7 @@ use crate::{
     coluna,
     format_dataframe,
     Arguments,
+    DataFrameExtension,
     PolarsXlsxWriter,
     Side::{
         Left,
@@ -57,19 +58,23 @@ pub fn write_xlsx(args: &Arguments, dfs: &[DataFrame]) -> PolarsResult<()> {
     let df_consolidacao_natureza_da_bcalc = &dataframes[2];
     let df_consolidacao_natureza_da_bcalc_result = &dataframes[3];
 
-    // Select a column and copy it to another df
-    let col_bc_original: Series = df_itens_de_docs_fiscais
-        .column("Valor da Base de Cálculo das Contribuições")?
-        .clone();
+    // Column names:
+    let valor_bc: &str = coluna(Left, "valor_bc");
+    let valor_bc_auditado: &str = coluna(Left, "valor_bc_auditado");
 
-    let joined = df_itens_de_docs_fiscais_result
+    // Add column from one dataframe to another.
+    let joined: DataFrame = df_itens_de_docs_fiscais_result
         .clone()
         .rename(
-            "Valor da Base de Cálculo das Contribuições",
-            "Valor da Base de Cálculo das Contribuições (após auditoria)"
+            valor_bc,
+            valor_bc_auditado
         )?
-        .insert_column(33, col_bc_original)? // .insert_at_idx(33, col_bc_original)?
-        .clone();
+        .with_column(
+            // Select a column and copy it to another df
+            df_itens_de_docs_fiscais.column(valor_bc)?.clone()
+        )?
+        //.insert_column(33, col_bc_original)?
+        .sort_by_columns(Some("sort_by_columns excel:"))?;
 
     // Workbook with worksheets
     let mut workbook = Workbook::new();

@@ -43,12 +43,12 @@ Example of use:
     // Verificação dos arquivos:
     sha512sum df*.csv "Dados - Bo/"df*.csv
     b3sum df*.csv "Dados - Da/"df*.csv
-    meld df_consolidacao_natureza_da_bcalc_result.csv "Dados - Nd/df_consolidacao_natureza_da_bcalc_result.csv"&
 
-    file1=foobar
-    file2=blabla
-    line=8393
+    file1="df_itens_de_docs_fiscais_result.csv"
+    file2="Dados - Da/df_itens_de_docs_fiscais_result.csv"
+    line=1
     diff <(head -n $line $file1 | tail -n 1) <(head -n $line $file2 | tail -n 1)
+    meld $file1 $file2&
 
     // Boring Data Tool (bdt): <https://github.com/andygrove/bdt>
     bdt schema df_itens_de_docs_fiscais_result.parquet

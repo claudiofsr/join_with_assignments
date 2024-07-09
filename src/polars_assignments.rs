@@ -7,18 +7,7 @@ use polars::{
 };
 
 use crate::{
-    get_lazyframe_from_csv,
-    round_series,
-    //round_float64_columns,
-    get_opt_vectuples,
-    get_option_assignments,
-    formatar_chave_eletronica,
-    VecTuples,
-    args::Arguments,
-    coluna,
-    Column,
-    columns::Extensions,
-    Side::{Left, Middle, Right},
+    args::Arguments, coluna, formatar_chave_eletronica, get_lazyframe_from_csv, get_opt_vectuples, get_option_assignments, round_series, DataFrameExtension, Side::{Left, Middle, Right}, VecTuples
 };
 
 /// Use Polars to get dataframe after Munkres assignments
@@ -58,7 +47,7 @@ pub fn get_dataframe_after_assignments(args: &Arguments) -> Result<DataFrame, Bo
         .collect()?;
     */
 
-    Ok(dfd_output)
+    Ok(dfd_output.sort_by_columns(None)?)
 }
 
 /// Formatar colunas a fim de realizar comparações e somas de valores.
@@ -72,8 +61,6 @@ fn format_fazyframe_a(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>>
     let count_lines = coluna(Left, "count_lines");
     let chave = coluna(Left, "chave");
     //let valor_item = coluna(Left, "valor_item");
-
-
 
     /*
     println!("df_a 1: {}", lazyframe.clone().collect()?);
@@ -90,8 +77,6 @@ fn format_fazyframe_a(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>>
     println!("valores: {:?}\n", vec_valores);
     */
 
-
-
     let lz = lazyframe // Formatar colunas
         .with_column(col(count_lines).cast(DataType::UInt64))
         .with_column(
@@ -104,13 +89,8 @@ fn format_fazyframe_a(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>>
         ]);
 
     // Lazy operations don’t execute until we call .collect()?.
-    // Using the select method is the recommended way to sort columns in polars.
-    let lazyframe: LazyFrame = lz
-        .collect()?
-        .select(Column::get_columns().get_names(Left))? // sort columns
-        .lazy();
-
-    Ok(lazyframe)
+    // Ok(lz.collect()?.sort_by_columns()?.lazy())
+    Ok(lz.collect()?.lazy())
 }
 
 /// Formatar colunas a fim de realizar comparações e somas de valores.
@@ -127,8 +107,6 @@ fn format_fazyframe_b(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>>
     let chave = coluna(Right, "chave");
     //let valor_item = coluna(Right, "valor_item");
 
-
-
     /*
     println!("df_b 1: {}", lazyframe.clone().collect()?);
     println!("[chave]: {}", lazyframe.clone().collect()?[chave]);
@@ -144,8 +122,6 @@ fn format_fazyframe_b(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>>
     println!("valores: {:?}\n", vec_valores);
     */
 
-
-
     let lz = lazyframe // Formatar colunas
         .with_column(col(count_lines).cast(DataType::UInt64))
         .with_column(
@@ -160,13 +136,8 @@ fn format_fazyframe_b(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>>
         ]);
     
     // Lazy operations don’t execute until we call .collect()?.
-    // Using the select method is the recommended way to sort columns in polars.
-    let lazyframe: LazyFrame = lz
-        .collect()?
-        .select(Column::get_columns().get_names(Right))? // sort columns
-        .lazy();
-
-    Ok(lazyframe)
+    // Ok(lz.collect()?.sort_by_columns()?.lazy())
+    Ok(lz.collect()?.lazy())
 }
 
 fn groupby_fazyframe_a(lazyframe: LazyFrame) -> Result<LazyFrame, PolarsError> {

@@ -21,7 +21,7 @@ impl Column {
 
     // Left
 
-    pub fn set_columns_left() -> [Column; 43] {
+    pub fn set_columns_left() -> [Column; 44] {
         let side = Side::Left;
         [
             Column {side, nick: "count_lines", name: "Linhas EFD", dtype: DataType::UInt64}, // Coluna Temporária
@@ -59,6 +59,7 @@ impl Column {
             Column {side, nick: "data_entrada", name: "Data da Entrada / Aquisição / Execução ou da Saída / Prestação / Conclusão", dtype: DataType::String},
             Column {side, nick: "valor_item", name: "Valor Total do Item", dtype: DataType::Float64},
             Column {side, nick: "valor_bc", name: "Valor da Base de Cálculo das Contribuições", dtype: DataType::Float64},
+            Column {side, nick: "valor_bc_auditado", name: "Valor da Base de Cálculo das Contribuições (após auditoria)", dtype: DataType::Float64},
             Column {side, nick: "aliq_pis", name: "Alíquota de PIS/PASEP (em percentual)", dtype: DataType::Float64},
             Column {side, nick: "aliq_cof", name: "Alíquota de COFINS (em percentual)", dtype: DataType::Float64},
             Column {side, nick: "valor_pis", name: "Valor de PIS/PASEP", dtype: DataType::Float64},
@@ -82,7 +83,7 @@ impl Column {
 
     // Right
 
-    pub fn set_columns_right() -> [Column; 57] {
+    pub fn set_columns_right() -> [Column; 64] {
         let side = Side::Right;
         [
             Column {side, nick: "count_lines", name: "Linhas NFE", dtype: DataType::UInt64}, // Coluna Temporária
@@ -116,6 +117,7 @@ impl Column {
             Column {side, nick: "num_doc", name: "Número da Nota : NF Item (Todos)", dtype: DataType::Int64},
             Column {side, nick: "chave", name: "Chave da Nota Fiscal Eletrônica : NF Item (Todos)", dtype: DataType::String},
             Column {side, nick: "chave_de_acesso", name: "Inf. NFe - Chave de acesso da NF-e : ConhecimentoInformacaoNFe", dtype: DataType::String},
+            Column {side, nick: "valor_docs_viculados", name: "Valor Total de Documentos Vinculados", dtype: DataType::Float64},
             Column {side, nick: "observacoes_gerais", name: "CTe - Observações Gerais de Conhecimento : ConhecimentoInformacaoNFe", dtype: DataType::String},
             Column {side, nick: "dia_emissao", name: "Dia da Emissão : NF Item (Todos)", dtype: DataType::String},
             Column {side, nick: "numero_di", name: "Número da DI : NF Item (Todos)", dtype: DataType::String},
@@ -135,13 +137,20 @@ impl Column {
             Column {side, nick: "aliq_cof", name: "COFINS: Alíquota ad valorem - Atributo : NF Item (Todos)", dtype: DataType::Float64},
             Column {side, nick: "valor_pis", name: "PIS: Valor do Tributo : NF Item (Todos) SOMA", dtype: DataType::Float64},
             Column {side, nick: "valor_cof", name: "COFINS: Valor do Tributo : NF Item (Todos) SOMA", dtype: DataType::Float64},
-            Column {side, nick: "valor_bc_ipi", name: "ISS: Base de Cálculo : NF Item (Todos) SOMA", dtype: DataType::Float64},
+            Column {side, nick: "valor_bc_iss", name: "ISS: Base de Cálculo : NF Item (Todos) SOMA", dtype: DataType::Float64},
             Column {side, nick: "valor_ipi", name: "IPI: Valor do Tributo : NF Item (Todos) SOMA", dtype: DataType::Float64},
             Column {side, nick: "valor_iss", name: "ISS: Valor do Tributo : NF Item (Todos) SOMA", dtype: DataType::Float64},
             Column {side, nick: "aliq_icms", name: "ICMS: Alíquota : NF Item (Todos) NOISE OR", dtype: DataType::Float64},
             Column {side, nick: "valor_bc_icms", name: "ICMS: Base de Cálculo : NF Item (Todos) SOMA", dtype: DataType::Float64},
             Column {side, nick: "valor_icms", name: "ICMS: Valor do Tributo : NF Item (Todos) SOMA", dtype: DataType::Float64},
             Column {side, nick: "valor_icms_sub", name: "ICMS por Substituição: Valor do Tributo : NF Item (Todos) SOMA", dtype: DataType::Float64},
+            // Colunas Auxiliares adicionadas
+            Column {side, nick: "aliquota_zero", name: "Alíquota Zero", dtype: DataType::String},
+            Column {side, nick: "credito_presumido", name:"Crédito Presumido", dtype: DataType::String},
+            Column {side, nick: "incidencai_monofasica", name: "Incidência Monofásica", dtype: DataType::String},
+            Column {side, nick: "cnpj_base_contribuinte", name: "CNPJ Base do Contribuinte", dtype: DataType::String},
+            Column {side, nick: "cnpj_base_remetente", name: "CNPJ Base do Remetente", dtype: DataType::String},
+            Column {side, nick: "cnpj_base_destinatario", name: "CNPJ Base do Destinatário", dtype: DataType::String},
         ]
     }
 
@@ -179,6 +188,7 @@ impl Column {
 
 pub trait Extensions {
     /// Get Column names
+    #[allow(dead_code)]
     fn get_names(&self, side: Side) -> Vec<&str>;
     /**
     HashMap<key, value>

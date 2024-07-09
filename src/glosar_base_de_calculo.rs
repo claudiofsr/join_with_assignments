@@ -3,6 +3,7 @@ use std::error::Error;
 
 use crate::{
     Arguments,
+    DataFrameExtension,
     round_series,
     get_cnpj_base,
     adicionar_coluna_de_aliquota_zero,
@@ -171,6 +172,7 @@ pub fn glosar_bc(dataframe: &DataFrame, args: &Arguments) -> Result<DataFrame, B
             //.remover_colunas_auxiliares()
             .format_values()
             .collect()?
+            .sort_by_columns(None)?
     )
 }
 
