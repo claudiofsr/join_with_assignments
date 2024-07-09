@@ -78,6 +78,8 @@ pub trait DataFrameExtension {
     /// Using the select method is the recommended way to sort columns in polars.
     ///
     /// Some messages can be added.
+    /// 
+    /// <https://doc.rust-lang.org/std/collections>
     fn sort_by_columns(&self, msg: Option<&str>) -> Result<Self, PolarsError>
     where
         Self: std::marker::Sized;
