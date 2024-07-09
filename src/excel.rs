@@ -17,7 +17,7 @@ use crate::{
     PolarsXlsxWriter,
     Side::{
         Left,
-        //Middle,
+        Middle,
         //Right,
     },
 };
@@ -433,12 +433,17 @@ pub enum Frame {
          Frame::Data(df) => df,
      };
 
-     let maintain = "Mês do Período de Apuração";
+    // Keep the names of these columns:
+    let pa_mes: &str = coluna(Left, "pa_mes");   // "Mês do Período de Apuração"
+    let glosar: &str = coluna(Middle, "glosar"); // "Glosar Base de Cálculo de PIS/PASEP e COFINS"
 
      let df_clean: DataFrame = df
          .iter()
-         //.filter(|series| series.is_not_null().any())
-         .filter(|series| series.is_not_null().any() || series.name().contains(maintain))
+         .filter(|series| 
+            series.is_not_null().any() || 
+            series.name().contains(pa_mes) ||
+            series.name().contains(glosar)
+        )
          .cloned()
          .collect();
 
