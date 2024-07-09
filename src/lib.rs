@@ -58,7 +58,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 
 use std::{
-    any, collections::HashMap, env,
+    any, collections::{HashMap, HashSet}, env,
     error::Error, fs::File, 
     num::ParseFloatError,
     path::PathBuf,
@@ -83,13 +83,23 @@ pub trait DataFrameExtension {
 
 impl DataFrameExtension for DataFrame {
     fn sort_by_columns(&self, msg: Option<&str>) -> Result<DataFrame, PolarsError> {
+        //let columns: Vec<&str> = Column::get_columns().iter().map(|col| col.name).collect();
+        // HashSet can do it in O(1).
+        // Rust Vec vs. HashMap lookup performance
+        // https://gist.github.com/daboross/976978d8200caf86e02acb6805961195#file-lib-rs
+        let df_columns: HashSet<&str> = self
+            .get_column_names()
+            .into_iter()
+            .collect();
+
         if let Some(msg) = msg { println!("{msg}") }
         let df_sorted: DataFrame = self
             .select(
                 Column::get_columns()
                     .iter()
+                    //.filter(|col| self.column(col.name).is_ok())
+                    .filter(|col| df_columns.contains(&col.name))
                     .enumerate()
-                    .filter(|(_index, col)| self.column(col.name).is_ok())
                     .map(|(index, col)| {
                         // Print column names and their respective types
                         if msg.is_some() {

@@ -250,7 +250,16 @@ impl Extensions for [Column] {
     }
 }
 
-static NAMES: Lazy<HashMap<(Side, &'static str), &'static str>> = Lazy::new(|| {
+#[allow(dead_code)]
+static COLUMN_NAMES: Lazy<HashSet<&'static str>> = Lazy::new(|| {
+    let hashset: HashSet<&str> = Column::get_columns()
+        .into_iter()
+        .map(|col| col.name)
+        .collect();
+    hashset
+});
+
+static KEY_NAME: Lazy<HashMap<(Side, &'static str), &'static str>> = Lazy::new(|| {
     Column::get_columns().get_hash()
 });
 
@@ -260,7 +269,7 @@ static NAMES: Lazy<HashMap<(Side, &'static str), &'static str>> = Lazy::new(|| {
 ///
 /// key: (side, nick)
 pub fn coluna(side: Side, nick: &str) -> &str {
-    match NAMES.get(&(side, nick)) {
+    match KEY_NAME.get(&(side, nick)) {
         Some(&name) => name,
         None => {
             eprintln!("fn coluna()");
@@ -310,14 +319,14 @@ mod tests {
 
         println!("Not sorted:");
 
-        for (key, value) in NAMES.iter() {
+        for (key, value) in KEY_NAME.iter() {
             let k = format!("{key:?}");
             println!("key: {k:32} ; value: {value}");
         }
 
         println!("\nSorted:");
 
-        let mut hash_vec: Vec<((Side, &str), &str)> = NAMES
+        let mut hash_vec: Vec<((Side, &str), &str)> = KEY_NAME
             .clone()
             .into_iter()
             .collect();
@@ -329,17 +338,17 @@ mod tests {
             println!("key: {k:32} ; value: {value}");
         }
 
-        let columns_len = NAMES.len();
-        println!("NAMES_len: {columns_len}");
+        let columns_len = KEY_NAME.len();
+        println!("KEY_NAME_len: {columns_len}");
 
-        assert_eq!(NAMES[&(Left, "efd_arquivo")], "Arquivo da EFD Contribuições");
-        assert_eq!(NAMES[&(Middle, "glosar")], "Glosar Base de Cálculo de PIS/PASEP e COFINS");
-        assert_eq!(NAMES[&(Left, "chave")], "Chave do Documento");
-        assert_eq!(NAMES[&(Right, "chave")], "Chave da Nota Fiscal Eletrônica : NF Item (Todos)");
-        assert_eq!(NAMES[&(Left, "count_lines")], "Linhas EFD");
-        assert_eq!(NAMES[&(Right, "count_lines")], "Linhas NFE");
-        assert_eq!(NAMES.get(&(Right, "count_lines")), Some(&"Linhas NFE"));
-        assert_eq!(columns_len, 43 + 2 + 57);
+        assert_eq!(KEY_NAME[&(Left, "efd_arquivo")], "Arquivo da EFD Contribuições");
+        assert_eq!(KEY_NAME[&(Middle, "glosar")], "Glosar Base de Cálculo de PIS/PASEP e COFINS");
+        assert_eq!(KEY_NAME[&(Left, "chave")], "Chave do Documento");
+        assert_eq!(KEY_NAME[&(Right, "chave")], "Chave da Nota Fiscal Eletrônica : NF Item (Todos)");
+        assert_eq!(KEY_NAME[&(Left, "count_lines")], "Linhas EFD");
+        assert_eq!(KEY_NAME[&(Right, "count_lines")], "Linhas NFE");
+        assert_eq!(KEY_NAME.get(&(Right, "count_lines")), Some(&"Linhas NFE"));
+        assert_eq!(columns_len, 44 + 2 + 64);
     }
 
     #[test]

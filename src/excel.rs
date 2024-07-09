@@ -74,7 +74,7 @@ pub fn write_xlsx(args: &Arguments, dfs: &[DataFrame]) -> PolarsResult<()> {
             df_itens_de_docs_fiscais.column(valor_bc)?.clone()
         )?
         //.insert_column(33, col_bc_original)?
-        .sort_by_columns(Some("sort_by_columns excel:"))?;
+        .sort_by_columns(Some("write_xlsx sort_by_columns:"))?;
 
     // Workbook with worksheets
     let mut workbook = Workbook::new();
