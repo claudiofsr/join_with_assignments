@@ -190,6 +190,8 @@ fn groupby_and_agg_values(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Err
 
     let reg: &str = coluna(Left, "registro");
     let top: &str = coluna(Left, "tipo_operacao");
+    let valor_item: &str = coluna(Left, "valor_item"); // "Valor Total do Item"
+    let valor_bc: &str = coluna(Left, "valor_bc");     // "Valor da Base de Cálculo das Contribuições"
 
     let range_a: [u32; 4] = [1, 2, 3, 5]; // RBNC_Tributada
     let range_b: [u32; 4] = [4, 6, 7, 9]; // RBNC_NTributada
@@ -215,7 +217,7 @@ fn groupby_and_agg_values(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Err
 
     let lazy_groupby: LazyFrame = lazyframe
         .with_columns([
-            // Adicionar 3 colunas de segregação da Receita Bruta
+            // Adicionar 3 colunas para segregação da Receita Bruta Não Cumulativa
             transferir_valores(1, "RBNC_Tributada"),
             transferir_valores(2, "RBNC_NTributada"),
             transferir_valores(3, "RBNC_Exportação"),
@@ -239,16 +241,15 @@ fn groupby_and_agg_values(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Err
             analisar_natureza_da_bc(),
         ])
         .agg([
-            //col("Some_Column").list(), // then collect into a list per group [1, 2, ...]
-            col("Valor da Base de Cálculo das Contribuições").sum(),
-            col("Valor Total do Item").sum(),
+            col(valor_bc).sum(),
+            col(valor_item).sum(),
             // Adicionar 6 colunas de Receita segregadas por CST e CFOP.
-            col("Valor Total do Item").filter(condition_a).sum().alias("RBNC_Tributada"),
-            col("Valor Total do Item").filter(condition_b).sum().alias("RBNC_NTributada"),
-            col("Valor Total do Item").filter(condition_c).sum().alias("RBNC_Exportação"),
-            col("Valor Total do Item").filter(condition_d).sum().alias("RecBrutaNCumulativa"),
-            col("Valor Total do Item").filter(condition_e).sum().alias("RecBrutaCumulativa"),
-            col("Valor Total do Item").filter(condition_f).sum().alias("ReceitaBrutaTotal"),
+            col(valor_item).filter(condition_a.and(condition_d.clone())).sum().alias("RBNC_Tributada"),
+            col(valor_item).filter(condition_b.and(condition_d.clone())).sum().alias("RBNC_NTributada"),
+            col(valor_item).filter(condition_c.and(condition_d.clone())).sum().alias("RBNC_Exportação"),
+            col(valor_item).filter(condition_d).sum().alias("RecBrutaNCumulativa"),
+            col(valor_item).filter(condition_e).sum().alias("RecBrutaCumulativa"),
+            col(valor_item).filter(condition_f).sum().alias("ReceitaBrutaTotal"),
 
         ])
         .collect()? // Executar procedimento para reduzir tamanho do dataframe
@@ -268,10 +269,10 @@ fn groupby_and_agg_values(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Err
         .with_columns([
             when(operacoes_de_ajustes_ou_descontos())
             .then(
-                col("Valor Total do Item")
-                .alias("Valor da Base de Cálculo das Contribuições")
+                col(valor_item)
+                .alias(valor_bc)
             )
-            .otherwise(col("Valor da Base de Cálculo das Contribuições"))
+            .otherwise(col(valor_bc))
         ]);
 
     Ok(lazy_groupby)
@@ -333,7 +334,7 @@ fn ratear_creditos(receita: &str) -> Expr {
     let cst_53_ou_63: Expr = (col(cst) % lit(10)).eq(lit(3)).and(lit(receita == "RBNC_Tributada"  || receita == "RBNC_NTributada"));
     let cst_54_ou_64: Expr = (col(cst) % lit(10)).eq(lit(4)).and(lit(receita == "RBNC_Tributada"  || receita == "RBNC_Exportação"));
     let cst_55_ou_65: Expr = (col(cst) % lit(10)).eq(lit(5)).and(lit(receita == "RBNC_NTributada" || receita == "RBNC_Exportação"));
-    let cst_56_ou_66: Expr = (col(cst) % lit(10)).eq(lit(6)).and(lit(receita == "RBNC_Tributada"  || receita == "RBNC_NTributada" || receita == "RBNC_Exportação")); // col(cst).eq(lit(56)).or(col(cst).eq(lit(66)))
+    let cst_56_ou_66: Expr = (col(cst) % lit(10)).eq(lit(6)).and(lit(receita == "RBNC_Tributada"  || receita == "RBNC_NTributada" || receita == "RBNC_Exportação"));
 
     let cst_rec_bruta_ncumulativa: Expr = lit(receita == "RecBrutaNCumulativa");
     let cst_rec_bruta_cumulativa: Expr = lit(receita == "RecBrutaCumulativa");
@@ -342,7 +343,7 @@ fn ratear_creditos(receita: &str) -> Expr {
     when( cst_50_a_66().and(receita_positiva) )
         .then(
             when( cst_56_ou_66 ) // ratear valor para as colunas 1 e 2 e 3
-                .then( col(valor_bc) * col(receita) / col("ReceitaBrutaTotal") )
+                .then( col(valor_bc) * col(receita) / col("RecBrutaNCumulativa") )
 
                 .when( cst_50_ou_60 ) // transferir valor para a coluna 1
                 .then( col(valor_bc) )
@@ -442,9 +443,9 @@ fn analisar_operacoes_de_saida(lazyframe: LazyFrame, auditar: bool, union_args: 
 
     let receita_bruta_percentuais = receita_bruta_valores.clone()
         .with_columns([
-            percentual("RBNC_Tributada",      "ReceitaBrutaTotal"),
-            percentual("RBNC_NTributada",     "ReceitaBrutaTotal"),
-            percentual("RBNC_Exportação",     "ReceitaBrutaTotal"),
+            percentual("RBNC_Tributada",      "RecBrutaNCumulativa"),
+            percentual("RBNC_NTributada",     "RecBrutaNCumulativa"),
+            percentual("RBNC_Exportação",     "RecBrutaNCumulativa"),
             percentual("RecBrutaNCumulativa", "ReceitaBrutaTotal"),
             percentual("RecBrutaCumulativa",  "ReceitaBrutaTotal"),
             percentual("ReceitaBrutaTotal",   "ReceitaBrutaTotal"),
