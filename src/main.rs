@@ -47,6 +47,7 @@ Example of use:
 
     file1="df_itens_de_docs_fiscais_result.csv"
     file2="Dados - Da/df_itens_de_docs_fiscais_result.csv"
+    diff $file1 $file2
     line=1
     diff <(head -n $line $file1 | tail -n 1) <(head -n $line $file2 | tail -n 1)
     meld $file1 $file2&
