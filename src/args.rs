@@ -5,44 +5,26 @@ use clap::{
     Parser,
 };
 
-use serde::{
-    Serialize,
-    Deserialize,
-};
+use serde::{Deserialize, Serialize};
 
-use std::{
-    default,
-    error::Error,
-    path::PathBuf,
-};
+use std::{default, error::Error, path::PathBuf};
 
 // https://stackoverflow.com/questions/74068168/clap-rs-not-printing-colors-during-help
 pub fn get_styles() -> clap::builder::Styles {
-
-    let cyan   = anstyle::Color::Ansi(anstyle::AnsiColor::Cyan);
-    let green  = anstyle::Color::Ansi(anstyle::AnsiColor::Green);
+    let cyan = anstyle::Color::Ansi(anstyle::AnsiColor::Cyan);
+    let green = anstyle::Color::Ansi(anstyle::AnsiColor::Green);
     let yellow = anstyle::Color::Ansi(anstyle::AnsiColor::Yellow);
 
     clap::builder::Styles::styled()
-        .placeholder(
-            anstyle::Style::new()
-                .fg_color(Some(yellow))
-        )
-        .usage(
-            anstyle::Style::new()
-                .fg_color(Some(cyan))
-                .bold()
-        )
+        .placeholder(anstyle::Style::new().fg_color(Some(yellow)))
+        .usage(anstyle::Style::new().fg_color(Some(cyan)).bold())
         .header(
             anstyle::Style::new()
                 .fg_color(Some(cyan))
                 .bold()
-                .underline()
+                .underline(),
         )
-        .literal(
-            anstyle::Style::new()
-                .fg_color(Some(green))
-        )
+        .literal(anstyle::Style::new().fg_color(Some(green)))
 }
 
 /*
@@ -106,7 +88,7 @@ pub struct Arguments {
     ///
     /// The default is `;`
     #[arg(short('d'), long, env("DELIMITER_OUTPUT"), required = false)]
-    pub delimiter_output:  Option<char>,
+    pub delimiter_output: Option<char>,
 
     /// Calculation Period: start date (format: yyyymm)
     ///
@@ -162,10 +144,8 @@ impl default::Default for Arguments {
 }
 
 impl Arguments {
-
     /// Build Arguments struct
     pub fn build() -> Result<Self, Box<dyn Error>> {
-
         let app: Command = Arguments::command();
         let app_name: &str = app.get_name();
 
@@ -181,7 +161,6 @@ impl Arguments {
     ///
     /// A new configuration file is created with default values if none exists.
     fn get_config_file(mut self, app_name: &str) -> Result<Self, Box<dyn Error>> {
-
         let config_file: Arguments = confy::load(app_name, None)?;
 
         self.file1 = self.file1.or(config_file.file1);
@@ -207,9 +186,7 @@ impl Arguments {
     ///
     /// ~/.config/join_with_assignments/default-config.toml
     fn print_config_file(self, app_name: &str) -> Result<Self, Box<dyn Error>> {
-
         if self.verbose.unwrap_or(true) {
-
             let file_path: PathBuf = confy::get_configuration_file_path(app_name, None)?;
             println!("Configuration file: '{}'", file_path.display());
 
@@ -233,7 +210,6 @@ mod tests {
     #[test]
     /// `cargo test -- --show-output teste_de_logica`
     fn teste_de_logica() -> Result<(), Box<dyn Error>> {
-
         let args: Arguments = Arguments {
             file1: None,
             file2: None,

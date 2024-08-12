@@ -2,35 +2,20 @@ use polars::prelude::*;
 use std::error::Error;
 
 use crate::{
-    Arguments,
-    DataFrameExtension,
-    round_series,
-    get_cnpj_base,
-    adicionar_coluna_de_aliquota_zero,
-    adicionar_coluna_de_credito_presumido,
+    adicionar_coluna_de_aliquota_zero, adicionar_coluna_de_credito_presumido,
     adicionar_coluna_de_incidencia_monofasica,
-    adicionar_coluna_periodo_de_apuracao_inicial_e_final,
-    filtros::{
-        cst_50_a_56,
-        cst_50_a_66,
-        codigo_nat_01_a_18,
-        operacoes_de_entrada_ou_saida
-    },
-    coluna,
+    adicionar_coluna_periodo_de_apuracao_inicial_e_final, coluna,
+    filtros::{codigo_nat_01_a_18, cst_50_a_56, cst_50_a_66, operacoes_de_entrada_ou_saida},
+    get_cnpj_base, round_series, Arguments, DataFrameExtension,
     Side::{Left, Middle, Right},
 };
 
 /// CFOP de Armazenagem de mercadoria
-pub const CFOP_DE_ARMAZENAGEM: [i32; 10] = [
-    5905, 5907, 5923, 5934, 5949,
-    6905, 6907, 6923, 6934, 6949,
-];
+pub const CFOP_DE_ARMAZENAGEM: [i32; 10] =
+    [5905, 5907, 5923, 5934, 5949, 6905, 6907, 6923, 6934, 6949];
 
 /// CFOP de Industrialização por encomenda
-pub const CFOP_DE_INDUSTRIALIZACAO: [i32; 8] = [
-    1124, 1125, 2124, 2125,
-    5124, 5125, 6124, 6125,
-];
+pub const CFOP_DE_INDUSTRIALIZACAO: [i32; 8] = [1124, 1125, 2124, 2125, 5124, 5125, 6124, 6125];
 
 /*
 // ### --- cte_valor.csv --- ###
@@ -77,29 +62,30 @@ impl LazyFrameExtension for LazyFrame {
         let glosar: &str = coluna(Middle, "glosar");
         let valor_bc: &str = coluna(Left, "valor_bc");
 
-        self
-            .with_columns([
-                col(valor_bc)
-                    .apply(|series| {
-                        round_series(series, 2)
-                    }, GetOutput::from_type(DataType::Float64)),
-                col(glosar)
-                    // Substituir multiple_whitespaces " " por apenas um " "
-                    .str().replace_all(lit(r"\s{2,}"), lit(" "), false)
-                    // Remover multiple_whitespaces " " e/or "&" das extremidades da linha
-                    .str().replace_all(lit(r"^[\s&]+|[\s&]+$"), lit(""), false)
-            ])
+        self.with_columns([
+            col(valor_bc).apply(
+                |series| round_series(series, 2),
+                GetOutput::from_type(DataType::Float64),
+            ),
+            col(glosar)
+                // Substituir multiple_whitespaces " " por apenas um " "
+                .str()
+                .replace_all(lit(r"\s{2,}"), lit(" "), false)
+                // Remover multiple_whitespaces " " e/or "&" das extremidades da linha
+                .str()
+                .replace_all(lit(r"^[\s&]+|[\s&]+$"), lit(""), false),
+        ])
     }
 
     fn adicionar_colunas_auxiliares(self) -> Self {
         let columns: Vec<&str> = vec![
-            coluna(Left, "contribuinte_cnpj"),  // "CNPJ dos Estabelecimentos do Contribuinte"
-            "CNPJ Base do Contribuinte",        // Coluna auxiliar
-            coluna(Right, "remetente_cnpj2"),   // "CTe - Remetente das mercadorias transportadas: CNPJ/CPF de Conhecimento : ConhecimentoInformacaoNFe"
-            "CNPJ Base do Remetente",           // Coluna auxiliar
+            coluna(Left, "contribuinte_cnpj"), // "CNPJ dos Estabelecimentos do Contribuinte"
+            "CNPJ Base do Contribuinte",       // Coluna auxiliar
+            coluna(Right, "remetente_cnpj2"), // "CTe - Remetente das mercadorias transportadas: CNPJ/CPF de Conhecimento : ConhecimentoInformacaoNFe"
+            "CNPJ Base do Remetente",         // Coluna auxiliar
             coluna(Right, "destinatario_cnpj"), // "CTe - Informações do Destinatário do CT-e: CNPJ/CPF de Conhecimento : ConhecimentoValoresPrestacaoServico-Componentes"
             "CNPJ Base do Destinatário",        // Coluna auxiliar
-            coluna(Right, "chave_de_acesso"),   // "Inf. NFe - Chave de acesso da NF-e : ConhecimentoInformacaoNFe"
+            coluna(Right, "chave_de_acesso"), // "Inf. NFe - Chave de acesso da NF-e : ConhecimentoInformacaoNFe"
             "Valor Total de Documentos Vinculados", // Coluna auxiliar
         ];
 
@@ -108,22 +94,23 @@ impl LazyFrameExtension for LazyFrame {
         // https://docs.pola.rs/user-guide/expressions/strings/#extract-a-pattern
         let pattern: Expr = lit(r"(?i)valor total = (.*)"); // regex
 
-        self
-            .with_columns([
-                // Adicionar 3 colunas contendo CNPJ Base
-                col(columns[0])
-                    .apply(get_cnpj_base, GetOutput::from_type(DataType::String))
-                    .alias(columns[1]), // Coluna auxiliar
-                col(columns[2])
-                    .apply(get_cnpj_base, GetOutput::from_type(DataType::String))
-                    .alias(columns[3]), // Coluna auxiliar
-                col(columns[4])
-                    .apply(get_cnpj_base, GetOutput::from_type(DataType::String))
-                    .alias(columns[5]), // Coluna auxiliar
-                col(columns[6])
-                    .str().extract(pattern, 1).cast(DataType::Float64)
-                    .alias(columns[7]), // Coluna auxiliar
-            ])
+        self.with_columns([
+            // Adicionar 3 colunas contendo CNPJ Base
+            col(columns[0])
+                .apply(get_cnpj_base, GetOutput::from_type(DataType::String))
+                .alias(columns[1]), // Coluna auxiliar
+            col(columns[2])
+                .apply(get_cnpj_base, GetOutput::from_type(DataType::String))
+                .alias(columns[3]), // Coluna auxiliar
+            col(columns[4])
+                .apply(get_cnpj_base, GetOutput::from_type(DataType::String))
+                .alias(columns[5]), // Coluna auxiliar
+            col(columns[6])
+                .str()
+                .extract(pattern, 1)
+                .cast(DataType::Float64)
+                .alias(columns[7]), // Coluna auxiliar
+        ])
     }
 
     fn remover_colunas_auxiliares(self) -> Self {
@@ -143,7 +130,6 @@ impl LazyFrameExtension for LazyFrame {
 }
 
 pub fn glosar_bc(dataframe: &DataFrame, args: &Arguments) -> Result<DataFrame, Box<dyn Error>> {
-
     let lazyframe: LazyFrame = dataframe.clone().lazy();
 
     let lazyframe: LazyFrame = adicionar_coluna_de_aliquota_zero(lazyframe)?;
@@ -167,26 +153,26 @@ pub fn glosar_bc(dataframe: &DataFrame, args: &Arguments) -> Result<DataFrame, B
     // let lazyframe: LazyFrame = analisar_situacao13(lazyframe)?;
     // let lazyframe: LazyFrame = analisar_situacao14(lazyframe)?;
 
-    Ok(
-        lazyframe
-            //.remover_colunas_auxiliares()
-            .format_values()
-            .collect()?
-            .sort_by_columns(None)?
-    )
+    Ok(lazyframe
+        //.remover_colunas_auxiliares()
+        .format_values()
+        .collect()?
+        .sort_by_columns(None)?)
 }
 
 /// Check if the columns are the same
 fn equal(col_a: &str, col_b: &str) -> Expr {
     // Uma das colunas com campos não nulos!!!
-    col(col_a).is_not_null()
+    col(col_a)
+        .is_not_null()
         .and(col(col_b).is_not_null()) // it is not necessary
         .and(col(col_a).eq(col(col_b)))
 }
 
 /// Check if the columns are different
 fn unequal(col_a: &str, col_b: &str) -> Expr {
-    col(col_a).is_not_null()
+    col(col_a)
+        .is_not_null()
         .and(col(col_b).is_not_null())
         .and(col(col_a).neq(col(col_b)))
 }
@@ -206,7 +192,6 @@ fn optante_do_simples_nacional() -> Expr {
 }
 
 fn analisar_situacao01(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>> {
-
     // /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/polars-plan-0.34.2/src/dsl/string.rs
     // https://pola-rs.github.io/polars/polars/export/regex/index.html
 
@@ -235,8 +220,10 @@ fn analisar_situacao01(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     Ok(lf_result)
 }
 
-fn analisar_situacao02(lazyframe: LazyFrame, args: &Arguments) -> Result<LazyFrame, Box<dyn Error>> {
-
+fn analisar_situacao02(
+    lazyframe: LazyFrame,
+    args: &Arguments,
+) -> Result<LazyFrame, Box<dyn Error>> {
     let glosar: &str = coluna(Middle, "glosar");
     let dia_emissao: &str = coluna(Right, "dia_emissao"); // "Dia da Emissão : NF Item (Todos)",
 
@@ -244,38 +231,39 @@ fn analisar_situacao02(lazyframe: LazyFrame, args: &Arguments) -> Result<LazyFra
     let pa_ini: &str = "Período de Apuração Inicial";
     let pa_fim: &str = "Período de Apuração Final";
 
-    let lazyframe: LazyFrame = adicionar_coluna_periodo_de_apuracao_inicial_e_final(lazyframe, args)?;
+    let lazyframe: LazyFrame =
+        adicionar_coluna_periodo_de_apuracao_inicial_e_final(lazyframe, args)?;
 
     let situacao_02: Expr = operacoes_de_credito()
         .and(col(dia_emissao).is_not_null())
         .and(
-            col(dia_emissao).lt(col(pa_ini))
-            .or(col(dia_emissao).gt(col(pa_fim)))
+            col(dia_emissao)
+                .lt(col(pa_ini))
+                .or(col(dia_emissao).gt(col(pa_fim))),
         );
 
     println!("situacao_02: {situacao_02:?}\n");
 
-    let mensagem: Expr = concat_str([
-        col(glosar),
-        lit("Situação 02:"),
-        lit("Crédito extemporâneo."),
-        lit("&"),
-    ], " ", true);
+    let mensagem: Expr = concat_str(
+        [
+            col(glosar),
+            lit("Situação 02:"),
+            lit("Crédito extemporâneo."),
+            lit("&"),
+        ],
+        " ",
+        true,
+    );
 
     let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_02, mensagem, lit(0))?;
 
     // Remover 2 colunas temporárias
-    let lf_result: LazyFrame = lf_result
-        .drop([
-            pa_ini,
-            pa_fim,
-        ]);
+    let lf_result: LazyFrame = lf_result.drop([pa_ini, pa_fim]);
 
     Ok(lf_result)
 }
 
 fn analisar_situacao03(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>> {
-
     let glosar: &str = coluna(Middle, "glosar");
     let cfop: &str = coluna(Right, "cfop");
     let origem_do_item: &str = coluna(Right, "origem"); // "Registro de Origem do Item : NF Item (Todos)"
@@ -285,7 +273,7 @@ fn analisar_situacao03(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
 
     let columns: Vec<&str> = vec![
         "Alíquota Zero",
-        "Alíquota Zero Temp",         // coluna temporária
+        "Alíquota Zero Temp", // coluna temporária
         "Incidência Monofásica",
         "Incidência Monofásica Temp", // coluna temporária
     ];
@@ -294,7 +282,11 @@ fn analisar_situacao03(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     let nfe: Expr = col(origem_do_item).str().contains(pattern01, false);
 
     // CFOPs relacionados a Serviços de Armazanagem ou Industrialização por encomenda.
-    let cfop_valido = [CFOP_DE_ARMAZENAGEM.as_slice(), CFOP_DE_INDUSTRIALIZACAO.as_slice()].concat();
+    let cfop_valido = [
+        CFOP_DE_ARMAZENAGEM.as_slice(),
+        CFOP_DE_INDUSTRIALIZACAO.as_slice(),
+    ]
+    .concat();
     let series: Series = cfop_valido.iter().collect();
 
     // Estes serviços são insumos com direito à crédito das Contribuições que devem ser excluídos das glosas.
@@ -308,24 +300,26 @@ fn analisar_situacao03(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
         .and(cst_50_a_56())
         .and(nfe)
         .and(cfop_de_insumos.not());
-        //.and(aliquotas_zero);
+    //.and(aliquotas_zero);
 
     // Adicionar coluna temporária
     let lazyframe: LazyFrame = lazyframe
         .with_column(
             when(filter.clone())
-                .then(columns[0])     // keep original value: "Alíquota Zero"
+                .then(columns[0]) // keep original value: "Alíquota Zero"
                 .otherwise(lit(NULL)) // replace by null
-            .alias(columns[1])        // Coluna Temporária
+                .alias(columns[1]), // Coluna Temporária
         )
         .with_column(
             when(filter)
-                .then(columns[2])     // keep original value: "Incidência Monofásica"
+                .then(columns[2]) // keep original value: "Incidência Monofásica"
                 .otherwise(lit(NULL)) // replace by null
-            .alias(columns[3])        // Coluna Temporária
+                .alias(columns[3]), // Coluna Temporária
         );
 
-    let situacao_03: Expr = col(columns[1]).is_not_null().or(col(columns[3]).is_not_null());
+    let situacao_03: Expr = col(columns[1])
+        .is_not_null()
+        .or(col(columns[3]).is_not_null());
 
     println!("situacao_03: {situacao_03:?}\n");
 
@@ -343,20 +337,15 @@ fn analisar_situacao03(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_03, mensagem, lit(0))?;
 
     // Remover coluna temporária
-    let lf_result: LazyFrame = lf_result
-        .drop([
-            columns[1],
-            columns[3],
-        ]);
+    let lf_result: LazyFrame = lf_result.drop([columns[1], columns[3]]);
 
     Ok(lf_result)
 }
 
 fn analisar_situacao04(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>> {
-
     let glosar: &str = coluna(Middle, "glosar");
-    let valor_total_do_item: &str = coluna(Left, "valor_item");             // "Valor Total do Item"
-    let valor_bc: &str = coluna(Left, "valor_bc");                          // "Valor da Base de Cálculo das Contribuições"
+    let valor_total_do_item: &str = coluna(Left, "valor_item"); // "Valor Total do Item"
+    let valor_bc: &str = coluna(Left, "valor_bc"); // "Valor da Base de Cálculo das Contribuições"
     let valor_da_nota_proporcional_nfe: &str = coluna(Right, "valor_item"); // "Valor da Nota Proporcional : NF Item (Todos) SOMA"
 
     let tomador1: &str = coluna(Right, "tomador_papel1");
@@ -369,14 +358,14 @@ fn analisar_situacao04(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
 
     // "CNPJ Base do Contribuinte" eq "CNPJ Base do Destinatário"
     // O Contribuinte é o Destinatário das operações.
-    let destinatario_das_operacoes: Expr = equal(cnpj_base_do_contribuinte, cnpj_base_do_destinatario);
+    let destinatario_das_operacoes: Expr =
+        equal(cnpj_base_do_contribuinte, cnpj_base_do_destinatario);
 
     // "CNPJ Base do Remetente"  eq "CNPJ Base do Destinatário": operação de transferência
     // "CNPJ Base do Remetente" neq "CNPJ Base do Destinatário": operação de compra
     let cnpjs_distintos: Expr = unequal(cnpj_base_do_remetente, cnpj_base_do_contribuinte);
 
-    let operacao_de_compra: Expr = destinatario_das_operacoes
-        .and(cnpjs_distintos);
+    let operacao_de_compra: Expr = destinatario_das_operacoes.and(cnpjs_distintos);
 
     let valores_iguais: Expr = equal(valor_bc, valor_da_nota_proporcional_nfe);
 
@@ -425,11 +414,10 @@ fn analisar_situacao04(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
 
 #[allow(dead_code)]
 fn analisar_situacao05(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>> {
-
     let glosar: &str = coluna(Middle, "glosar");
-    let valor_bc: &str = coluna(Left, "valor_bc");                                // "Valor da Base de Cálculo das Contribuições"
-    let valor_da_nota_proporcional_nfe: &str = coluna(Right, "valor_item");       // "Valor da Nota Proporcional : NF Item (Todos) SOMA";
-    // let valor_da_base_calculo_icms_nfe: &str = coluna(Right, "valor_bc_icms"); // "ICMS: Base de Cálculo : NF Item (Todos) SOMA"
+    let valor_bc: &str = coluna(Left, "valor_bc"); // "Valor da Base de Cálculo das Contribuições"
+    let valor_da_nota_proporcional_nfe: &str = coluna(Right, "valor_item"); // "Valor da Nota Proporcional : NF Item (Todos) SOMA";
+                                                                            // let valor_da_base_calculo_icms_nfe: &str = coluna(Right, "valor_bc_icms"); // "ICMS: Base de Cálculo : NF Item (Todos) SOMA"
 
     let valores_iguais_nota_prop: Expr = equal(valor_bc, valor_da_nota_proporcional_nfe);
     //let valores_iguais_base_icms: Expr = col(valor_da_bcal_da_efd).eq(col(valor_da_base_calculo_icms_nfe));
@@ -460,10 +448,9 @@ fn analisar_situacao05(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
 }
 
 fn analisar_situacao06(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>> {
-
     let glosar: &str = coluna(Middle, "glosar");
     let cnpj_particip: &str = coluna(Left, "cnpj_particip"); // "CNPJ do Participante",
-    let num_doc: &str = coluna(Left, "num_doc");             // "Nº do Documento Fiscal",
+    let num_doc: &str = coluna(Left, "num_doc"); // "Nº do Documento Fiscal",
 
     let series: Series = Series::new("c", ["12.345.678/0009-01"]);
     let cnpj: Expr = col(cnpj_particip).is_in(lit(series));
@@ -471,18 +458,20 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     let series: Series = Series::new("n", [654321]);
     let num_doc: Expr = col(num_doc).is_in(lit(series));
 
-    let situacao_06: Expr = operacoes_de_credito()
-        .and(cnpj)
-        .and(num_doc);
+    let situacao_06: Expr = operacoes_de_credito().and(cnpj).and(num_doc);
 
     println!("situacao_06: {situacao_06:?}\n");
 
-    let mensagem: Expr = concat_str([
-        col(glosar),
-        lit("Situação 06:"),
-        lit("Item de Documento Fiscal usado em duplicidade."),
-        lit("&"),
-    ], " ", true);
+    let mensagem: Expr = concat_str(
+        [
+            col(glosar),
+            lit("Situação 06:"),
+            lit("Item de Documento Fiscal usado em duplicidade."),
+            lit("&"),
+        ],
+        " ",
+        true,
+    );
 
     let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_06, mensagem, lit(0))?;
 
@@ -490,7 +479,6 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
 }
 
 fn analisar_situacao07(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>> {
-
     let glosar: &str = coluna(Middle, "glosar");
     let origem_do_item: &str = coluna(Right, "origem"); // "Registro de Origem do Item : NF Item (Todos)"
 
@@ -498,7 +486,7 @@ fn analisar_situacao07(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
         "Código de Situação Tributária (CST)",
         "Código CFOP : NF Item (Todos)",
         "Alíquota Zero",
-        "Alíquota Zero Temp",         // coluna temporária
+        "Alíquota Zero Temp", // coluna temporária
         "Incidência Monofásica",
         "Incidência Monofásica Temp", // coluna temporária
         "Crédito Presumido",          // Coluna auxiliar
@@ -511,11 +499,17 @@ fn analisar_situacao07(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     let cte: Expr = col(origem_do_item).str().contains(pattern, false);
 
     // CFOPs relacionados a Serviços de Armazanagem ou Industrialização por encomenda.
-    let cfop_valido = [CFOP_DE_ARMAZENAGEM.as_slice(), CFOP_DE_INDUSTRIALIZACAO.as_slice()].concat();
+    let cfop_valido = [
+        CFOP_DE_ARMAZENAGEM.as_slice(),
+        CFOP_DE_INDUSTRIALIZACAO.as_slice(),
+    ]
+    .concat();
     let series: Series = cfop_valido.iter().collect();
 
     // Estes serviços são insumos com direito à crédito das Contribuições que devem ser excluídos das glosas.
-    let cfop_de_insumos: Expr = col(columns[1]).is_not_null().and(col(columns[1]).is_in(lit(series)));
+    let cfop_de_insumos: Expr = col(columns[1])
+        .is_not_null()
+        .and(col(columns[1]).is_in(lit(series)));
 
     let not_credito_presumido: Expr = col(columns[6]).is_null();
 
@@ -527,8 +521,7 @@ fn analisar_situacao07(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     // "CNPJ Base do Remetente" neq "CNPJ Base do Destinatário": operação de compra
     let cnpjs_distintos: Expr = unequal(columns[8], columns[9]);
 
-    let operacao_de_compra: Expr = destinatario_das_operacoes
-        .and(cnpjs_distintos);
+    let operacao_de_compra: Expr = destinatario_das_operacoes.and(cnpjs_distintos);
 
     let filter: Expr = operacoes_de_credito()
         .and(cst_50_a_56())
@@ -541,18 +534,20 @@ fn analisar_situacao07(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     let lazyframe: LazyFrame = lazyframe
         .with_column(
             when(filter.clone())
-                .then(columns[2])     // keep original value: "Alíquota Zero"
+                .then(columns[2]) // keep original value: "Alíquota Zero"
                 .otherwise(lit(NULL)) // replace by null
-            .alias(columns[3])        // Coluna Temporária
+                .alias(columns[3]), // Coluna Temporária
         )
         .with_column(
             when(filter)
-                .then(columns[4])     // keep original value: "Incidência Monofásica"
+                .then(columns[4]) // keep original value: "Incidência Monofásica"
                 .otherwise(lit(NULL)) // replace by null
-            .alias(columns[5])        // Coluna Temporária
+                .alias(columns[5]), // Coluna Temporária
         );
 
-    let situacao_07: Expr = col(columns[3]).is_not_null().or(col(columns[5]).is_not_null());
+    let situacao_07: Expr = col(columns[3])
+        .is_not_null()
+        .or(col(columns[5]).is_not_null());
 
     println!("situacao_07: {situacao_07:?}\n");
 
@@ -568,22 +563,17 @@ fn analisar_situacao07(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_07, mensagem, lit(0))?;
 
     // Remover coluna temporária
-    let lf_result: LazyFrame = lf_result
-        .drop([
-            columns[3],
-            columns[5],
-        ]);
+    let lf_result: LazyFrame = lf_result.drop([columns[3], columns[5]]);
 
     Ok(lf_result)
 }
 
 fn analisar_situacao08(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>> {
-
     let glosar: &str = coluna(Middle, "glosar");
     let contabil: &str = coluna(Left, "contabil");
 
     let columns: Vec<&str> = vec![
-        "CNPJ Base do Remetente",    // Coluna auxiliar adicionada em fn adicionar_colunas_auxiliares()
+        "CNPJ Base do Remetente", // Coluna auxiliar adicionada em fn adicionar_colunas_auxiliares()
         "CNPJ Base do Destinatário", // Coluna auxiliar adicionada em fn adicionar_colunas_auxiliares()
     ];
 
@@ -615,7 +605,6 @@ fn analisar_situacao08(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
 }
 
 fn analisar_situacao09(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>> {
-
     let glosar: &str = coluna(Middle, "glosar");
     let item_descricao: &str = coluna(Left, "item_desc");
     let escri_contabil: &str = coluna(Left, "contabil");
@@ -626,8 +615,7 @@ fn analisar_situacao09(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     let condicao1: Expr = col(item_descricao).str().contains(pattern1, false);
     let condicao2: Expr = col(escri_contabil).str().contains(pattern2, false);
 
-    let situacao_09: Expr = operacoes_de_credito()
-        .and(condicao1.or(condicao2));
+    let situacao_09: Expr = operacoes_de_credito().and(condicao1.or(condicao2));
 
     println!("situacao_09: {situacao_09:?}\n");
 
@@ -646,7 +634,6 @@ fn analisar_situacao09(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
 }
 
 fn analisar_situacao10(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>> {
-
     let glosar: &str = coluna(Middle, "glosar");
     let origem_do_item: &str = coluna(Right, "origem"); // "Registro de Origem do Item : NF Item (Todos)"
     let descricao_cfop: &str = coluna(Right, "descricao_cfop");
@@ -659,23 +646,23 @@ fn analisar_situacao10(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     let condicao2: Expr = col(descricao_cfop).str().contains(pattern2, false);
     let condicao3: Expr = col(descricao_cfop).str().contains(pattern3, false);
 
-    let situacao_10: Expr = operacoes_de_credito()
-        .and(condicao1)
-        .and(condicao2)
-        .and(
-            condicao3
-            .not() // crédito válido: venda com retorno simbólico de mercadoria do armazém para a empresa.
-        );
+    let situacao_10: Expr = operacoes_de_credito().and(condicao1).and(condicao2).and(
+        condicao3.not(), // crédito válido: venda com retorno simbólico de mercadoria do armazém para a empresa.
+    );
 
     println!("situacao_10: {situacao_10:?}\n");
 
-    let mensagem: Expr = concat_str([
-        col(glosar),
-        lit("Situação 10:"),
-        lit("Anulação ou Amostras e Brindes ou Retorno de Vasilhame."),
-        lit("Ver coluna <Descrição CFOP : NF Item (Todos)>."),
-        lit("&"),
-    ], " ", true);
+    let mensagem: Expr = concat_str(
+        [
+            col(glosar),
+            lit("Situação 10:"),
+            lit("Anulação ou Amostras e Brindes ou Retorno de Vasilhame."),
+            lit("Ver coluna <Descrição CFOP : NF Item (Todos)>."),
+            lit("&"),
+        ],
+        " ",
+        true,
+    );
 
     let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_10, mensagem, lit(0))?;
 
@@ -683,7 +670,6 @@ fn analisar_situacao10(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
 }
 
 fn analisar_situacao11(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>> {
-
     let glosar: &str = coluna(Middle, "glosar");
     let item_descricao: &str = coluna(Left, "item_desc");
     let escri_contabil: &str = coluna(Left, "contabil");
@@ -694,8 +680,7 @@ fn analisar_situacao11(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     let condicao1: Expr = col(item_descricao).str().contains(pattern1, false);
     let condicao2: Expr = col(escri_contabil).str().contains(pattern2, false);
 
-    let situacao_11: Expr = operacoes_de_credito()
-        .and(condicao1.or(condicao2));
+    let situacao_11: Expr = operacoes_de_credito().and(condicao1.or(condicao2));
 
     println!("situacao_11: {situacao_11:?}\n");
 
@@ -715,7 +700,6 @@ fn analisar_situacao11(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
 }
 
 fn analisar_situacao12(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>> {
-
     let glosar: &str = coluna(Middle, "glosar");
     let chave: &str = coluna(Left, "chave"); // "Chave do Documento"
 
@@ -729,12 +713,14 @@ fn analisar_situacao12(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
         "43150110683982000117570000000026111551067357",
         "43150110683982000117570000000026131094958062",
         "43170410683982000117570000000066751423453025",
-    ].iter().map(|doc| doc.to_string()).collect();
+    ]
+    .iter()
+    .map(|doc| doc.to_string())
+    .collect();
 
     let chave_inexistente: Expr = col(chave).is_in(lit(series));
 
-    let situacao_12: Expr = operacoes_de_credito()
-        .and(chave_inexistente);
+    let situacao_12: Expr = operacoes_de_credito().and(chave_inexistente);
 
     println!("situacao_12: {situacao_12:?}\n");
 
@@ -752,36 +738,35 @@ fn analisar_situacao12(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
 
 #[allow(dead_code)]
 fn analisar_situacao13(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>> {
-
     let glosar: &str = coluna(Middle, "glosar");
     let num_linha: &str = coluna(Left, "num_linha"); // "Linhas"
 
     let series: Series = [
-        95217,   95222,  95223,  95225, 105758,
-        116292, 116294, 116575, 127290, 127291,
-        127292, 137505, 147797, 157909, 157914,
-        168540, 178655, 188135, 188136, 188140,
-        188141, 196421, 197989, 199430, 199913,
-        201399, 202588, 203362, 203832, 203833,
-        203836, 204524, 204570, 205051, 206238,
-        206249, 206253, 207449, 208792, 210039,
-        211260, 212538, 213786, 213787, 213788,
-        215102
-    ].iter().collect();
+        95217, 95222, 95223, 95225, 105758, 116292, 116294, 116575, 127290, 127291, 127292, 137505,
+        147797, 157909, 157914, 168540, 178655, 188135, 188136, 188140, 188141, 196421, 197989,
+        199430, 199913, 201399, 202588, 203362, 203832, 203833, 203836, 204524, 204570, 205051,
+        206238, 206249, 206253, 207449, 208792, 210039, 211260, 212538, 213786, 213787, 213788,
+        215102,
+    ]
+    .iter()
+    .collect();
 
     let linhas: Expr = col(num_linha).is_in(lit(series));
 
-    let situacao_13: Expr = operacoes_de_credito()
-        .and(linhas);
+    let situacao_13: Expr = operacoes_de_credito().and(linhas);
 
     println!("situacao_13: {situacao_13:?}\n");
 
-    let mensagem: Expr = concat_str([
-        col(glosar),
-        lit("Situação 13:"),
-        lit("Créditos Estornados, conforme respostas do Contribuinte às Intimações Fiscais."),
-        lit("&"),
-    ], " ", true);
+    let mensagem: Expr = concat_str(
+        [
+            col(glosar),
+            lit("Situação 13:"),
+            lit("Créditos Estornados, conforme respostas do Contribuinte às Intimações Fiscais."),
+            lit("&"),
+        ],
+        " ",
+        true,
+    );
 
     let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_13, mensagem, lit(0))?;
 
@@ -790,7 +775,6 @@ fn analisar_situacao13(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
 
 #[allow(dead_code)]
 fn analisar_situacao14(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>> {
-
     let glosar: &str = coluna(Middle, "glosar");
     let item_tipo: &str = coluna(Left, "item_tipo");
     let escri_contabil: &str = coluna(Left, "contabil");
@@ -801,39 +785,42 @@ fn analisar_situacao14(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     let condicao1: Expr = col(item_tipo).str().contains(pattern1, false);
     let condicao2: Expr = col(escri_contabil).str().contains(pattern2, false);
 
-    let situacao_14: Expr = operacoes_de_credito()
-        .and(condicao1.and(condicao2));
+    let situacao_14: Expr = operacoes_de_credito().and(condicao1.and(condicao2));
 
     println!("situacao_14: {situacao_14:?}\n");
 
-/*
-PARECER NORMATIVO Nº 5, DE 17 DE DEZEMBRO DE 2018
+    /*
+    PARECER NORMATIVO Nº 5, DE 17 DE DEZEMBRO DE 2018
 
-2. INEXISTÊNCIA DE INSUMOS NA ATIVIDADE COMERCIAL
+    2. INEXISTÊNCIA DE INSUMOS NA ATIVIDADE COMERCIAL
 
-42.Em razão disso, exemplificativamente, não constituem insumos geradores de créditos para pessoas jurídicas
-dedicadas à atividade de revenda de bens: a) combustíveis e lubrificantes utilizados em veículos próprios de entrega de
-mercadorias2; b) transporte de mercadorias entre centros de distribuição próprios; c) embalagens para transporte das mercadorias;
-etc.
+    42.Em razão disso, exemplificativamente, não constituem insumos geradores de créditos para pessoas jurídicas
+    dedicadas à atividade de revenda de bens: a) combustíveis e lubrificantes utilizados em veículos próprios de entrega de
+    mercadorias2; b) transporte de mercadorias entre centros de distribuição próprios; c) embalagens para transporte das mercadorias;
+    etc.
 
-5. GASTOS POSTERIORES À FINALIZAÇÃO DO PROCESSO DE PRODUÇÃO OU DE PRESTAÇÃO
+    5. GASTOS POSTERIORES À FINALIZAÇÃO DO PROCESSO DE PRODUÇÃO OU DE PRESTAÇÃO
 
-56.Destarte, exemplificativamente não podem ser considerados insumos gastos com transporte (frete) de produtos
-acabados (mercadorias) de produção própria entre estabelecimentos da pessoa jurídica, para centros de distribuição ou para entrega
-direta ao adquirente6, como: a) combustíveis utilizados em frota própria de veículos; b) embalagens para transporte de mercadorias
-acabadas; c) contratação de transportadoras.
-*/
+    56.Destarte, exemplificativamente não podem ser considerados insumos gastos com transporte (frete) de produtos
+    acabados (mercadorias) de produção própria entre estabelecimentos da pessoa jurídica, para centros de distribuição ou para entrega
+    direta ao adquirente6, como: a) combustíveis utilizados em frota própria de veículos; b) embalagens para transporte de mercadorias
+    acabadas; c) contratação de transportadoras.
+    */
 
-    let mensagem: Expr = concat_str([
-        col(glosar),
-        lit("Situação 14:"),
-        lit("Embalagens."),
-        lit("Conforme Parecer Normativo SRFB n° 5 de 2018, linha 42,"),
-        lit("não constituem insumos geradores de créditos para pessoas jurídicas"),
-        lit("dedicadas à atividade de revenda de bens:"),
-        lit("c) embalagens para transporte das mercadorias;"),
-        lit("&"),
-    ], " ", true);
+    let mensagem: Expr = concat_str(
+        [
+            col(glosar),
+            lit("Situação 14:"),
+            lit("Embalagens."),
+            lit("Conforme Parecer Normativo SRFB n° 5 de 2018, linha 42,"),
+            lit("não constituem insumos geradores de créditos para pessoas jurídicas"),
+            lit("dedicadas à atividade de revenda de bens:"),
+            lit("c) embalagens para transporte das mercadorias;"),
+            lit("&"),
+        ],
+        " ",
+        true,
+    );
 
     let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_14, mensagem, lit(0))?;
 
@@ -846,7 +833,6 @@ fn aplicar_situacao(
     mensagem: Expr,
     new_value: Expr,
 ) -> Result<LazyFrame, Box<dyn Error>> {
-
     let glosar: &str = coluna(Middle, "glosar");
     let valor_bc: &str = coluna(Left, "valor_bc");
 
@@ -855,13 +841,13 @@ fn aplicar_situacao(
             when(situacao.clone())
                 .then(mensagem)
                 .otherwise(col(glosar))
-            .alias(glosar)
+                .alias(glosar),
         )
         .with_column(
             when(situacao)
                 .then(new_value)
                 .otherwise(col(valor_bc))
-            .alias(valor_bc)
+                .alias(valor_bc),
         );
 
     Ok(lf_result)
@@ -879,7 +865,6 @@ mod tests {
     #[test]
     /// `cargo test -- --show-output test_analisar_situacao02`
     fn test_analisar_situacao02() -> Result<(), Box<dyn Error>> {
-
         configure_the_environment();
 
         let glosar: &str = coluna(Middle, "glosar");
@@ -910,19 +895,18 @@ mod tests {
         let options = StrptimeOptions {
             format: Some("%Y-%-m-%-d".into()),
             strict: false, // If set then polars will return an error if any date parsing fails
-            exact: true,   // If polars may parse matches that not contain the whole string e.g. “foo-2021-01-01-bar” could match “2021-01-01”
-            cache: true,   // use a cache of unique, converted dates to apply the datetime conversion.
+            exact: true, // If polars may parse matches that not contain the whole string e.g. “foo-2021-01-01-bar” could match “2021-01-01”
+            cache: true, // use a cache of unique, converted dates to apply the datetime conversion.
         };
 
         let lazyframe: LazyFrame = dataframe
             .lazy()
-            .with_column(
-                col("^(Período|Data|Dia).*$")
-                .str()
-                .to_date(options)
-            );
+            .with_column(col("^(Período|Data|Dia).*$").str().to_date(options));
 
-        println!("dataframe após formatar 'Dia da Emissão':\n{}\n", lazyframe.clone().collect()?);
+        println!(
+            "dataframe após formatar 'Dia da Emissão':\n{}\n",
+            lazyframe.clone().collect()?
+        );
 
         let args: Arguments = Arguments::default();
         println!("args: {args:#?}\n");
@@ -941,9 +925,12 @@ mod tests {
         assert_eq!(
             vec_option,
             vec![
-                Some("Situação 01"), Some(""), Some(""),
+                Some("Situação 01"),
+                Some(""),
+                Some(""),
                 Some("Situação 01 & Situação 02: Crédito extemporâneo."),
-                Some(""), Some("Situação 02: Crédito extemporâneo.")
+                Some(""),
+                Some("Situação 02: Crédito extemporâneo.")
             ]
         );
 
@@ -955,17 +942,16 @@ mod tests {
     ///
     /// `cargo test -- --show-output test_analisar_situacao03`
     fn test_analisar_situacao03() -> Result<(), Box<dyn Error>> {
-
         configure_the_environment();
 
         let cfop: &str = coluna(Right, "cfop");
         let origem_do_item: &str = coluna(Right, "origem"); // "Registro de Origem do Item : NF Item (Todos)"
-        let valor_bc: &str = coluna(Left, "valor_bc");      // "Valor da Base de Cálculo das Contribuições";
+        let valor_bc: &str = coluna(Left, "valor_bc"); // "Valor da Base de Cálculo das Contribuições";
         let glosar: &str = coluna(Middle, "glosar");
 
         let columns: Vec<&str> = vec![
             "Alíquota Zero",
-            "Alíquota Zero Temp",         // coluna temporária
+            "Alíquota Zero Temp", // coluna temporária
             "Incidência Monofásica",
             "Incidência Monofásica Temp", // coluna temporária
         ];
@@ -999,32 +985,36 @@ mod tests {
         let nfe: Expr = col(origem_do_item).str().contains(pattern01, false);
 
         // CFOPs relacionados a Serviços de Armazanagem ou Industrialização por encomenda.
-        let cfop_valido = [CFOP_DE_ARMAZENAGEM.as_slice(), CFOP_DE_INDUSTRIALIZACAO.as_slice()].concat();
+        let cfop_valido = [
+            CFOP_DE_ARMAZENAGEM.as_slice(),
+            CFOP_DE_INDUSTRIALIZACAO.as_slice(),
+        ]
+        .concat();
         let series: Series = cfop_valido.iter().collect();
 
         // Estes serviços são insumos com direito à crédito das Contribuições que devem ser excluídos das glosas.
         let cfop_de_insumos: Expr = col(cfop).is_in(lit(series));
 
-        let filter: Expr = nfe
-            .and(cfop_de_insumos.not());
+        let filter: Expr = nfe.and(cfop_de_insumos.not());
 
         // Adicionar coluna temporária
         let lazyframe: LazyFrame = dataframe01
             .lazy()
             .with_column(
                 when(filter.clone())
-                    .then(columns[0])     // keep original value: "Alíquota Zero"
+                    .then(columns[0]) // keep original value: "Alíquota Zero"
                     .otherwise(lit(NULL)) // replace by null
-                .alias(columns[1])        // Coluna Temporária
+                    .alias(columns[1]), // Coluna Temporária
             )
             .with_column(
                 when(filter)
-                    .then(columns[2])     // keep original value: "Incidência Monofásica"
+                    .then(columns[2]) // keep original value: "Incidência Monofásica"
                     .otherwise(lit(NULL)) // replace by null
-                .alias(columns[3])        // Coluna Temporária
+                    .alias(columns[3]), // Coluna Temporária
             );
 
-        let situacao_03: Expr = col(columns[1]).is_not_null()
+        let situacao_03: Expr = col(columns[1])
+            .is_not_null()
             .or(col(columns[3]).is_not_null());
 
         println!("situacao_03: {situacao_03:?}");
@@ -1050,26 +1040,15 @@ mod tests {
         let bcal_values: &Series = dataframe02.column(valor_bc)?;
 
         // Get columns with into_iter()
-        let vec_bcal_values: Vec<f64> = bcal_values
-            .f64()?
-            .into_iter()
-            .flatten()
-            .collect();
+        let vec_bcal_values: Vec<f64> = bcal_values.f64()?.into_iter().flatten().collect();
 
         // Get columns from dataframe
         let glosar: &Series = dataframe02.column(glosar)?;
-        let glosar_col: Vec<&str> = glosar
-            .str()?
-            .into_iter()
-            .flatten()
-            .collect();
+        let glosar_col: Vec<&str> = glosar.str()?.into_iter().flatten().collect();
 
         println!("glosar_col: {glosar_col:#?}\n");
 
-        assert_eq!(
-            vec_bcal_values,
-            vec![0.0, 0.3, 10.0, 89.01, -3.41, 0.0]
-        );
+        assert_eq!(vec_bcal_values, vec![0.0, 0.3, 10.0, 89.01, -3.41, 0.0]);
 
         Ok(())
     }
@@ -1077,15 +1056,14 @@ mod tests {
     #[test]
     /// `cargo test -- --show-output test_analisar_situacao10`
     fn test_analisar_situacao10() -> Result<(), Box<dyn Error>> {
-
         configure_the_environment();
 
         let top: &str = coluna(Left, "tipo_operacao");
         let natureza: &str = coluna(Left, "natureza");
         let cst: &str = coluna(Left, "cst");
-        let origem_do_item: &str = coluna(Right, "origem");         // "Registro de Origem do Item : NF Item (Todos)"
+        let origem_do_item: &str = coluna(Right, "origem"); // "Registro de Origem do Item : NF Item (Todos)"
         let descricao_cfop: &str = coluna(Right, "descricao_cfop"); // "Descrição CFOP : NF Item (Todos)"
-        let valor_bc: &str = coluna(Left, "valor_bc");              // "Valor da Base de Cálculo das Contribuições";
+        let valor_bc: &str = coluna(Left, "valor_bc"); // "Valor da Base de Cálculo das Contribuições";
         let glosar: &str = coluna(Middle, "glosar");
 
         let dataframe: DataFrame = df! [
@@ -1105,7 +1083,8 @@ mod tests {
 
         let lf_itens_de_docs_fiscais_result: LazyFrame = analisar_situacao10(lazyframe)?;
 
-        let df_itens_de_docs_fiscais_result: DataFrame = lf_itens_de_docs_fiscais_result.collect()?;
+        let df_itens_de_docs_fiscais_result: DataFrame =
+            lf_itens_de_docs_fiscais_result.collect()?;
 
         println!("df_itens_de_docs_fiscais_result: {df_itens_de_docs_fiscais_result}\n");
 
@@ -1124,7 +1103,14 @@ mod tests {
 
         assert_eq!(
             vec_opt_bcal_values,
-            vec![Some(0.0), Some(0.0), Some(10.0), Some(0.0), Some(0.0), Some(52.07)]
+            vec![
+                Some(0.0),
+                Some(0.0),
+                Some(10.0),
+                Some(0.0),
+                Some(0.0),
+                Some(52.07)
+            ]
         );
 
         Ok(())

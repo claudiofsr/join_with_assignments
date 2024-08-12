@@ -1,11 +1,8 @@
 use chrono::{DateTime, Local};
-use polars::prelude::*;
-use std::{
-    error::Error,
-    time::Instant,
-};
 use claudiofsr_lib::clear_terminal_screen;
 use join_with_assignments::*;
+use polars::prelude::*;
+use std::{error::Error, time::Instant};
 
 /*
 Example of use:
@@ -58,7 +55,6 @@ Example of use:
     bdt count --table df_itens_de_docs_fiscais_result.parquet
 */
 fn main() -> Result<(), Box<dyn Error>> {
-
     clear_terminal_screen();
     configure_the_environment();
     show_sysinfo();
@@ -68,11 +64,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let df_itens_de_docs_fiscais: DataFrame = get_dataframe_after_assignments(&args)?;
 
-    let df_consolidacao_natureza_da_bcalc: DataFrame = obter_consolidacao_nat(&df_itens_de_docs_fiscais, false)?;
+    let df_consolidacao_natureza_da_bcalc: DataFrame =
+        obter_consolidacao_nat(&df_itens_de_docs_fiscais, false)?;
 
     let df_itens_de_docs_fiscais_result: DataFrame = glosar_bc(&df_itens_de_docs_fiscais, &args)?;
 
-    let df_consolidacao_natureza_da_bcalc_result: DataFrame = obter_consolidacao_nat(&df_itens_de_docs_fiscais_result, true)?;
+    let df_consolidacao_natureza_da_bcalc_result: DataFrame =
+        obter_consolidacao_nat(&df_itens_de_docs_fiscais_result, true)?;
 
     let dataframes: [DataFrame; 4] = [
         df_itens_de_docs_fiscais,

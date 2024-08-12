@@ -1,19 +1,13 @@
-use pathfinding::prelude::{
-    Matrix,
-    kuhn_munkres_min,
-};
+use colored::*;
+use pathfinding::prelude::{kuhn_munkres_min, Matrix};
+use rayon::prelude::*;
 use std::{
     cmp::{self, Ordering},
     fmt::{Debug, Display},
 };
-use rayon::prelude::*;
-use colored::*;
 use tabled::{
     builder::Builder,
-    settings::{
-        Style,
-        Alignment,
-    },
+    settings::{Alignment, Style},
 };
 
 /**
@@ -45,10 +39,10 @@ To see examples, run:
 `cargo test -- --show-output munkres_assignments_example`
 */
 pub fn munkres_assignments<T, U>(slice_a: &[T], slice_b: &[U], verbose: bool) -> Vec<u64>
-    where
-        T: Debug + Copy,
-        U: Debug + Copy,
-        f64: From<T> + From<U>,
+where
+    T: Debug + Copy,
+    U: Debug + Copy,
+    f64: From<T> + From<U>,
 {
     // Try to convert slices &[T] and &[U] to Vec<f64>.
     let floats_a: Vec<f64> = try_convert(slice_a);
@@ -108,18 +102,16 @@ pub fn try_convert<T, U>(slice: &[T]) -> Vec<U>
 where
     T: Copy,
     U: TryFrom<T>,
-    <U as TryFrom<T>>::Error: Display
+    <U as TryFrom<T>>::Error: Display,
 {
     slice
         .iter()
-        .map(|&type_t| {
-            match U::try_from(type_t) {
-                Ok(type_u) => type_u,
-                Err(why) => {
-                    let t = std::any::type_name::<T>();
-                    let u = std::any::type_name::<U>();
-                    panic!("Error converting from {t} to {u}: {why}")
-                }
+        .map(|&type_t| match U::try_from(type_t) {
+            Ok(type_u) => type_u,
+            Err(why) => {
+                let t = std::any::type_name::<T>();
+                let u = std::any::type_name::<U>();
+                panic!("Error converting from {t} to {u}: {why}")
             }
         })
         .collect()
@@ -149,7 +141,7 @@ pub trait FloatIterExt {
 
 impl<T> FloatIterExt for T
 where
-    T: Iterator<Item=f64>
+    T: Iterator<Item = f64>,
 {
     fn float_max(&mut self) -> f64 {
         self.fold(f64::NAN, f64::max)
@@ -168,7 +160,6 @@ where
 ///
 /// <https://dev.to/eblocha/parallel-matrix-multiplication-in-rust-39f6>
 fn get_matrix(slice_a: &[f64], slice_b: &[f64]) -> Vec<Vec<i64>> {
-
     let col_number: usize = slice_a.len();
     let row_number: usize = slice_b.len();
 
@@ -225,16 +216,13 @@ fn get_matrix(slice_a: &[f64], slice_b: &[f64]) -> Vec<Vec<i64>> {
 /// But without rayon parallel iterator.
 #[allow(dead_code)]
 fn get_matrix_v2(slice_a: &[f64], slice_b: &[f64]) -> Vec<Vec<i64>> {
-
     let mut matrix = Vec::new();
 
     for a1 in slice_a {
         let mut array = Vec::new();
         for a2 in slice_b {
             let delta: f64 = (a1 - a2).abs();
-            let square_value: f64 = delta
-                .powi(2)
-                .ceil();
+            let square_value: f64 = delta.powi(2).ceil();
             array.push(square_value as i64);
         }
         matrix.push(array);
@@ -249,32 +237,36 @@ fn get_matrix_v2(slice_a: &[f64], slice_b: &[f64]) -> Vec<Vec<i64>> {
 /// Check if the `matrix` is a square matrix,
 /// if not convert it to square matrix by padding zeroes.
 fn convert_to_square_matrix(matrix: &mut Vec<Vec<i64>>) {
-
     let row_number: usize = matrix.len();
     let col_number: usize = matrix[0].len();
     let delta: usize = row_number.abs_diff(col_number);
 
     match row_number.cmp(&col_number) {
-
-        Ordering::Less => { // Add rows
+        Ordering::Less => {
+            // Add rows
             let row: Vec<i64> = vec![0; col_number];
             let rows = vec![row; delta];
             matrix.extend(rows);
-        },
+        }
 
-        Ordering::Greater => { // Add columns
+        Ordering::Greater => {
+            // Add columns
             for vector in &mut matrix[..] {
                 let zeroes: Vec<i64> = vec![0; delta];
                 vector.extend(zeroes);
             }
-        },
+        }
 
         Ordering::Equal => (),
     }
 }
 
-fn show_assignments(vec_a: &[f64], vec_b: &[f64], matrix: &[Vec<i64>], assignments: &[usize]) -> i64 {
-
+fn show_assignments(
+    vec_a: &[f64],
+    vec_b: &[f64],
+    matrix: &[Vec<i64>],
+    assignments: &[usize],
+) -> i64 {
     let width: usize = get_max_width(vec_a, vec_b);
     println!("\nFind the minimum bipartite matching:");
     println!("array1: {vec_a:width$?}");
@@ -294,15 +286,16 @@ fn show_assignments(vec_a: &[f64], vec_b: &[f64], matrix: &[Vec<i64>], assignmen
 }
 
 fn get_max_width<T>(slice_a: &[T], slice_b: &[T]) -> usize
-    where T: Clone + ToString
+where
+    T: Clone + ToString,
 {
     [slice_a, slice_b]
         .concat()
         .iter()
         .map(|a| a.to_string().chars().count())
         .fold(0, usize::max)
-        //.max_by(|a, b| a.partial_cmp(b).unwrap())
-        //.expect("Failed to get the maximum width!")
+    //.max_by(|a, b| a.partial_cmp(b).unwrap())
+    //.expect("Failed to get the maximum width!")
 }
 
 fn print_matrix(
@@ -318,7 +311,6 @@ fn print_matrix(
 
     let mut rows = Vec::new();
     for (i, line) in matrix.iter().enumerate() {
-
         // Add header
         if i == 0 {
             let mut header = vec!["".to_string()];
@@ -329,15 +321,12 @@ fn print_matrix(
             rows.push(header)
         }
 
-        let mut row = vec![
-            array1
-                .get(i)
-                .map(|x| x.to_string().green().to_string())
-                .unwrap_or_default()
-        ];
+        let mut row = vec![array1
+            .get(i)
+            .map(|x| x.to_string().green().to_string())
+            .unwrap_or_default()];
 
         for (j, integer) in line.iter().enumerate() {
-
             if filter && (j >= col_number) {
                 break;
             }
@@ -369,7 +358,7 @@ fn print_matrix(
 /// Examples:
 ///
 /// <https://github.com/zhiburt/tabled>
-fn print_table(rows:&[Vec<String>]) {
+fn print_table(rows: &[Vec<String>]) {
     let table = Builder::from_iter(rows)
         .build()
         .with(Alignment::right())
@@ -386,7 +375,6 @@ fn display_bipartite_matching(
     assignments: &[usize],
     filter: bool,
 ) -> i64 {
-
     let row_number: usize = array1.len();
     let col_number: usize = array2.len();
     let min: usize = cmp::min(row_number, col_number);
@@ -402,8 +390,9 @@ fn display_bipartite_matching(
     // assignments.to_vec().retain(|&col| col < min);
 
     for (row, &col) in assignments.iter().enumerate() {
-
-        if filter && ((row_number > col_number && col >= min) || (row_number < col_number && row >= min)) {
+        if filter
+            && ((row_number > col_number && col >= min) || (row_number < col_number && row >= min))
+        {
             continue;
         }
 
@@ -422,7 +411,6 @@ fn display_bipartite_matching(
     println!("sum of values: {sum}\n");
 
     for (row, &col) in assignments.iter().enumerate() {
-
         if (row_number > col_number && col >= min) || (row_number < col_number && row >= min) {
             continue;
         }
@@ -441,8 +429,8 @@ fn display_bipartite_matching(
 
 #[cfg(test)]
 mod tests {
-    use std::error::Error;
     use super::*;
+    use std::error::Error;
 
     // cargo test -- --help
     // cargo test -- --nocapture
@@ -451,10 +439,9 @@ mod tests {
     #[test]
     /// `cargo test -- --show-output convert_types`
     fn convert_types() -> Result<(), Box<dyn Error>> {
-
         let array_a: [i32; 7] = [20, 2, 5, 35, 456, -15, 47];
         let array_b: [i16; 7] = [20, 2, 5, 35, 456, -15, 47];
-        let array_03: [u32; 7] = [20, 2, 5, 35, 456,  15, 47];
+        let array_03: [u32; 7] = [20, 2, 5, 35, 456, 15, 47];
 
         let mut result = Vec::new();
 
@@ -471,11 +458,12 @@ mod tests {
             println!("result: {floats:5?}");
         }
 
-        assert_eq!(result,
+        assert_eq!(
+            result,
             vec![
                 [20.0, 2.0, 5.0, 35.0, 456.0, -15.0, 47.0],
                 [20.0, 2.0, 5.0, 35.0, 456.0, -15.0, 47.0],
-                [20.0, 2.0, 5.0, 35.0, 456.0,  15.0, 47.0],
+                [20.0, 2.0, 5.0, 35.0, 456.0, 15.0, 47.0],
             ]
         );
 
@@ -485,7 +473,6 @@ mod tests {
     #[test]
     /// `cargo test -- --show-output max_width`
     fn max_width() -> Result<(), Box<dyn Error>> {
-
         let array01 = [2.34, 0.1]; // rows
         let array02 = [2.34, 5.0]; // columns
 
@@ -506,9 +493,8 @@ mod tests {
     ///
     /// `cargo test -- --show-output munkres_assignments_example01`
     fn munkres_assignments_example01() -> Result<(), Box<dyn Error>> {
-
         let array01 = [20.01, 2.34, 5.0, 35.2, 456.04, -15.2, 47.65]; // rows
-        let array02 = [ 35.2, 2.34, 0.1, 22.6, 99.03]; // columns
+        let array02 = [35.2, 2.34, 0.1, 22.6, 99.03]; // columns
 
         let result: Vec<u64> = munkres_assignments(&array01, &array02, true);
 
@@ -524,8 +510,7 @@ mod tests {
     ///
     /// `cargo test -- --show-output munkres_assignments_example02`
     fn munkres_assignments_example02() -> Result<(), Box<dyn Error>> {
-
-        let array01 = [ 35.2, 2.34, 0.1, 22.6, 99.03]; // rows
+        let array01 = [35.2, 2.34, 0.1, 22.6, 99.03]; // rows
         let array02 = [20.01, 2.34, 5.0, 35.2, 456.04, -15.2, 47.65]; // columns
 
         let result: Vec<u64> = munkres_assignments(&array01, &array02, true);
@@ -542,8 +527,7 @@ mod tests {
     ///
     /// `cargo test -- --show-output munkres_assignments_example03`
     fn munkres_assignments_example03() -> Result<(), Box<dyn Error>> {
-
-        let array01 = [ 35.2, 2.34, 0.1, 22.6,  99.03]; // rows
+        let array01 = [35.2, 2.34, 0.1, 22.6, 99.03]; // rows
         let array02 = [20.01, 2.34, 5.0, 35.2, 456.04]; // columns
 
         let result: Vec<u64> = munkres_assignments(&array01, &array02, true);
@@ -564,9 +548,8 @@ mod tests {
     ///
     /// `cargo test -- --show-output munkres_assignments_example04`
     fn munkres_assignments_example04() -> Result<(), Box<dyn Error>> {
-
         let array01: [i32; 7] = [20, 2, 5, 35, 456, -15, 47]; // rows
-        let array02: [f64; 5] = [ 35.2, 2.34, 0.1, 22.6, 99.03]; // columns
+        let array02: [f64; 5] = [35.2, 2.34, 0.1, 22.6, 99.03]; // columns
 
         let result: Vec<u64> = munkres_assignments(&array01, &array02, true);
 
@@ -582,7 +565,6 @@ mod tests {
     ///
     /// `cargo test -- --show-output munkres_assignments_example05`
     fn munkres_assignments_example05() -> Result<(), Box<dyn Error>> {
-
         let array01 = [2.34, 0.1]; // rows
         let array02 = [2.34, 5.0]; // columns
 
@@ -600,9 +582,10 @@ mod tests {
     ///
     /// `cargo test -- --show-output munkres_assignments_example06`
     fn munkres_assignments_example06() -> Result<(), Box<dyn Error>> {
-
-        let array01 = [20.01, 35.2, 2.34, 5.0, 35.2, 2.34, -15.2, 35.2, 35.2, 47.65, 2.36]; // rows
-        let array02 = [ 35.2, 2.34, 0.1, 22.6, 99.03, 35.2, 2.35]; // columns
+        let array01 = [
+            20.01, 35.2, 2.34, 5.0, 35.2, 2.34, -15.2, 35.2, 35.2, 47.65, 2.36,
+        ]; // rows
+        let array02 = [35.2, 2.34, 0.1, 22.6, 99.03, 35.2, 2.35]; // columns
 
         let result: Vec<u64> = munkres_assignments(&array01, &array02, true);
 

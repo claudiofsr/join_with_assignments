@@ -1,10 +1,7 @@
 use rayon::prelude::*;
 use std::error::Error;
 
-use polars::{
-    prelude::*,
-    series::Series,
-};
+use polars::{prelude::*, series::Series};
 
 use crate::filtros::operacoes_de_entrada_ou_saida;
 
@@ -15,18 +12,12 @@ use crate::filtros::operacoes_de_entrada_ou_saida;
 /// O resultado é uma nova coluna com informações sobre a incidência das Contribuições.
 ///
 /// Nome da nova coluna: `Incidência Monofásica`
-pub fn adicionar_coluna_de_incidencia_monofasica(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>> {
+pub fn adicionar_coluna_de_incidencia_monofasica(
+    lazyframe: LazyFrame,
+) -> Result<LazyFrame, Box<dyn Error>> {
+    let columns: Vec<&'static str> = vec!["Tipo de Operação", "Incidência Monofásica"];
 
-    let columns: Vec<&'static str> = vec![
-        "Tipo de Operação",
-        "Incidência Monofásica",
-    ];
-
-    let side_a: Vec<&'static str> = vec![
-        "Código NCM",
-        "Descrição do Item",
-        "Coluna Temporária A",
-    ];
+    let side_a: Vec<&'static str> = vec!["Código NCM", "Descrição do Item", "Coluna Temporária A"];
 
     let side_b: Vec<&'static str> = vec![
         "Código NCM : NF Item (Todos)",
@@ -38,43 +29,54 @@ pub fn adicionar_coluna_de_incidencia_monofasica(lazyframe: LazyFrame) -> Result
     let boolean_b: Expr = col(side_b[2]).is_not_null(); // .and(operacoes_de_entrada_ou_de_saida());
 
     // Exemplo: 'NCM 2207.10.90 : Incidência Monofásica - Lei 9.718/1998, Art. 5º (Álcool, Inclusive para Fins Carburantes).'
-    let exp_a: Expr = concat_str([lit("NCM"), col(side_a[0]), lit(":"), col(side_a[2])], " ", true);
-    let exp_b: Expr = concat_str([lit("NCM"), col(side_b[0]), lit(":"), col(side_b[2])], " ", true);
+    let exp_a: Expr = concat_str(
+        [lit("NCM"), col(side_a[0]), lit(":"), col(side_a[2])],
+        " ",
+        true,
+    );
+    let exp_b: Expr = concat_str(
+        [lit("NCM"), col(side_b[0]), lit(":"), col(side_b[2])],
+        " ",
+        true,
+    );
 
     let lazyframe: LazyFrame = lazyframe
-        .with_column( // Adicionar 2 colunas temporárias
-            as_struct([
-                col(side_a[0]).cast(DataType::String),
-                col(side_a[1]),
-            ].to_vec())
-            .apply(|series: Series| analisar_colunas_selecionadas(&series), GetOutput::same_type()) // GetOutput::from_type(DataType::String)
-            .alias(side_a[2])
+        .with_column(
+            // Adicionar 2 colunas temporárias
+            as_struct([col(side_a[0]).cast(DataType::String), col(side_a[1])].to_vec())
+                .apply(
+                    |series: Series| analisar_colunas_selecionadas(&series),
+                    GetOutput::same_type(),
+                ) // GetOutput::from_type(DataType::String)
+                .alias(side_a[2]),
         )
         .with_column(
-            as_struct([
-                col(side_b[0]).cast(DataType::String),
-                col(side_b[1]),
-            ].to_vec())
-            .apply(|series: Series| analisar_colunas_selecionadas(&series), GetOutput::same_type()) // GetOutput::from_type(DataType::String)
-            .alias(side_b[2])
+            as_struct([col(side_b[0]).cast(DataType::String), col(side_b[1])].to_vec())
+                .apply(
+                    |series: Series| analisar_colunas_selecionadas(&series),
+                    GetOutput::same_type(),
+                ) // GetOutput::from_type(DataType::String)
+                .alias(side_b[2]),
         )
-        .with_column( // Adicionar 1 coluna que concentra as informações das 2 colunas temporárias
+        .with_column(
+            // Adicionar 1 coluna que concentra as informações das 2 colunas temporárias
             when(boolean_a)
                 .then(exp_a)
                 .when(boolean_b)
-                    .then(exp_b)
-                    .otherwise(lit(NULL))
-            .alias(columns[1])
+                .then(exp_b)
+                .otherwise(lit(NULL))
+                .alias(columns[1]),
         )
-        .with_column( // Filtrar Operações de Entrada ou de Saída
+        .with_column(
+            // Filtrar Operações de Entrada ou de Saída
             when(operacoes_de_entrada_ou_saida())
-                .then(columns[1])     // keep original value
+                .then(columns[1]) // keep original value
                 .otherwise(lit(NULL)) // replace by null
-            .alias(columns[1])        // .keep_name()
+                .alias(columns[1]), // .keep_name()
         )
-        .drop([ // Remover 2 colunas temporárias
-            side_a[2],
-            side_b[2],
+        .drop([
+            // Remover 2 colunas temporárias
+            side_a[2], side_b[2],
         ]);
 
     Ok(lazyframe)
@@ -96,18 +98,18 @@ fn analisar_colunas_selecionadas(series: &Series) -> Result<Option<Series>, Pola
     // MultiZip is an iterator that zips up a tuple of parallel iterators to produce tuples of their items.
     let new_series: Series = (vec_opt_str_ncm, vec_opt_str_dsc)
         .into_par_iter() // rayon: parallel iterator
-        .map(|(opt_str_ncm, opt_str_dsc)| {
-            match (opt_str_ncm, opt_str_dsc) {
+        .map(
+            |(opt_str_ncm, opt_str_dsc)| match (opt_str_ncm, opt_str_dsc) {
                 (Some(str_ncm), Some(str_dsc)) => {
                     let codigo_ncm = str_ncm.replace('.', "");
                     match codigo_ncm.parse::<u64>() {
                         Ok(ncm) => base_legal(ncm, str_dsc),
                         Err(_) => None,
                     }
-                },
+                }
                 _ => None,
-            }
-        })
+            },
+        )
         .collect::<StringChunked>()
         .into_series();
 
@@ -116,7 +118,6 @@ fn analisar_colunas_selecionadas(series: &Series) -> Result<Option<Series>, Pola
 
 /// Base Legal conforme código NCM e descrição do item.
 fn base_legal(codigo_ncm: u64, _descricao: &str) -> Option<&'static str> {
-
     let especificos: [u64; 2] = [
         30039056, // exceção em Incidência Monofásica
         30049046, // exceção em Incidência Monofásica

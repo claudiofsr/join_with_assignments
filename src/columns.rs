@@ -1,6 +1,6 @@
-use polars::datatypes::DataType;
 use once_cell::sync::Lazy;
-use std::collections::{HashSet, HashMap};
+use polars::datatypes::DataType;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub enum Side {
@@ -18,56 +18,275 @@ pub struct Column {
 }
 
 impl Column {
-
     // Left
 
     pub fn set_columns_left() -> [Column; 44] {
         let side = Side::Left;
         [
-            Column {side, nick: "count_lines", name: "Linhas EFD", dtype: DataType::UInt64}, // Coluna Temporária
-            Column {side, nick: "num_linha", name: "Linhas", dtype: DataType::UInt64},
-            Column {side, nick: "efd_arquivo", name: "Arquivo da EFD Contribuições", dtype: DataType::String},
-            Column {side, nick: "efd_linha", name: "Nº da Linha da EFD", dtype: DataType::UInt64},
-            Column {side, nick: "contribuinte_cnpj", name: "CNPJ dos Estabelecimentos do Contribuinte", dtype: DataType::String},
-            Column {side, nick: "contribuinte_nome", name: "Nome do Contribuinte", dtype: DataType::String},
-            Column {side, nick: "pa", name: "Período de Apuração", dtype: DataType::String},
-            Column {side, nick: "pa_ano", name: "Ano do Período de Apuração", dtype: DataType::Int64},
-            Column {side, nick: "pa_trim", name: "Trimestre do Período de Apuração", dtype: DataType::Int64},
-            Column {side, nick: "pa_mes", name: "Mês do Período de Apuração", dtype: DataType::Int64},
-            Column {side, nick: "tipo_operacao", name: "Tipo de Operação", dtype: DataType::Int64},
-            Column {side, nick: "origem", name: "Indicador de Origem", dtype: DataType::Int64},
-            Column {side, nick: "cod_cred", name: "Código do Tipo de Crédito", dtype: DataType::Int64},
-            Column {side, nick: "tipo_cred", name: "Tipo de Crédito", dtype: DataType::Int64},
-            Column {side, nick: "registro", name: "Registro", dtype: DataType::String},
-            Column {side, nick: "cst", name: "Código de Situação Tributária (CST)", dtype: DataType::Int64},
-            Column {side, nick: "cfop", name: "Código Fiscal de Operações e Prestações (CFOP)", dtype: DataType::Int64},
-            Column {side, nick: "natureza", name: "Natureza da Base de Cálculo dos Créditos", dtype: DataType::Int64},
-            Column {side, nick: "cnpj_particip", name: "CNPJ do Participante", dtype: DataType::String},
-            Column {side, nick: "cpf_particip", name: "CPF do Participante", dtype: DataType::String},
-            Column {side, nick: "nome_particip", name: "Nome do Participante", dtype: DataType::String},
-            Column {side, nick: "num_doc", name: "Nº do Documento Fiscal", dtype: DataType::Int64},
-            Column {side, nick: "chave", name: "Chave do Documento", dtype: DataType::String},
-            Column {side, nick: "doc_modelo", name: "Modelo do Documento Fiscal", dtype: DataType::String},
-            Column {side, nick: "item_num", name: "Nº do Item do Documento Fiscal", dtype: DataType::Int64},
-            Column {side, nick: "item_tipo", name: "Tipo do Item", dtype: DataType::String},
-            Column {side, nick: "item_desc", name: "Descrição do Item", dtype: DataType::String},
-            Column {side, nick: "ncm", name: "Código NCM", dtype: DataType::String},
-            Column {side, nick: "nat_operacao", name: "Natureza da Operação/Prestação", dtype: DataType::String},
-            Column {side, nick: "informacao", name: "Informação Complementar do Documento Fiscal", dtype: DataType::String},
-            Column {side, nick: "contabil", name: "Escrituração Contábil: Nome da Conta", dtype: DataType::String},
-            Column {side, nick: "data_emissao", name: "Data da Emissão do Documento Fiscal", dtype: DataType::String},
-            Column {side, nick: "data_entrada", name: "Data da Entrada / Aquisição / Execução ou da Saída / Prestação / Conclusão", dtype: DataType::String},
-            Column {side, nick: "valor_item", name: "Valor Total do Item", dtype: DataType::Float64},
-            Column {side, nick: "valor_bc", name: "Valor da Base de Cálculo das Contribuições", dtype: DataType::Float64},
-            Column {side, nick: "valor_bc_auditado", name: "Valor da Base de Cálculo das Contribuições (após auditoria)", dtype: DataType::Float64},
-            Column {side, nick: "aliq_pis", name: "Alíquota de PIS/PASEP (em percentual)", dtype: DataType::Float64},
-            Column {side, nick: "aliq_cof", name: "Alíquota de COFINS (em percentual)", dtype: DataType::Float64},
-            Column {side, nick: "valor_pis", name: "Valor de PIS/PASEP", dtype: DataType::Float64},
-            Column {side, nick: "valor_cof", name: "Valor de COFINS", dtype: DataType::Float64},
-            Column {side, nick: "valor_iss", name: "Valor de ISS", dtype: DataType::Float64},
-            Column {side, nick: "valor_bc_icms", name: "Valor da Base de Cálculo de ICMS", dtype: DataType::Float64},
-            Column {side, nick: "aliq_icms", name: "Alíquota de ICMS (em percentual)", dtype: DataType::Float64},
-            Column {side, nick: "valor_icms", name: "Valor de ICMS", dtype: DataType::Float64},
+            Column {
+                side,
+                nick: "count_lines",
+                name: "Linhas EFD",
+                dtype: DataType::UInt64,
+            }, // Coluna Temporária
+            Column {
+                side,
+                nick: "num_linha",
+                name: "Linhas",
+                dtype: DataType::UInt64,
+            },
+            Column {
+                side,
+                nick: "efd_arquivo",
+                name: "Arquivo da EFD Contribuições",
+                dtype: DataType::String,
+            },
+            Column {
+                side,
+                nick: "efd_linha",
+                name: "Nº da Linha da EFD",
+                dtype: DataType::UInt64,
+            },
+            Column {
+                side,
+                nick: "contribuinte_cnpj",
+                name: "CNPJ dos Estabelecimentos do Contribuinte",
+                dtype: DataType::String,
+            },
+            Column {
+                side,
+                nick: "contribuinte_nome",
+                name: "Nome do Contribuinte",
+                dtype: DataType::String,
+            },
+            Column {
+                side,
+                nick: "pa",
+                name: "Período de Apuração",
+                dtype: DataType::String,
+            },
+            Column {
+                side,
+                nick: "pa_ano",
+                name: "Ano do Período de Apuração",
+                dtype: DataType::Int64,
+            },
+            Column {
+                side,
+                nick: "pa_trim",
+                name: "Trimestre do Período de Apuração",
+                dtype: DataType::Int64,
+            },
+            Column {
+                side,
+                nick: "pa_mes",
+                name: "Mês do Período de Apuração",
+                dtype: DataType::Int64,
+            },
+            Column {
+                side,
+                nick: "tipo_operacao",
+                name: "Tipo de Operação",
+                dtype: DataType::Int64,
+            },
+            Column {
+                side,
+                nick: "origem",
+                name: "Indicador de Origem",
+                dtype: DataType::Int64,
+            },
+            Column {
+                side,
+                nick: "cod_cred",
+                name: "Código do Tipo de Crédito",
+                dtype: DataType::Int64,
+            },
+            Column {
+                side,
+                nick: "tipo_cred",
+                name: "Tipo de Crédito",
+                dtype: DataType::Int64,
+            },
+            Column {
+                side,
+                nick: "registro",
+                name: "Registro",
+                dtype: DataType::String,
+            },
+            Column {
+                side,
+                nick: "cst",
+                name: "Código de Situação Tributária (CST)",
+                dtype: DataType::Int64,
+            },
+            Column {
+                side,
+                nick: "cfop",
+                name: "Código Fiscal de Operações e Prestações (CFOP)",
+                dtype: DataType::Int64,
+            },
+            Column {
+                side,
+                nick: "natureza",
+                name: "Natureza da Base de Cálculo dos Créditos",
+                dtype: DataType::Int64,
+            },
+            Column {
+                side,
+                nick: "cnpj_particip",
+                name: "CNPJ do Participante",
+                dtype: DataType::String,
+            },
+            Column {
+                side,
+                nick: "cpf_particip",
+                name: "CPF do Participante",
+                dtype: DataType::String,
+            },
+            Column {
+                side,
+                nick: "nome_particip",
+                name: "Nome do Participante",
+                dtype: DataType::String,
+            },
+            Column {
+                side,
+                nick: "num_doc",
+                name: "Nº do Documento Fiscal",
+                dtype: DataType::Int64,
+            },
+            Column {
+                side,
+                nick: "chave",
+                name: "Chave do Documento",
+                dtype: DataType::String,
+            },
+            Column {
+                side,
+                nick: "doc_modelo",
+                name: "Modelo do Documento Fiscal",
+                dtype: DataType::String,
+            },
+            Column {
+                side,
+                nick: "item_num",
+                name: "Nº do Item do Documento Fiscal",
+                dtype: DataType::Int64,
+            },
+            Column {
+                side,
+                nick: "item_tipo",
+                name: "Tipo do Item",
+                dtype: DataType::String,
+            },
+            Column {
+                side,
+                nick: "item_desc",
+                name: "Descrição do Item",
+                dtype: DataType::String,
+            },
+            Column {
+                side,
+                nick: "ncm",
+                name: "Código NCM",
+                dtype: DataType::String,
+            },
+            Column {
+                side,
+                nick: "nat_operacao",
+                name: "Natureza da Operação/Prestação",
+                dtype: DataType::String,
+            },
+            Column {
+                side,
+                nick: "informacao",
+                name: "Informação Complementar do Documento Fiscal",
+                dtype: DataType::String,
+            },
+            Column {
+                side,
+                nick: "contabil",
+                name: "Escrituração Contábil: Nome da Conta",
+                dtype: DataType::String,
+            },
+            Column {
+                side,
+                nick: "data_emissao",
+                name: "Data da Emissão do Documento Fiscal",
+                dtype: DataType::String,
+            },
+            Column {
+                side,
+                nick: "data_entrada",
+                name: "Data da Entrada / Aquisição / Execução ou da Saída / Prestação / Conclusão",
+                dtype: DataType::String,
+            },
+            Column {
+                side,
+                nick: "valor_item",
+                name: "Valor Total do Item",
+                dtype: DataType::Float64,
+            },
+            Column {
+                side,
+                nick: "valor_bc",
+                name: "Valor da Base de Cálculo das Contribuições",
+                dtype: DataType::Float64,
+            },
+            Column {
+                side,
+                nick: "valor_bc_auditado",
+                name: "Valor da Base de Cálculo das Contribuições (após auditoria)",
+                dtype: DataType::Float64,
+            },
+            Column {
+                side,
+                nick: "aliq_pis",
+                name: "Alíquota de PIS/PASEP (em percentual)",
+                dtype: DataType::Float64,
+            },
+            Column {
+                side,
+                nick: "aliq_cof",
+                name: "Alíquota de COFINS (em percentual)",
+                dtype: DataType::Float64,
+            },
+            Column {
+                side,
+                nick: "valor_pis",
+                name: "Valor de PIS/PASEP",
+                dtype: DataType::Float64,
+            },
+            Column {
+                side,
+                nick: "valor_cof",
+                name: "Valor de COFINS",
+                dtype: DataType::Float64,
+            },
+            Column {
+                side,
+                nick: "valor_iss",
+                name: "Valor de ISS",
+                dtype: DataType::Float64,
+            },
+            Column {
+                side,
+                nick: "valor_bc_icms",
+                name: "Valor da Base de Cálculo de ICMS",
+                dtype: DataType::Float64,
+            },
+            Column {
+                side,
+                nick: "aliq_icms",
+                name: "Alíquota de ICMS (em percentual)",
+                dtype: DataType::Float64,
+            },
+            Column {
+                side,
+                nick: "valor_icms",
+                name: "Valor de ICMS",
+                dtype: DataType::Float64,
+            },
         ]
     }
 
@@ -76,8 +295,18 @@ impl Column {
     pub fn set_columns_middle() -> [Column; 2] {
         let side = Side::Middle;
         [
-            Column {side, nick: "verificar", name: "Verificação dos Valores: EFD x Docs Fiscais",  dtype: DataType::String},
-            Column {side, nick: "glosar",    name: "Glosar Base de Cálculo de PIS/PASEP e COFINS", dtype: DataType::String},
+            Column {
+                side,
+                nick: "verificar",
+                name: "Verificação dos Valores: EFD x Docs Fiscais",
+                dtype: DataType::String,
+            },
+            Column {
+                side,
+                nick: "glosar",
+                name: "Glosar Base de Cálculo de PIS/PASEP e COFINS",
+                dtype: DataType::String,
+            },
         ]
     }
 
@@ -155,18 +384,15 @@ impl Column {
     }
 
     /// Get all columns after checking uniqueness.
-    /// 
+    ///
     /// <https://stackoverflow.com/questions/67041830/how-to-concatenate-arrays-of-known-lengths>
     pub fn get_columns() -> Vec<Column> {
-        let columns_left   = Column::set_columns_left();
+        let columns_left = Column::set_columns_left();
         let columns_middle = Column::set_columns_middle();
-        let columns_right  = Column::set_columns_right();
+        let columns_right = Column::set_columns_right();
 
-        let cols: Vec<Column> = [
-            &columns_left[..],
-            &columns_middle[..],
-            &columns_right[..]
-        ].concat();
+        let cols: Vec<Column> =
+            [&columns_left[..], &columns_middle[..], &columns_right[..]].concat();
 
         // Verificar unicidade de todas as colunas
         cols.uniqueness();
@@ -177,13 +403,12 @@ impl Column {
     /// HashMap<Column_Name, DataType>
     pub fn get_cols_dtype(side: Side) -> HashMap<&'static str, DataType> {
         let cols: Vec<Column> = match side {
-            Side::Left   => Column::set_columns_left().to_vec(),
+            Side::Left => Column::set_columns_left().to_vec(),
             Side::Middle => Column::set_columns_middle().to_vec(),
-            Side::Right  => Column::set_columns_right().to_vec(),
+            Side::Right => Column::set_columns_right().to_vec(),
         };
 
-        cols
-            .iter()
+        cols.iter()
             .map(|col| (col.name, col.dtype.clone()))
             .collect()
     }
@@ -210,16 +435,14 @@ pub trait Extensions {
 
 impl Extensions for [Column] {
     fn get_names(&self, side: Side) -> Vec<&str> {
-        self
-            .iter()
+        self.iter()
             .filter(|col| col.side == side)
             .map(|col| col.name)
             .collect()
     }
 
     fn get_hash(&self) -> HashMap<(Side, &'static str), &'static str> {
-        self
-            .iter()
+        self.iter()
             .map(|col| {
                 let key = (col.side, col.nick);
                 let value = col.name;
@@ -232,24 +455,22 @@ impl Extensions for [Column] {
         let mut unique_name = HashSet::new();
         let mut unique_key = HashSet::new();
 
-        self
-            .iter()
-            .for_each(|col| {
-                let name = col.name;
-                let key = (col.side, col.nick);
+        self.iter().for_each(|col| {
+            let name = col.name;
+            let key = (col.side, col.nick);
 
-                if !unique_name.insert(name) {
-                    eprintln!("col: {col:?}");
-                    eprintln!("Column '{name}' is not unique.");
-                    panic!("The column name must be unique!");
-                }
+            if !unique_name.insert(name) {
+                eprintln!("col: {col:?}");
+                eprintln!("Column '{name}' is not unique.");
+                panic!("The column name must be unique!");
+            }
 
-                if !unique_key.insert(key) {
-                    eprintln!("col: {col:?}");
-                    eprintln!("key: {key:?} is not unique.");
-                    panic!("The key must be unique!");
-                }
-            });
+            if !unique_key.insert(key) {
+                eprintln!("col: {col:?}");
+                eprintln!("key: {key:?} is not unique.");
+                panic!("The key must be unique!");
+            }
+        });
     }
 }
 
@@ -262,9 +483,8 @@ static COLUMN_NAMES: Lazy<HashSet<&'static str>> = Lazy::new(|| {
     hashset
 });
 
-static KEY_NAME: Lazy<HashMap<(Side, &'static str), &'static str>> = Lazy::new(|| {
-    Column::get_columns().get_hash()
-});
+static KEY_NAME: Lazy<HashMap<(Side, &'static str), &'static str>> =
+    Lazy::new(|| Column::get_columns().get_hash());
 
 /// Get Column name from NAMES.get(&key)
 ///
@@ -279,7 +499,7 @@ pub fn coluna(side: Side, nick: &str) -> &str {
             eprintln!("side: {side:?}");
             eprintln!("nick: {nick}");
             panic!("Error: Invalid key: (side, nick)!");
-        },
+        }
     }
 }
 
@@ -311,7 +531,10 @@ mod tests {
         println!("hash: {hash:#?}");
 
         assert_eq!(hash[&(Left, "chave")], "Chave do Documento");
-        assert_eq!(hash[&(Right, "chave")], "Chave da Nota Fiscal Eletrônica : NF Item (Todos)");
+        assert_eq!(
+            hash[&(Right, "chave")],
+            "Chave da Nota Fiscal Eletrônica : NF Item (Todos)"
+        );
     }
 
     #[test]
@@ -326,12 +549,9 @@ mod tests {
 
         println!("\nSorted:");
 
-        let mut hash_vec: Vec<((Side, &str), &str)> = KEY_NAME
-            .clone()
-            .into_iter()
-            .collect();
+        let mut hash_vec: Vec<((Side, &str), &str)> = KEY_NAME.clone().into_iter().collect();
 
-        hash_vec.sort_by_key(|tuple| (tuple.0.0, tuple.0.1, tuple.1));
+        hash_vec.sort_by_key(|tuple| (tuple.0 .0, tuple.0 .1, tuple.1));
 
         for (key, value) in &hash_vec {
             let k = format!("{key:?}");
@@ -341,10 +561,19 @@ mod tests {
         let columns_len = KEY_NAME.len();
         println!("KEY_NAME_len: {columns_len}");
 
-        assert_eq!(KEY_NAME[&(Left, "efd_arquivo")], "Arquivo da EFD Contribuições");
-        assert_eq!(KEY_NAME[&(Middle, "glosar")], "Glosar Base de Cálculo de PIS/PASEP e COFINS");
+        assert_eq!(
+            KEY_NAME[&(Left, "efd_arquivo")],
+            "Arquivo da EFD Contribuições"
+        );
+        assert_eq!(
+            KEY_NAME[&(Middle, "glosar")],
+            "Glosar Base de Cálculo de PIS/PASEP e COFINS"
+        );
         assert_eq!(KEY_NAME[&(Left, "chave")], "Chave do Documento");
-        assert_eq!(KEY_NAME[&(Right, "chave")], "Chave da Nota Fiscal Eletrônica : NF Item (Todos)");
+        assert_eq!(
+            KEY_NAME[&(Right, "chave")],
+            "Chave da Nota Fiscal Eletrônica : NF Item (Todos)"
+        );
         assert_eq!(KEY_NAME[&(Left, "count_lines")], "Linhas EFD");
         assert_eq!(KEY_NAME[&(Right, "count_lines")], "Linhas NFE");
         assert_eq!(KEY_NAME.get(&(Right, "count_lines")), Some(&"Linhas NFE"));
@@ -355,9 +584,15 @@ mod tests {
     /// `cargo test -- --show-output get_column_from_hash`
     fn get_column_from_hash() {
         assert_eq!(coluna(Left, "efd_arquivo"), "Arquivo da EFD Contribuições");
-        assert_eq!(coluna(Middle, "glosar"), "Glosar Base de Cálculo de PIS/PASEP e COFINS");
+        assert_eq!(
+            coluna(Middle, "glosar"),
+            "Glosar Base de Cálculo de PIS/PASEP e COFINS"
+        );
         assert_eq!(coluna(Left, "chave"), "Chave do Documento");
-        assert_eq!(coluna(Right, "chave"), "Chave da Nota Fiscal Eletrônica : NF Item (Todos)");
+        assert_eq!(
+            coluna(Right, "chave"),
+            "Chave da Nota Fiscal Eletrônica : NF Item (Todos)"
+        );
         assert_eq!(coluna(Left, "count_lines"), "Linhas EFD");
         assert_eq!(coluna(Right, "count_lines"), "Linhas NFE");
     }

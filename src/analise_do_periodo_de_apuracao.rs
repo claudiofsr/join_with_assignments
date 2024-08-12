@@ -1,28 +1,22 @@
 use std::error::Error;
 
-use polars::{
-    prelude::*,
-    series::Series,
-};
+use polars::{prelude::*, series::Series};
 
 use chrono::{
-    NaiveDate,
-    Months,
     Datelike, // let year = naive_date.year(); let month = naive_date.month();
+    Months,
+    NaiveDate,
 };
 
-use crate::{
-    Arguments,
-    coluna,
-    Side::Left,
-    filtros::operacoes_de_entrada_ou_saida,
-};
+use crate::{coluna, filtros::operacoes_de_entrada_ou_saida, Arguments, Side::Left};
 
 /// Colunas temporárias: `Período de Apuração Inicial` e `Período de Apuração Final`.
 ///
 /// Adicionar estas 2 colunas temporárias para analisar_situacao02.
-pub fn adicionar_coluna_periodo_de_apuracao_inicial_e_final(lazyframe: LazyFrame, args: &Arguments) -> Result<LazyFrame, Box<dyn Error>> {
-
+pub fn adicionar_coluna_periodo_de_apuracao_inicial_e_final(
+    lazyframe: LazyFrame,
+    args: &Arguments,
+) -> Result<LazyFrame, Box<dyn Error>> {
     let periodo_de_apuracao: &str = coluna(Left, "pa"); // "Período de Apuração",
     let pa_ini: &str = "Período de Apuração Inicial";
     let pa_fim: &str = "Período de Apuração Final";
@@ -35,25 +29,29 @@ pub fn adicionar_coluna_periodo_de_apuracao_inicial_e_final(lazyframe: LazyFrame
             when(operacoes_de_entrada_ou_saida())
                 .then(col(periodo_de_apuracao).min())
                 .otherwise(lit(NULL)) // replace by null
-            .alias(pa_ini)
+                .alias(pa_ini),
         )
         .with_column(
             when(operacoes_de_entrada_ou_saida())
                 .then(col(periodo_de_apuracao).max())
                 .otherwise(lit(NULL)) // replace by null
-            .alias(pa_fim)
+                .alias(pa_fim),
         )
         .with_column(
             // Subtrair 62 dias, aproximadamente dois meses
             // col(pa_ini) - chrono::Duration::days(62).lit()
-            col(pa_ini)
-            .apply(move |series: Series| subtrair_meses(series, 2, dt_start), GetOutput::from_type(DataType::Date))
+            col(pa_ini).apply(
+                move |series: Series| subtrair_meses(series, 2, dt_start),
+                GetOutput::from_type(DataType::Date),
+            ),
         )
         .with_column(
             // Adicionar 31 dias, aproximadamente um mês
             // col(pa_fim) + chrono::Duration::days(31).lit()
-            col(pa_fim)
-            .apply(move |series: Series| adicionar_meses(series, 1, dt_final), GetOutput::from_type(DataType::Date))
+            col(pa_fim).apply(
+                move |series: Series| adicionar_meses(series, 1, dt_final),
+                GetOutput::from_type(DataType::Date),
+            ),
         );
 
     //println!("lazyframe: {:?}", lz.clone().collect()?);
@@ -62,32 +60,40 @@ pub fn adicionar_coluna_periodo_de_apuracao_inicial_e_final(lazyframe: LazyFrame
 }
 
 /// Subtrair numero_de_mes de Series compostas de datas
-pub fn subtrair_meses(series: Series, numero_de_mes: u32, dt: Option<u32>) -> Result<Option<Series>, PolarsError> {
+pub fn subtrair_meses(
+    series: Series,
+    numero_de_mes: u32,
+    dt: Option<u32>,
+) -> Result<Option<Series>, PolarsError> {
     match series.dtype() {
         DataType::Date => sub_month(series, numero_de_mes, dt),
         _ => {
             eprintln!("fn subtrair_meses()");
             eprintln!("Series: {series:?}");
             Err(PolarsError::InvalidOperation(
-            format!(
-                "Not supported for Series with DataType {:?}",
-                series.dtype()
-            )
-            .into()))
-        },
+                format!(
+                    "Not supported for Series with DataType {:?}",
+                    series.dtype()
+                )
+                .into(),
+            ))
+        }
     }
 }
 
 // Polars does not have a FromIterator implementation on Series from an iterator of NaiveDate's.
 // https://stackoverflow.com/questions/76297868/convert-str-to-naivedate-datatype-in-rust-polars
 // https://stackoverflow.com/questions/75074357/filter-a-polars-dataframe-by-date-in-rust
-fn sub_month(series: Series, numero_de_mes: u32, dt: Option<u32>) -> Result<Option<Series>, PolarsError> {
+fn sub_month(
+    series: Series,
+    numero_de_mes: u32,
+    dt: Option<u32>,
+) -> Result<Option<Series>, PolarsError> {
     let date: Vec<Option<NaiveDate>> = series
         .date()?
         .as_date_iter()
         .map(|opt_naive_date: Option<NaiveDate>| {
             opt_naive_date.and_then(|naive_date| {
-
                 let (year, month) = get_year_and_month(naive_date, dt);
 
                 // Fixar uma data específica:
@@ -103,29 +109,37 @@ fn sub_month(series: Series, numero_de_mes: u32, dt: Option<u32>) -> Result<Opti
     Ok(Some(Series::new("a", date)))
 }
 
-pub fn adicionar_meses(series: Series, numero_de_mes: u32, dt: Option<u32>) -> Result<Option<Series>, PolarsError> {
+pub fn adicionar_meses(
+    series: Series,
+    numero_de_mes: u32,
+    dt: Option<u32>,
+) -> Result<Option<Series>, PolarsError> {
     match series.dtype() {
         DataType::Date => add_month(series, numero_de_mes, dt),
         _ => {
             eprintln!("fn adicionar_meses()");
             eprintln!("Series: {series:?}");
             Err(PolarsError::InvalidOperation(
-            format!(
-                "Not supported for Series with DataType {:?}",
-                series.dtype()
-            )
-            .into()))
-        },
+                format!(
+                    "Not supported for Series with DataType {:?}",
+                    series.dtype()
+                )
+                .into(),
+            ))
+        }
     }
 }
 
-fn add_month(series: Series, numero_de_mes: u32, dt:Option<u32>) -> Result<Option<Series>, PolarsError> {
+fn add_month(
+    series: Series,
+    numero_de_mes: u32,
+    dt: Option<u32>,
+) -> Result<Option<Series>, PolarsError> {
     let date: Vec<Option<NaiveDate>> = series
         .date()?
         .as_date_iter()
         .map(|opt_naive_date: Option<NaiveDate>| {
             opt_naive_date.and_then(|naive_date| {
-
                 let (year, month) = get_year_and_month(naive_date, dt);
 
                 // Fixar uma data específica:
@@ -150,7 +164,7 @@ fn get_year_and_month(naive_date: NaiveDate, dt: Option<u32>) -> (i32, u32) {
             let month: u32 = number % 100;
             // println!("year: {year} ; month: {month}");
             (year, month)
-        },
+        }
         None => {
             let year: i32 = naive_date.year();
             let month: u32 = naive_date.month();

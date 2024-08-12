@@ -8,13 +8,8 @@ use crate::{
 };
 
 use claudiofsr_lib::{
-    CST_CREDITO,
-    CST_CREDITO_BASICO,
-    CST_RECEITA_BRUTA,
-    CODIGO_DA_NATUREZA_BC,
-    CFOP_DE_EXPORTACAO,
-    CFOP_VENDA_DE_IMOBILIZADO,
-    PATTERN,
+    CFOP_DE_EXPORTACAO, CFOP_VENDA_DE_IMOBILIZADO, CODIGO_DA_NATUREZA_BC, CST_CREDITO,
+    CST_CREDITO_BASICO, CST_RECEITA_BRUTA, PATTERN,
 };
 
 use polars::prelude::*;
@@ -73,41 +68,36 @@ pub fn operacoes_de_ajustes_ou_descontos() -> Expr {
 /// Operações de Descontos: `[5, 6]`
 ///
 /// E demais opções.
-pub fn operacoes<const N: usize>(range: [u32; N]) -> Expr
-{
+pub fn operacoes<const N: usize>(range: [u32; N]) -> Expr {
     let top: &str = coluna(Left, "tipo_operacao");
 
     // 1: Entrada, 2: Saída, 3 e 4: Ajustes, 5 e 6: Descontos, 7: Detalhamento
     let series: Series = range.into_iter().collect();
 
-    col(top).is_not_null()
-        .and(col(top).is_in(lit(series)))
+    col(top).is_not_null().and(col(top).is_in(lit(series)))
 }
 
 #[allow(dead_code)]
 fn operacoes_v2<T>(range: T) -> Expr
 where
-    T: Iterator<Item=u32>,
+    T: Iterator<Item = u32>,
 {
     let top: &str = coluna(Left, "tipo_operacao");
 
     // 1: Entrada, 2: Saída, 3 e 4: Ajustes, 5 e 6: Descontos, 7: Detalhamento
     let series: Series = range.collect();
 
-    col(top).is_not_null()
-        .and(col(top).is_in(lit(series)))
+    col(top).is_not_null().and(col(top).is_in(lit(series)))
 }
 
 #[allow(dead_code)]
-fn operacoes_v3(range: impl Iterator<Item=u32>) -> Expr
-{
+fn operacoes_v3(range: impl Iterator<Item = u32>) -> Expr {
     let top: &str = coluna(Left, "tipo_operacao");
 
     // 1: Entrada, 2: Saída, 3 e 4: Ajustes, 5 e 6: Descontos, 7: Detalhamento
     let series: Series = range.collect();
 
-    col(top).is_not_null()
-        .and(col(top).is_in(lit(series)))
+    col(top).is_not_null().and(col(top).is_in(lit(series)))
 }
 
 /// CST de Receita Bruta Cumulativa e Receita Bruta Não Cumulativa:
@@ -149,8 +139,7 @@ where
     let cst: &str = coluna(Left, "cst");
     let series: Series = get_series(range);
 
-    col(cst).is_not_null()
-        .and(col(cst).is_in(lit(series)))
+    col(cst).is_not_null().and(col(cst).is_in(lit(series)))
 }
 
 /**
@@ -181,14 +170,9 @@ Get series from array
 pub fn get_series<const N: usize, T>(range: [T; N]) -> Series
 where
     T: Copy,
-    u32: From<T>
+    u32: From<T>,
 {
-    let series: Series = range
-        .into_iter()
-        .map(|type_t| {
-            u32::from(type_t)
-        })
-        .collect();
+    let series: Series = range.into_iter().map(|type_t| u32::from(type_t)).collect();
 
     series
 }
@@ -200,7 +184,8 @@ pub fn codigo_nat_01_a_18() -> Expr {
     let natureza: &str = coluna(Left, "natureza");
     let series: Series = get_series(CODIGO_DA_NATUREZA_BC);
 
-    col(natureza).is_not_null()
+    col(natureza)
+        .is_not_null()
         .and(col(natureza).is_in(lit(series)))
 }
 
@@ -217,7 +202,8 @@ pub fn cfop_de_exportacao() -> Expr {
     let cfop: &str = coluna(Left, "cfop");
     let series: Series = get_series(CFOP_DE_EXPORTACAO);
 
-    col(cfop).is_null() // <-- IS NULL
+    col(cfop)
+        .is_null() // <-- IS NULL
         .or(col(cfop).is_in(lit(series)))
 }
 
@@ -226,8 +212,7 @@ pub fn venda_de_imobilizado() -> Expr {
     let cfop: &str = coluna(Left, "cfop");
     let series: Series = get_series(CFOP_VENDA_DE_IMOBILIZADO);
 
-    col(cfop).is_not_null()
-        .and(col(cfop).is_in(lit(series)))
+    col(cfop).is_not_null().and(col(cfop).is_in(lit(series)))
 }
 
 #[allow(dead_code)]
@@ -237,8 +222,7 @@ fn doacao_ou_brinde() -> Expr {
 
     let series = Series::from_iter([5910, 6910]);
 
-    col(cfop).is_not_null()
-        .and(col(cfop).is_in(lit(series)))
+    col(cfop).is_not_null().and(col(cfop).is_in(lit(series)))
 }
 
 /**
@@ -254,61 +238,71 @@ Esta é uma lista com possíveis Receitas Não Operacionais
 a depender das atividades que constituam objeto da empresa.
 */
 pub fn descricao_de_outras_receitas() -> Expr {
-
     let pattern: Expr = lit(PATTERN);
 
     // Check if this column of strings contains a Regex.
     // fn contains(self, pat: Expr, strict: bool)
     // see polars-plan-0.33.2/src/dsl/string.rs
 
-    let descricao_do_item: Expr = col(coluna(Left, "item_desc")).str().contains(pattern.clone(), false); // "Descrição do Item"
-    let escritur_contabil: Expr = col(coluna(Left, "contabil")).str().contains(pattern.clone(), false);  // "Escrituração Contábil: Nome da Conta"
-    let info_complementar: Expr = col(coluna(Left, "informacao")).str().contains(pattern, false);        // "Informação Complementar do Documento Fiscal"
+    let descricao_do_item: Expr = col(coluna(Left, "item_desc"))
+        .str()
+        .contains(pattern.clone(), false); // "Descrição do Item"
+    let escritur_contabil: Expr = col(coluna(Left, "contabil"))
+        .str()
+        .contains(pattern.clone(), false); // "Escrituração Contábil: Nome da Conta"
+    let info_complementar: Expr = col(coluna(Left, "informacao"))
+        .str()
+        .contains(pattern, false); // "Informação Complementar do Documento Fiscal"
 
     descricao_do_item
         .or(escritur_contabil)
         .or(info_complementar)
 }
 
- /// Alíquota de Receita Financeira
- ///
- /// Indicativo de Outras Receitas
- ///
- /// Alíquota de PIS/PASEP = 0,65%
- ///
- /// Alíquota de COFINS = 4,00%
+/// Alíquota de Receita Financeira
+///
+/// Indicativo de Outras Receitas
+///
+/// Alíquota de PIS/PASEP = 0,65%
+///
+/// Alíquota de COFINS = 4,00%
 pub fn aliquota_de_receita_financeira() -> Expr {
-
     let aliquota_de_pis: &str = coluna(Left, "aliq_pis"); // "Alíquota de PIS/PASEP (em percentual)"
     let aliquota_de_cof: &str = coluna(Left, "aliq_cof"); // "Alíquota de COFINS (em percentual)"
 
     // Alíquotas de Receitas Financeiras: pis 0,65% e cofins 4,00%
-    let aliq_pis: Expr = col(aliquota_de_pis).is_not_null().and(col(aliquota_de_pis).eq(lit(0.65)));
-    let aliq_cof: Expr = col(aliquota_de_cof).is_not_null().and(col(aliquota_de_cof).eq(lit(4.0)));
+    let aliq_pis: Expr = col(aliquota_de_pis)
+        .is_not_null()
+        .and(col(aliquota_de_pis).eq(lit(0.65)));
+    let aliq_cof: Expr = col(aliquota_de_cof)
+        .is_not_null()
+        .and(col(aliquota_de_cof).eq(lit(4.0)));
 
     aliq_pis.and(aliq_cof)
 }
 
- /// Alíquota de Receita Bruta Cumulativa
- ///
- /// Alíquota de PIS/PASEP = 0,65%
- ///
- /// Alíquota de COFINS = 3,00%
+/// Alíquota de Receita Bruta Cumulativa
+///
+/// Alíquota de PIS/PASEP = 0,65%
+///
+/// Alíquota de COFINS = 3,00%
 pub fn aliquota_de_receita_cumulativa() -> Expr {
-
     let aliquota_de_pis: &str = coluna(Left, "aliq_pis"); // "Alíquota de PIS/PASEP (em percentual)"
     let aliquota_de_cof: &str = coluna(Left, "aliq_cof"); // "Alíquota de COFINS (em percentual)"
 
     // Alíquotas de Receitas Financeiras: pis 0,65% e cofins 4,00%
-    let aliq_pis: Expr = col(aliquota_de_pis).is_not_null().and(col(aliquota_de_pis).eq(lit(0.65)));
-    let aliq_cof: Expr = col(aliquota_de_cof).is_not_null().and(col(aliquota_de_cof).eq(lit(3.0)));
+    let aliq_pis: Expr = col(aliquota_de_pis)
+        .is_not_null()
+        .and(col(aliquota_de_pis).eq(lit(0.65)));
+    let aliq_cof: Expr = col(aliquota_de_cof)
+        .is_not_null()
+        .and(col(aliquota_de_cof).eq(lit(3.0)));
 
     aliq_pis.and(aliq_cof)
 }
 
 /// Insumos com direito ao desconto de crédito das Contribuições
 pub fn entrada_de_credito() -> Expr {
-
     let tipo_de_credito: &str = coluna(Left, "tipo_cred");
     let aliquota_de_pis: &str = coluna(Left, "aliq_pis"); // "Alíquota de PIS/PASEP (em percentual)"
     let aliquota_de_cof: &str = coluna(Left, "aliq_cof"); // "Alíquota de COFINS (em percentual)"
@@ -375,8 +369,7 @@ A Receita Bruta é composta por:
 A Receita Bruta Cumulativa é identificada pelas alíquotas de pis = 0,65% e cofins = 3,0%.
 */
 pub fn receita_bruta_nao_cumulativa() -> Expr {
-    saida_de_receita_bruta()
-        .and(aliquota_de_receita_cumulativa().not())
+    saida_de_receita_bruta().and(aliquota_de_receita_cumulativa().not())
 }
 
 /**
@@ -388,6 +381,5 @@ A Receita Bruta é composta por:
 A Receita Bruta Cumulativa é identificada pelas alíquotas de pis = 0,65% e cofins = 3,0%.
 */
 pub fn receita_bruta_cumulativa() -> Expr {
-    saida_de_receita_bruta()
-        .and(aliquota_de_receita_cumulativa())
+    saida_de_receita_bruta().and(aliquota_de_receita_cumulativa())
 }

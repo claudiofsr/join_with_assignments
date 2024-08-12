@@ -1,12 +1,9 @@
+use once_cell::sync::Lazy;
 use rayon::prelude::*;
 use regex::Regex;
 use std::error::Error;
-use once_cell::sync::Lazy;
 
-use polars::{
-    prelude::*,
-    series::Series,
-};
+use polars::{prelude::*, series::Series};
 
 use crate::filtros::operacoes_de_entrada_ou_saida;
 
@@ -17,18 +14,12 @@ use crate::filtros::operacoes_de_entrada_ou_saida;
 /// O resultado é uma nova coluna com informações sobre a incidência das Contribuições.
 ///
 /// Nome da nova coluna: `Alíquota Zero`
-pub fn adicionar_coluna_de_aliquota_zero(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>> {
+pub fn adicionar_coluna_de_aliquota_zero(
+    lazyframe: LazyFrame,
+) -> Result<LazyFrame, Box<dyn Error>> {
+    let columns: Vec<&'static str> = vec!["Tipo de Operação", "Alíquota Zero"];
 
-    let columns: Vec<&'static str> = vec![
-        "Tipo de Operação",
-        "Alíquota Zero",
-    ];
-
-    let side_a: Vec<&'static str> = vec![
-        "Código NCM",
-        "Descrição do Item",
-        "Coluna Temporária A",
-    ];
+    let side_a: Vec<&'static str> = vec!["Código NCM", "Descrição do Item", "Coluna Temporária A"];
 
     let side_b: Vec<&'static str> = vec![
         "Código NCM : NF Item (Todos)",
@@ -40,43 +31,54 @@ pub fn adicionar_coluna_de_aliquota_zero(lazyframe: LazyFrame) -> Result<LazyFra
     let boolean_b: Expr = col(side_b[2]).is_not_null(); // .and(operacoes_de_entrada_ou_de_saida());
 
     // Exemplo: 'NCM 2207.10.90 : Alíquota Zero - Lei xxx.'
-    let exp_a: Expr = concat_str([lit("NCM"), col(side_a[0]), lit(":"), col(side_a[2])], " ", true);
-    let exp_b: Expr = concat_str([lit("NCM"), col(side_b[0]), lit(":"), col(side_b[2])], " ", true);
+    let exp_a: Expr = concat_str(
+        [lit("NCM"), col(side_a[0]), lit(":"), col(side_a[2])],
+        " ",
+        true,
+    );
+    let exp_b: Expr = concat_str(
+        [lit("NCM"), col(side_b[0]), lit(":"), col(side_b[2])],
+        " ",
+        true,
+    );
 
     let lazyframe: LazyFrame = lazyframe
-        .with_column( // Adicionar 2 colunas temporárias
-            as_struct([
-                col(side_a[0]).cast(DataType::String),
-                col(side_a[1]),
-            ].to_vec())
-            .apply(|series: Series| analisar_colunas_selecionadas(&series), GetOutput::same_type()) // GetOutput::from_type(DataType::String)
-            .alias(side_a[2])
+        .with_column(
+            // Adicionar 2 colunas temporárias
+            as_struct([col(side_a[0]).cast(DataType::String), col(side_a[1])].to_vec())
+                .apply(
+                    |series: Series| analisar_colunas_selecionadas(&series),
+                    GetOutput::same_type(),
+                ) // GetOutput::from_type(DataType::String)
+                .alias(side_a[2]),
         )
         .with_column(
-            as_struct([
-                col(side_b[0]).cast(DataType::String),
-                col(side_b[1]),
-            ].to_vec())
-            .apply(|series: Series| analisar_colunas_selecionadas(&series), GetOutput::same_type()) // GetOutput::from_type(DataType::String)
-            .alias(side_b[2])
+            as_struct([col(side_b[0]).cast(DataType::String), col(side_b[1])].to_vec())
+                .apply(
+                    |series: Series| analisar_colunas_selecionadas(&series),
+                    GetOutput::same_type(),
+                ) // GetOutput::from_type(DataType::String)
+                .alias(side_b[2]),
         )
-        .with_column( // Adicionar 1 coluna que concentra as informações das 2 colunas temporárias
+        .with_column(
+            // Adicionar 1 coluna que concentra as informações das 2 colunas temporárias
             when(boolean_a)
                 .then(exp_a)
                 .when(boolean_b)
-                    .then(exp_b)
-                    .otherwise(lit(NULL))
-            .alias(columns[1])
+                .then(exp_b)
+                .otherwise(lit(NULL))
+                .alias(columns[1]),
         )
-        .with_column( // Filtrar Operações de Entrada ou de Saída
+        .with_column(
+            // Filtrar Operações de Entrada ou de Saída
             when(operacoes_de_entrada_ou_saida())
-                .then(columns[1])     // keep original value
+                .then(columns[1]) // keep original value
                 .otherwise(lit(NULL)) // replace by null
-            .alias(columns[1])        // .keep_name() or .name().keep()
+                .alias(columns[1]), // .keep_name() or .name().keep()
         )
-        .drop([ // Remover 2 colunas temporárias
-            side_a[2],
-            side_b[2],
+        .drop([
+            // Remover 2 colunas temporárias
+            side_a[2], side_b[2],
         ]);
 
     Ok(lazyframe)
@@ -98,18 +100,18 @@ fn analisar_colunas_selecionadas(series: &Series) -> Result<Option<Series>, Pola
     // MultiZip is an iterator that zips up a tuple of parallel iterators to produce tuples of their items.
     let new_series: Series = (vec_opt_str_ncm, vec_opt_str_dsc)
         .into_par_iter() // rayon: parallel iterator
-        .map(|(opt_str_ncm, opt_str_dsc)| {
-            match (opt_str_ncm, opt_str_dsc) {
+        .map(
+            |(opt_str_ncm, opt_str_dsc)| match (opt_str_ncm, opt_str_dsc) {
                 (Some(str_ncm), Some(str_dsc)) => {
                     let codigo_ncm = str_ncm.replace('.', "");
                     match codigo_ncm.parse::<u64>() {
                         Ok(ncm) => base_legal(ncm, str_dsc),
                         Err(_) => None,
                     }
-                },
+                }
                 _ => None,
-            }
-        })
+            },
+        )
         .collect::<StringChunked>()
         .into_series();
 
@@ -118,9 +120,8 @@ fn analisar_colunas_selecionadas(series: &Series) -> Result<Option<Series>, Pola
 
 /// Base Legal conforme código NCM e descrição do item.
 fn base_legal(codigo_ncm: u64, descricao: &str) -> Option<&'static str> {
-
     let especificos: [u64; 1] = [
-        3029000,  // lei_10925_art01_inciso20a()
+        3029000, // lei_10925_art01_inciso20a()
     ];
 
     if especificos.contains(&codigo_ncm) {
@@ -128,46 +129,59 @@ fn base_legal(codigo_ncm: u64, descricao: &str) -> Option<&'static str> {
     }
 
     match codigo_ncm {
-        31000000 ..= 31999999            => lei_10925_art01_inciso01(),
-        38080000 ..= 38089999 | 27075000 => lei_10925_art01_inciso02(),
-        12011000                         => lei_10925_art01_inciso03(descricao),
-        25000000 ..= 25999999            => lei_10925_art01_inciso04(descricao),
-        7133319 | 7133329 | 7133399 | 10062000 ..= 10063099 | 11062000 ..= 11062099 => lei_10925_art01_inciso05(),
-        30029099              => lei_10925_art01_inciso06(),
-        30023000 ..= 30023099 => lei_10925_art01_inciso07(),
-        11022000 ..= 11022099 | 11031300 ..= 11031399 |
-        11041900 ..= 11041999 => lei_10925_art01_inciso09(),
-        1051100               => lei_10925_art01_inciso10(),
+        31000000..=31999999 => lei_10925_art01_inciso01(),
+        38080000..=38089999 | 27075000 => lei_10925_art01_inciso02(),
+        12011000 => lei_10925_art01_inciso03(descricao),
+        25000000..=25999999 => lei_10925_art01_inciso04(descricao),
+        7133319 | 7133329 | 7133399 | 10062000..=10063099 | 11062000..=11062099 => {
+            lei_10925_art01_inciso05()
+        }
+        30029099 => lei_10925_art01_inciso06(),
+        30023000..=30023099 => lei_10925_art01_inciso07(),
+        11022000..=11022099 | 11031300..=11031399 | 11041900..=11041999 => {
+            lei_10925_art01_inciso09()
+        }
+        1051100 => lei_10925_art01_inciso10(),
         // Observe que o intervalo de ncm (4010000 ..= 4049999) é analisado
         // em diferentes condições conforme a descrição do item.
         // Decreto 8.533/2015, Art 04 ; LEI Nº 10.925/2004, Art 01 incisos 11 e 13
-        ncm @ 4010000 ..= 4049999 => condicoes_ncm_04(descricao, ncm),
-        22029000 | 22029900   => lei_10925_art01_inciso11b(descricao),
-        4060000 ..= 4069999   => lei_10925_art01_inciso12(descricao),
-        11010010              => lei_10925_art01_inciso14(),
-        10010000 ..= 10019999 => lei_10925_art01_inciso15(),
-        19012000 | 19059090   => lei_10925_art01_inciso16(),
-        19020000 ..= 19029999 => lei_10925_art01_inciso18(),
+        ncm @ 4010000..=4049999 => condicoes_ncm_04(descricao, ncm),
+        22029000 | 22029900 => lei_10925_art01_inciso11b(descricao),
+        4060000..=4069999 => lei_10925_art01_inciso12(descricao),
+        11010010 => lei_10925_art01_inciso14(),
+        10010000..=10019999 => lei_10925_art01_inciso15(),
+        19012000 | 19059090 => lei_10925_art01_inciso16(),
+        19020000..=19029999 => lei_10925_art01_inciso18(),
 
-        2010000 ..= 2029999 | 2062000 ..= 2062999 | 15021010 ..= 15021019 |
-        2061000 | 2102000 | 5069000 | 5100010 => lei_10925_art01_inciso19a(),
-        2030000 ..= 2039999 | 2064000 ..= 2064999 | 2070000 ..= 2079999 |
-        2090000 ..= 2099999 | 2101000 ..= 2101999 | 2063000 | 2109900 => lei_10925_art01_inciso19b(),
-        2040000 ..= 2049999 | 2068000 => lei_10925_art01_inciso19c(),
+        2010000..=2029999
+        | 2062000..=2062999
+        | 15021010..=15021019
+        | 2061000
+        | 2102000
+        | 5069000
+        | 5100010 => lei_10925_art01_inciso19a(),
+        2030000..=2039999
+        | 2064000..=2064999
+        | 2070000..=2079999
+        | 2090000..=2099999
+        | 2101000..=2101999
+        | 2063000
+        | 2109900 => lei_10925_art01_inciso19b(),
+        2040000..=2049999 | 2068000 => lei_10925_art01_inciso19c(),
 
-        3020000 ..= 3029999 => lei_10925_art01_inciso20a(),
-        3030000 ..= 3049999 => lei_10925_art01_inciso20b(),
+        3020000..=3029999 => lei_10925_art01_inciso20a(),
+        3030000..=3049999 => lei_10925_art01_inciso20b(),
 
-        9010000 ..= 9019999 | 21011000 ..= 21011999 => lei_10925_art01_inciso21(),
-        17011400 | 17019900   => lei_10925_art01_inciso22(),
-        15070000 ..= 15149999 => lei_10925_art01_inciso23(),
-        4051000               => lei_10925_art01_inciso24(),
-        15171000              => lei_10925_art01_inciso25(),
-        34011190              => lei_10925_art01_inciso26(),
-        33060000 ..= 33069999 => lei_10925_art01_inciso27(),
-        48181000              => lei_10925_art01_inciso28(),
+        9010000..=9019999 | 21011000..=21011999 => lei_10925_art01_inciso21(),
+        17011400 | 17019900 => lei_10925_art01_inciso22(),
+        15070000..=15149999 => lei_10925_art01_inciso23(),
+        4051000 => lei_10925_art01_inciso24(),
+        15171000 => lei_10925_art01_inciso25(),
+        34011190 => lei_10925_art01_inciso26(),
+        33060000..=33069999 => lei_10925_art01_inciso27(),
+        48181000 => lei_10925_art01_inciso28(),
 
-        29000000 ..= 29999999 => decreto_6426_art01(descricao),
+        29000000..=29999999 => decreto_6426_art01(descricao),
 
         _ => None,
     }
@@ -182,13 +196,13 @@ fn base_legal(codigo_ncm: u64, descricao: &str) -> Option<&'static str> {
 */
 
 fn lei_10925_art01_inciso01() -> Option<&'static str> {
-	// I - adubos ou fertilizantes classificados no Capítulo 31, exceto os produtos de uso veterinário, da Tabela de Incidência do Imposto sobre
-	// Produtos Industrializados - TIPI, aprovada pelo Decreto nº 4.542, de 26 de dezembro de 2002, e suas matérias-primas;
+    // I - adubos ou fertilizantes classificados no Capítulo 31, exceto os produtos de uso veterinário, da Tabela de Incidência do Imposto sobre
+    // Produtos Industrializados - TIPI, aprovada pelo Decreto nº 4.542, de 26 de dezembro de 2002, e suas matérias-primas;
     Some("Alíquota Zero - Lei 10.925/2004, Art. 1º, Inciso I (Adubos ou Fertilizantes).")
 }
 
 fn lei_10925_art01_inciso02() -> Option<&'static str> {
-	// II - defensivos agropecuários classificados na posição 38.08 da TIPI e suas matérias-primas;
+    // II - defensivos agropecuários classificados na posição 38.08 da TIPI e suas matérias-primas;
     Some("Alíquota Zero - Lei 10.925/2004, Art. 1º, Inciso II (Defensivos Agropecuários).")
 }
 
@@ -217,7 +231,8 @@ fn lei_10925_art01_inciso04(descricao: &str) -> Option<&'static str> {
     CST do produto em sua   saída: 06 Operação Tributável a Alíquota Zero.
     */
 
-    static RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)Corretivo|Sal Refinado|Perlita").unwrap());
+    static RE: Lazy<Regex> =
+        Lazy::new(|| Regex::new(r"(?i)Corretivo|Sal Refinado|Perlita").unwrap());
 
     if RE.is_match(descricao) {
         Some("Alíquota Zero - Lei 10.925/2004, Art. 1º, Inciso IV (Corretivo de Solo).")
@@ -227,23 +242,25 @@ fn lei_10925_art01_inciso04(descricao: &str) -> Option<&'static str> {
 }
 
 fn lei_10925_art01_inciso05() -> Option<&'static str> {
-	// V - produtos classificados nos códigos 0713.33.19, 0713.33.29, 0713.33.99, 1006.20, 1006.30 e 1106.20 da TIPI;
+    // V - produtos classificados nos códigos 0713.33.19, 0713.33.29, 0713.33.99, 1006.20, 1006.30 e 1106.20 da TIPI;
     Some("Alíquota Zero - Lei 10.925/2004, Art. 1º, Inciso V (Arroz e Feijão).")
 }
 
 fn lei_10925_art01_inciso06() -> Option<&'static str> {
-	// VI - inoculantes agrícolas produzidos a partir de bactérias fixadoras de nitrogênio,
+    // VI - inoculantes agrícolas produzidos a partir de bactérias fixadoras de nitrogênio,
     // classificados no código 3002.90.99 da TIPI;
     Some("Alíquota Zero - Lei 10.925/2004, Art. 1º, Inciso VI (Inoculantes Agrícolas, biofertilizantes).")
 }
 
 fn lei_10925_art01_inciso07() -> Option<&'static str> {
-	// VII - produtos classificados no Código 3002.30 da TIPI;
-    Some("Alíquota Zero - Lei 10.925/2004, Art. 1º, Inciso VII (Vacinas para Medicina Veterinária).")
+    // VII - produtos classificados no Código 3002.30 da TIPI;
+    Some(
+        "Alíquota Zero - Lei 10.925/2004, Art. 1º, Inciso VII (Vacinas para Medicina Veterinária).",
+    )
 }
 
 fn lei_10925_art01_inciso09() -> Option<&'static str> {
-	// IX - farinha, grumos e sêmolas, grãos esmagados ou em flocos, de milho, classificados,
+    // IX - farinha, grumos e sêmolas, grãos esmagados ou em flocos, de milho, classificados,
     // respectivamente, nos códigos 1102.20, 1103.13 e 1104.19, todos da TIPI;
     Some("Alíquota Zero - Lei 10.925/2004, Art. 1º, Inciso IX (Farinha de Milho).")
 }
@@ -254,15 +271,27 @@ fn lei_10925_art01_inciso10() -> Option<&'static str> {
 }
 
 fn condicoes_ncm_04(descricao: &str, ncm: u64) -> Option<&'static str> {
+    static QUEIJOS_TRIBUTADOS: Lazy<Regex> = Lazy::new(|| {
+        Regex::new(r"(?i)creme.*leite|sobremesa|sobr.*qj|gorgonzola|cheddar|cotage|cottage|soro")
+            .unwrap()
+    });
+    static LEITE_FLUIDO: Lazy<Regex> = Lazy::new(|| {
+        Regex::new(r"(?i)Leite\s*(Fluido Paste|Fluido Industr|Past|UHT|UAT)").unwrap()
+    });
+    static LEITE_EM_PO: Lazy<Regex> = Lazy::new(|| {
+        Regex::new(r"(?i)Leite\s*(em Po|em Pó|Integral|Semidesnatado|Desnatado|Ferm)").unwrap()
+    });
+    static IOGURTE: Lazy<Regex> = Lazy::new(|| {
+        Regex::new(r"(?i)Beb.*Lac|Achocolatado|(Iog|Yogur|Yoghurt|Kefir|Kumys)|Coalhada").unwrap()
+    });
+    static SORO_FLUIDO: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)Soro").unwrap());
+    static SORO_EM_PO: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)\b(Pó|Po)\b").unwrap()); // word boundaries: \b
 
-    static QUEIJOS_TRIBUTADOS: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)creme.*leite|sobremesa|sobr.*qj|gorgonzola|cheddar|cotage|cottage|soro").unwrap());
-    static LEITE_FLUIDO:       Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)Leite\s*(Fluido Paste|Fluido Industr|Past|UHT|UAT)").unwrap());
-    static LEITE_EM_PO:        Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)Leite\s*(em Po|em Pó|Integral|Semidesnatado|Desnatado|Ferm)").unwrap());
-    static IOGURTE:            Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)Beb.*Lac|Achocolatado|(Iog|Yogur|Yoghurt|Kefir|Kumys)|Coalhada").unwrap());
-    static SORO_FLUIDO:        Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)Soro").unwrap());
-    static SORO_EM_PO:         Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)\b(Pó|Po)\b").unwrap()); // word boundaries: \b
-
-    if !QUEIJOS_TRIBUTADOS.is_match(descricao) && (LEITE_FLUIDO.is_match(descricao) || LEITE_EM_PO.is_match(descricao) || IOGURTE.is_match(descricao)) {
+    if !QUEIJOS_TRIBUTADOS.is_match(descricao)
+        && (LEITE_FLUIDO.is_match(descricao)
+            || LEITE_EM_PO.is_match(descricao)
+            || IOGURTE.is_match(descricao))
+    {
         // XI - leite fluido pasteurizado ou industrializado, na forma de ultrapasteurizado, leite em pó, integral, semidesnatado ou desnatado,
         // leite fermentado, bebidas e compostos lácteos e fórmulas infantis, assim definidas conforme previsão legal específica, destinados ao
         // consumo humano ou utilizados na industrialização de produtos que se destinam ao consumo humano;
@@ -276,8 +305,8 @@ fn condicoes_ncm_04(descricao: &str, ncm: u64) -> Option<&'static str> {
 }
 
 fn lei_10925_art01_inciso11b(descricao: &str) -> Option<&'static str> {
-
-    static RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)Beb.*Lac|Achocolatado|Achocolat").unwrap());
+    static RE: Lazy<Regex> =
+        Lazy::new(|| Regex::new(r"(?i)Beb.*Lac|Achocolatado|Achocolat").unwrap());
 
     if RE.is_match(descricao) {
         Some("Alíquota Zero - Lei 10.925/2004, Art. 1º, Inciso XI (Bebidas Lácteas e Achocolatados).")
@@ -287,13 +316,21 @@ fn lei_10925_art01_inciso11b(descricao: &str) -> Option<&'static str> {
 }
 
 fn lei_10925_art01_inciso12(descricao: &str) -> Option<&'static str> {
-
     // XII - queijos tipo mozarela, minas, prato, queijo de coalho, ricota, requeijão, queijo provolone, queijo parmesão, queijo fresco não maturado e queijo do reino;
-	// queijos tipo mozarela = (mozarela|mussarela|muçarela)
+    // queijos tipo mozarela = (mozarela|mussarela|muçarela)
 
-    static RE01: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)creme.*leite|sobremesa|sobr.*qj|gorgonzola|cheddar").unwrap());
-    static RE02: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)(QJO|Queijo).*(moza|muss|muça|minas|prato|coalho|ricota|provolone|Parm|fresc|petit suisse|suico|reino|cotage|cottage)").unwrap());
-    static RE03: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)Req\b|Requeijão|Requeijao|C.*Cheese|(QJO|Queijo).*(cremoso|uf equil)|ricota").unwrap());
+    static RE01: Lazy<Regex> = Lazy::new(|| {
+        Regex::new(r"(?i)creme.*leite|sobremesa|sobr.*qj|gorgonzola|cheddar").unwrap()
+    });
+    static RE02: Lazy<Regex> = Lazy::new(|| {
+        Regex::new(r"(?i)(QJO|Queijo).*(moza|muss|muça|minas|prato|coalho|ricota|provolone|Parm|fresc|petit suisse|suico|reino|cotage|cottage)").unwrap()
+    });
+    static RE03: Lazy<Regex> = Lazy::new(|| {
+        Regex::new(
+            r"(?i)Req\b|Requeijão|Requeijao|C.*Cheese|(QJO|Queijo).*(cremoso|uf equil)|ricota",
+        )
+        .unwrap()
+    });
 
     if !RE01.is_match(descricao) && (RE02.is_match(descricao) || RE03.is_match(descricao)) {
         Some("Alíquota Zero - Lei 10.925/2004, Art. 1º, Inciso XII (Queijos e Requeijão).")
@@ -325,7 +362,7 @@ fn lei_10925_art01_inciso18() -> Option<&'static str> {
 
 fn lei_10925_art01_inciso19a() -> Option<&'static str> {
     // 	XIX - carnes bovina, suína, ovina, caprina e de aves e produtos de origem animal classificados nos seguintes códigos da Tipi:
-	// a) 02.01, 02.02, 0206.10.00, 0206.2, 0210.20.00, 0506.90.00, 0510.00.10 e 1502.10.1;
+    // a) 02.01, 02.02, 0206.10.00, 0206.2, 0210.20.00, 0506.90.00, 0510.00.10 e 1502.10.1;
     Some("Alíquota Zero - Lei 10.925/2004, Art. 1º, Inciso XIX, alínea A (Carnes).")
 }
 
@@ -341,7 +378,7 @@ fn lei_10925_art01_inciso19c() -> Option<&'static str> {
 
 fn lei_10925_art01_inciso20a() -> Option<&'static str> {
     // XX - peixes e outros produtos classificados nos seguintes códigos da Tipi:
-	// a) 03.02, exceto 0302.90.00;
+    // a) 03.02, exceto 0302.90.00;
     Some("Alíquota Zero - Lei 10.925/2004, Art. 1º, Inciso XX, alínea A (Peixes).")
 }
 
@@ -394,15 +431,14 @@ fn lei_10925_art01_inciso28() -> Option<&'static str> {
 #[allow(dead_code)]
 fn lei_10925_art01_paragrafo04() -> Option<&'static str> {
     // 	§ 4º - Aplica-se a redução de alíquotas de que trata o caput também à receita bruta decorrente das saídas do
-	// estabelecimento industrial, na industrialização por conta e ordem de terceiros dos bens e produtos classificados
-	// nas posições 01.03, 01.05, 02.03, 02.06.30.00, 0206.4, 02.07 e 0210.1 da Tipi.
+    // estabelecimento industrial, na industrialização por conta e ordem de terceiros dos bens e produtos classificados
+    // nas posições 01.03, 01.05, 02.03, 02.06.30.00, 0206.4, 02.07 e 0210.1 da Tipi.
     Some("Alíquota Zero - Lei 10.925/2004, Art. 1º, §4º.")
 }
 
 fn decreto_6426_art01(descricao: &str) -> Option<&'static str> {
-
     /*
- 	--- Decreto 6.426/2008 ---
+     --- Decreto 6.426/2008 ---
     Ver também o Art. 425 da IN RFB 1911/2019
 
     https://aditivosingredientes.com.br/upload_arquivos/201610/2016100943561001477573436.pdf
@@ -419,7 +455,8 @@ fn decreto_6426_art01(descricao: &str) -> Option<&'static str> {
     38% de óleo e 2% de umidade segundo Moretto e Fett (1998).
     */
 
-    static RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)Sucralox|LACTATO DE CALCIO|Lactulose").unwrap());
+    static RE: Lazy<Regex> =
+        Lazy::new(|| Regex::new(r"(?i)Sucralox|LACTATO DE CALCIO|Lactulose").unwrap());
 
     if RE.is_match(descricao) {
         Some("Alíquota Zero - Decreto 6.426/2008, Art. 1º, Inciso I e Inciso II (Produtos Químicos relacionados nos Anexos I e II).")
@@ -477,7 +514,6 @@ mod tests {
         println!("dataframe: {df}\n");
 
         fn multiply(s: &mut [Series]) -> Result<Option<Series>, PolarsError> {
-
             // Get the fields as Series
             let series_0: &Series = &s[0];
             let series_1: &Series = &s[1];
@@ -490,12 +526,10 @@ mod tests {
             // MultiZip is an iterator that zips up a tuple of parallel iterators to produce tuples of their items.
             let new_series: Series = (vec_opt_0, vec_opt_1)
                 .into_par_iter() // rayon: parallel iterator
-                .map(|(opt_0, opt_1)|
-                    match (opt_0, opt_1) {
-                        (Some(val_0), Some(val_1)) => Some(val_0.pow(2) * (val_1 - 2)),
-                        _ => None,
-                    }
-                )
+                .map(|(opt_0, opt_1)| match (opt_0, opt_1) {
+                    (Some(val_0), Some(val_1)) => Some(val_0.pow(2) * (val_1 - 2)),
+                    _ => None,
+                })
                 .collect::<Int32Chunked>()
                 .into_series();
 
@@ -512,7 +546,7 @@ mod tests {
                     [col("A"), col("B")],
                     GetOutput::from_type(DataType::Float64),
                 )
-                .alias("Map Multiple")
+                .alias("Map Multiple"),
             )
             .collect()?;
 
@@ -539,23 +573,18 @@ mod tests {
 
         println!("groupby: {groupby}\n");
 
-        let vec_series: Vec<Series> = groupby
-            .column("A")?
-            .list()?
-            .into_iter()
-            .flatten()
-            .collect();
+        let vec_series: Vec<Series> = groupby.column("A")?.list()?.into_iter().flatten().collect();
 
         let vec_vec_i32: Vec<Vec<i32>> = vec_series
             .into_iter()
-            .map(|series|
+            .map(|series| {
                 series
                     .i32()
                     .unwrap()
                     .into_iter()
                     .flatten()
                     .collect::<Vec<_>>()
-            )
+            })
             .collect();
 
         println!("vec_vec_i32: {vec_vec_i32:?}\n");
@@ -565,7 +594,7 @@ mod tests {
     }
 
     #[test]
-    fn filtrar_coluna()-> Result<(), Box<dyn Error>> {
+    fn filtrar_coluna() -> Result<(), Box<dyn Error>> {
         // cargo test -- --show-output filtrar_coluna
 
         configure_the_environment();
@@ -591,9 +620,7 @@ mod tests {
         let dataframe02: DataFrame = lazyframe.collect()?;
         println!("dataframe02: {dataframe02}\n");
 
-        let columns: Vec<&str> = vec![
-            "Alíquota Zero",
-        ];
+        let columns: Vec<&str> = vec!["Alíquota Zero"];
 
         // Get columns from dataframe
         let cst_values: &Series = dataframe02.column(columns[0])?;

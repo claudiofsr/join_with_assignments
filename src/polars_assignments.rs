@@ -1,13 +1,14 @@
 use rayon::prelude::*;
 use std::error::Error;
 
-use polars::{
-    prelude::*,
-    datatypes::DataType,
-};
+use polars::{datatypes::DataType, prelude::*};
 
 use crate::{
-    args::Arguments, coluna, formatar_chave_eletronica, get_lazyframe_from_csv, get_opt_vectuples, get_option_assignments, round_series, DataFrameExtension, Side::{Left, Middle, Right}, VecTuples
+    args::Arguments,
+    coluna, formatar_chave_eletronica, get_lazyframe_from_csv, get_opt_vectuples,
+    get_option_assignments, round_series, DataFrameExtension,
+    Side::{Left, Middle, Right},
+    VecTuples,
 };
 
 /// Use Polars to get dataframe after Munkres assignments
@@ -16,12 +17,13 @@ use crate::{
 ///
 /// [polars-core-version/src/frame/mod.rs]
 pub fn get_dataframe_after_assignments(args: &Arguments) -> Result<DataFrame, Box<dyn Error>> {
-
     println!("Read LazyFrame from CSV files.");
-    let lazyframe_a: LazyFrame = get_lazyframe_from_csv(args.file1.clone(), args.delimiter_input_1, Left)?
-        .with_row_index(coluna(Left, "count_lines"), Some(0u32));
-    let lazyframe_b: LazyFrame = get_lazyframe_from_csv(args.file2.clone(), args.delimiter_input_2, Right)?
-        .with_row_index(coluna(Right, "count_lines"), Some(0u32));
+    let lazyframe_a: LazyFrame =
+        get_lazyframe_from_csv(args.file1.clone(), args.delimiter_input_1, Left)?
+            .with_row_index(coluna(Left, "count_lines"), Some(0u32));
+    let lazyframe_b: LazyFrame =
+        get_lazyframe_from_csv(args.file2.clone(), args.delimiter_input_2, Right)?
+            .with_row_index(coluna(Right, "count_lines"), Some(0u32));
 
     println!("Format the columns to perform comparisons and sum values.");
     let lazyframe_a: LazyFrame = format_fazyframe_a(lazyframe_a)?;
@@ -35,7 +37,8 @@ pub fn get_dataframe_after_assignments(args: &Arguments) -> Result<DataFrame, Bo
     let vec_opt_vec_tuples: Vec<Option<VecTuples>> = get_vec_from_assignments(dataframe_joinned)?;
     let df_correlation: DataFrame = make_df_correlation(vec_opt_vec_tuples)?;
 
-    let lazyframe_c: LazyFrame = join_with_interline_correlations(lazyframe_a, lazyframe_b, df_correlation)?;
+    let lazyframe_c: LazyFrame =
+        join_with_interline_correlations(lazyframe_a, lazyframe_b, df_correlation)?;
     let df_final: DataFrame = check_correlation_between_dataframes(lazyframe_c)?;
 
     /*
@@ -52,11 +55,8 @@ pub fn get_dataframe_after_assignments(args: &Arguments) -> Result<DataFrame, Bo
 
 /// Formatar colunas a fim de realizar comparações e somas de valores.
 fn format_fazyframe_a(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>> {
-
-    let columns_with_float64: Vec<&str> = vec![
-        coluna(Left, "valor_item"),
-        coluna(Left, "valor_bc"),
-    ];
+    let columns_with_float64: Vec<&str> =
+        vec![coluna(Left, "valor_item"), coluna(Left, "valor_bc")];
 
     let count_lines = coluna(Left, "count_lines");
     let chave = coluna(Left, "chave");
@@ -79,14 +79,14 @@ fn format_fazyframe_a(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>>
 
     let lz = lazyframe // Formatar colunas
         .with_column(col(count_lines).cast(DataType::UInt64))
-        .with_column(
-            col(chave)
-            .apply(formatar_chave_eletronica, GetOutput::from_type(DataType::String))
-        )
-        .with_columns([
-            cols(columns_with_float64)
-            .apply(|series| round_series(series, 2), GetOutput::from_type(DataType::Float64))
-        ]);
+        .with_column(col(chave).apply(
+            formatar_chave_eletronica,
+            GetOutput::from_type(DataType::String),
+        ))
+        .with_columns([cols(columns_with_float64).apply(
+            |series| round_series(series, 2),
+            GetOutput::from_type(DataType::Float64),
+        )]);
 
     // Lazy operations don’t execute until we call .collect()?.
     Ok(lz.collect()?.lazy())
@@ -94,7 +94,6 @@ fn format_fazyframe_a(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>>
 
 /// Formatar colunas a fim de realizar comparações e somas de valores.
 fn format_fazyframe_b(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>> {
-
     let columns_with_float64: Vec<&str> = vec![
         coluna(Right, "valor_total"),
         coluna(Right, "valor_item"),
@@ -123,15 +122,16 @@ fn format_fazyframe_b(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>>
 
     let lz = lazyframe // Formatar colunas
         .with_column(col(count_lines).cast(DataType::UInt64))
-        .with_column(
-            col(chave)
-            .apply(formatar_chave_eletronica, GetOutput::from_type(DataType::String))
-        )
+        .with_column(col(chave).apply(
+            formatar_chave_eletronica,
+            GetOutput::from_type(DataType::String),
+        ))
         .with_columns([
-            cols(columns_with_float64)
-            .apply(|series| round_series(series, 2), GetOutput::from_type(DataType::Float64))
-            //all()
-            //.apply(|series| round_float64_columns(series, 2), GetOutput::same_type())
+            cols(columns_with_float64).apply(
+                |series| round_series(series, 2),
+                GetOutput::from_type(DataType::Float64),
+            ), //all()
+               //.apply(|series| round_float64_columns(series, 2), GetOutput::same_type())
         ]);
 
     // Lazy operations don’t execute until we call .collect()?.
@@ -139,16 +139,12 @@ fn format_fazyframe_b(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>>
 }
 
 fn groupby_fazyframe_a(lazyframe: LazyFrame) -> Result<LazyFrame, PolarsError> {
-
     let count_lines = coluna(Left, "count_lines");
     let chave = coluna(Left, "chave");
     let valor_item = coluna(Left, "valor_item");
 
     let lf_groupby: LazyFrame = lazyframe
-        .filter(
-            col(chave).is_not_null()
-            .and(col(valor_item).is_not_null())
-        )
+        .filter(col(chave).is_not_null().and(col(valor_item).is_not_null()))
         .group_by([col(chave)])
         .agg([
             //count(),
@@ -163,21 +159,17 @@ fn groupby_fazyframe_a(lazyframe: LazyFrame) -> Result<LazyFrame, PolarsError> {
 }
 
 fn groupby_fazyframe_b(lazyframe: LazyFrame) -> Result<LazyFrame, PolarsError> {
-
     let count_lines = coluna(Right, "count_lines");
     let chave = coluna(Right, "chave");
     let valor_item = coluna(Right, "valor_item");
     let origem = coluna(Right, "origem");
 
     let lf_groupby: LazyFrame = lazyframe
-        .filter(
-            col(chave).is_not_null()
-            .and(col(valor_item).is_not_null())
-        )
+        .filter(col(chave).is_not_null().and(col(valor_item).is_not_null()))
         .filter(
             when(col(origem).eq(lit("NFe")))
-            .then(col(valor_item).gt(0))
-            .otherwise(true)
+                .then(col(valor_item).gt(0))
+                .otherwise(true),
         )
         .group_by([col(chave)])
         .agg([
@@ -192,61 +184,78 @@ fn groupby_fazyframe_b(lazyframe: LazyFrame) -> Result<LazyFrame, PolarsError> {
     Ok(lf_groupby)
 }
 
-fn join_lazyframes(lazyframe_a: LazyFrame, lazyframe_b: LazyFrame) -> Result<DataFrame, PolarsError> {
-
+fn join_lazyframes(
+    lazyframe_a: LazyFrame,
+    lazyframe_b: LazyFrame,
+) -> Result<DataFrame, PolarsError> {
     let dataframe: DataFrame = lazyframe_a
-        .join(lazyframe_b, [col(coluna(Left, "chave"))], [col(coluna(Right, "chave"))], JoinType::Inner.into())
+        .join(
+            lazyframe_b,
+            [col(coluna(Left, "chave"))],
+            [col(coluna(Right, "chave"))],
+            JoinType::Inner.into(),
+        )
         // An inner join produces a DataFrame that contains only the rows where the join key exists in both DataFrames.
         // https://pola-rs.github.io/polars-book/user-guide/expressions/user-defined-functions/#combining-multiple-column-values
         .with_column(
             // pack to struct to get access to multiple fields in a custom `apply/map`
             // polars-plan-0.26.1/src/dsl/functions.rs ; features = ["dtype-struct"]
-            as_struct([
-                col("Valores dos Itens da Nota Fiscal EFD"),
-                col("Valores dos Itens da Nota Fiscal NFE"),
-                ].to_vec())
-                .apply(
-                    |s| {
-                        // Downcast to struct
-                        let struct_chunked: &StructChunked = s.struct_()?;
+            as_struct(
+                [
+                    col("Valores dos Itens da Nota Fiscal EFD"),
+                    col("Valores dos Itens da Nota Fiscal NFE"),
+                ]
+                .to_vec(),
+            )
+            .apply(
+                |s| {
+                    // Downcast to struct
+                    let struct_chunked: &StructChunked = s.struct_()?;
 
-                        // Get the fields as Series
-                        let ser_list_efd: &Series = &struct_chunked.field_by_name("Valores dos Itens da Nota Fiscal EFD")?;
-                        let ser_list_nfe: &Series = &struct_chunked.field_by_name("Valores dos Itens da Nota Fiscal NFE")?;
+                    // Get the fields as Series
+                    let ser_list_efd: &Series =
+                        &struct_chunked.field_by_name("Valores dos Itens da Nota Fiscal EFD")?;
+                    let ser_list_nfe: &Series =
+                        &struct_chunked.field_by_name("Valores dos Itens da Nota Fiscal NFE")?;
 
-                        // Get columns with into_iter()
-                        let vec_opt_ser_efd: Vec<Option<Series>> = ser_list_efd.list()?.into_iter().collect();
-                        let vec_opt_ser_nfe: Vec<Option<Series>> = ser_list_nfe.list()?.into_iter().collect();
+                    // Get columns with into_iter()
+                    let vec_opt_ser_efd: Vec<Option<Series>> =
+                        ser_list_efd.list()?.into_iter().collect();
+                    let vec_opt_ser_nfe: Vec<Option<Series>> =
+                        ser_list_nfe.list()?.into_iter().collect();
 
-                        // https://docs.rs/rayon/latest/rayon/iter/struct.MultiZip.html
-                        // MultiZip is an iterator that zips up a tuple of parallel iterators to produce tuples of their items.
-                        let vec_series: Vec<Option<Series>> = (vec_opt_ser_efd, vec_opt_ser_nfe)
-                            .into_par_iter() // rayon: parallel iterator
-                            .map(|(opt_ser_efd, opt_ser_nfe)| {
-                                match (opt_ser_efd, opt_ser_nfe) {
-                                    (Some(ser_efd), Some(ser_nfe)) => get_option_assignments(ser_efd, ser_nfe),
-                                    _ => None,
+                    // https://docs.rs/rayon/latest/rayon/iter/struct.MultiZip.html
+                    // MultiZip is an iterator that zips up a tuple of parallel iterators to produce tuples of their items.
+                    let vec_series: Vec<Option<Series>> = (vec_opt_ser_efd, vec_opt_ser_nfe)
+                        .into_par_iter() // rayon: parallel iterator
+                        .map(
+                            |(opt_ser_efd, opt_ser_nfe)| match (opt_ser_efd, opt_ser_nfe) {
+                                (Some(ser_efd), Some(ser_nfe)) => {
+                                    get_option_assignments(ser_efd, ser_nfe)
                                 }
-                            })
-                            .collect();
+                                _ => None,
+                            },
+                        )
+                        .collect();
 
-                        let new_series = Series::new("New", vec_series);
+                    let new_series = Series::new("New", vec_series);
 
-                        Ok(Some(new_series))
-                    },
-                    GetOutput::from_type(DataType::UInt64),
-                )
-                .alias("Munkres Assignments"),
+                    Ok(Some(new_series))
+                },
+                GetOutput::from_type(DataType::UInt64),
+            )
+            .alias("Munkres Assignments"),
         )
         .collect()?;
 
-    println!("dataframe_joinned = lazyframe_a.join(lazyframe_b, [...], JoinType::Inner)\n{dataframe}\n");
+    println!(
+        "dataframe_joinned = lazyframe_a.join(lazyframe_b, [...], JoinType::Inner)\n{dataframe}\n"
+    );
 
     Ok(dataframe)
 }
 
 fn get_vec_from_assignments(dataframe: DataFrame) -> Result<Vec<Option<VecTuples>>, PolarsError> {
-
     // Get columns from dataframe
     let aggregation: &Series = dataframe.column(coluna(Left, "chave"))?;
     let lines_efd: &Series = dataframe.column(coluna(Left, "count_lines"))?;
@@ -261,12 +270,19 @@ fn get_vec_from_assignments(dataframe: DataFrame) -> Result<Vec<Option<VecTuples
 
     // https://docs.rs/rayon/latest/rayon/iter/struct.MultiZip.html
     // MultiZip is an iterator that zips up a tuple of parallel iterators to produce tuples of their items.
-    let vec_opt_vec_tuples: Vec<Option<VecTuples>> = (vec_opt_aggregation, vec_opt_ser_efd, vec_opt_ser_nfe, vec_opt_ser_asg)
+    let vec_opt_vec_tuples: Vec<Option<VecTuples>> = (
+        vec_opt_aggregation,
+        vec_opt_ser_efd,
+        vec_opt_ser_nfe,
+        vec_opt_ser_asg,
+    )
         .into_par_iter() // rayon: parallel iterator
         .map(|(opt_aggregation, opt_ser_efd, opt_ser_nfe, opt_ser_asg)| {
             match (opt_aggregation, opt_ser_efd, opt_ser_nfe, opt_ser_asg) {
-                (Some(aggregation), Some(ser_efd), Some(ser_nfe), Some(ser_asg)) => get_opt_vectuples(aggregation, ser_efd, ser_nfe, ser_asg),
-                _ => None
+                (Some(aggregation), Some(ser_efd), Some(ser_nfe), Some(ser_asg)) => {
+                    get_opt_vectuples(aggregation, ser_efd, ser_nfe, ser_asg)
+                }
+                _ => None,
             }
         })
         .collect();
@@ -276,8 +292,9 @@ fn get_vec_from_assignments(dataframe: DataFrame) -> Result<Vec<Option<VecTuples
     Ok(vec_opt_vec_tuples)
 }
 
-fn make_df_correlation(vec_opt_vec_tuples:Vec<Option<VecTuples>>) -> Result<DataFrame, PolarsError> {
-
+fn make_df_correlation(
+    vec_opt_vec_tuples: Vec<Option<VecTuples>>,
+) -> Result<DataFrame, PolarsError> {
     // Transform a vector of tuples into many vectors
     let mut col_chaves: Vec<String> = Vec::new();
     let mut col_lines_efd: Vec<u64> = Vec::new();
@@ -304,69 +321,91 @@ fn make_df_correlation(vec_opt_vec_tuples:Vec<Option<VecTuples>>) -> Result<Data
     Ok(df_correlation)
 }
 
-fn join_with_interline_correlations(lf_a: LazyFrame, lf_b: LazyFrame, df_correlation: DataFrame) -> Result<LazyFrame, PolarsError> {
-
+fn join_with_interline_correlations(
+    lf_a: LazyFrame,
+    lf_b: LazyFrame,
+    df_correlation: DataFrame,
+) -> Result<LazyFrame, PolarsError> {
     let columns = (coluna(Left, "chave"), coluna(Right, "count_lines"));
     let common_a = [col(columns.0), col(columns.1)];
     let common_b = [col(columns.0), col(columns.1)];
 
     let lf_b = lf_b // Duplicate columns before join()
-        .with_column(
-            col(coluna(Right, "chave")).alias(columns.0),
-        );
+        .with_column(col(coluna(Right, "chave")).alias(columns.0));
 
-    let lf_b_solution: LazyFrame = df_correlation.lazy().join(lf_b, common_a, common_b, JoinType::Left.into())
+    let lf_b_solution: LazyFrame = df_correlation
+        .lazy()
+        .join(lf_b, common_a, common_b, JoinType::Left.into())
         .drop([coluna(Right, "count_lines")]);
 
     // add two empty columns to lazyframe
-    let lf_a = lf_a
-        .with_columns([
-            lit(NULL).alias(coluna(Middle, "verificar")).cast(DataType::String),
-            lit(NULL).alias(coluna(Middle, "glosar")).cast(DataType::String),
-        ]);
+    let lf_a = lf_a.with_columns([
+        lit(NULL)
+            .alias(coluna(Middle, "verificar"))
+            .cast(DataType::String),
+        lit(NULL)
+            .alias(coluna(Middle, "glosar"))
+            .cast(DataType::String),
+    ]);
 
     let columns = (coluna(Left, "chave"), coluna(Left, "count_lines"));
     let common_a = [col(columns.0), col(columns.1)];
     let common_b = [col(columns.0), col(columns.1)];
 
-    let lf_c: LazyFrame = lf_a.join(lf_b_solution, common_a, common_b, JoinType::Left.into())
+    let lf_c: LazyFrame = lf_a
+        .join(lf_b_solution, common_a, common_b, JoinType::Left.into())
         .drop([coluna(Left, "count_lines")]);
 
     Ok(lf_c)
 }
 
 fn check_correlation_between_dataframes(lazyframe: LazyFrame) -> Result<DataFrame, PolarsError> {
-
     let delta: f64 = 0.05;
     let chave_is_null: Expr = col(coluna(Right, "chave")).is_null();
 
-    let valor_da_bcal_da_efd: &str = coluna(Left, "valor_bc");                 // "Valor da Base de Cálculo das Contribuições";
-    let valor_do_item_da_efd: &str = coluna(Left, "valor_item");               // "Valor Total do Item",
+    let valor_da_bcal_da_efd: &str = coluna(Left, "valor_bc"); // "Valor da Base de Cálculo das Contribuições";
+    let valor_do_item_da_efd: &str = coluna(Left, "valor_item"); // "Valor Total do Item",
 
-    let coluna_de_verificacao: &str = coluna(Middle, "verificar");             // "Verificação dos Valores: EFD x Docs Fiscais";
+    let coluna_de_verificacao: &str = coluna(Middle, "verificar"); // "Verificação dos Valores: EFD x Docs Fiscais";
 
-    let valor_da_nota_proporcional_nfe: &str = coluna(Right, "valor_item");    // "Valor da Nota Proporcional : NF Item (Todos) SOMA";
+    let valor_da_nota_proporcional_nfe: &str = coluna(Right, "valor_item"); // "Valor da Nota Proporcional : NF Item (Todos) SOMA";
     let valor_da_base_calculo_icms_nfe: &str = coluna(Right, "valor_bc_icms"); // "ICMS: Base de Cálculo : NF Item (Todos) SOMA"
 
-    let valores_iguais_base_prop: Expr = (col(valor_da_bcal_da_efd) - col(valor_da_nota_proporcional_nfe)).abs().lt(lit(delta));
-    let valores_iguais_base_icms: Expr = (col(valor_da_bcal_da_efd) - col(valor_da_base_calculo_icms_nfe)).abs().lt(lit(delta));
-    let valores_iguais_item_prop: Expr = (col(valor_do_item_da_efd) - col(valor_da_nota_proporcional_nfe)).abs().lt(lit(delta));
-    let valores_iguais_item_icms: Expr = (col(valor_do_item_da_efd) - col(valor_da_base_calculo_icms_nfe)).abs().lt(lit(delta));
+    let valores_iguais_base_prop: Expr = (col(valor_da_bcal_da_efd)
+        - col(valor_da_nota_proporcional_nfe))
+    .abs()
+    .lt(lit(delta));
+    let valores_iguais_base_icms: Expr = (col(valor_da_bcal_da_efd)
+        - col(valor_da_base_calculo_icms_nfe))
+    .abs()
+    .lt(lit(delta));
+    let valores_iguais_item_prop: Expr = (col(valor_do_item_da_efd)
+        - col(valor_da_nota_proporcional_nfe))
+    .abs()
+    .lt(lit(delta));
+    let valores_iguais_item_icms: Expr = (col(valor_do_item_da_efd)
+        - col(valor_da_base_calculo_icms_nfe))
+    .abs()
+    .lt(lit(delta));
 
     let dataframe: DataFrame = lazyframe
         .with_column(
             when(chave_is_null)
                 .then(lit(NULL))
                 .when(valores_iguais_base_prop)
-                .then(lit("Base de Cálculo das Contribuições == Nota Proporcional"))
+                .then(lit(
+                    "Base de Cálculo das Contribuições == Nota Proporcional",
+                ))
                 .when(valores_iguais_base_icms)
-                .then(lit("Base de Cálculo das Contribuições == Base de Cálculo do ICMS"))
+                .then(lit(
+                    "Base de Cálculo das Contribuições == Base de Cálculo do ICMS",
+                ))
                 .when(valores_iguais_item_prop)
                 .then(lit("Valor Total do Item == Nota Proporcional"))
                 .when(valores_iguais_item_icms)
                 .then(lit("Valor Total do Item == Base de Cálculo do ICMS"))
                 .otherwise(lit(NULL))
-                .alias(coluna_de_verificacao)
+                .alias(coluna_de_verificacao),
         )
         .collect()?;
 
@@ -375,14 +414,12 @@ fn check_correlation_between_dataframes(lazyframe: LazyFrame) -> Result<DataFram
 
 #[cfg(test)]
 mod test_assignments {
-    use std::{collections::HashMap, env};
     use super::*;
     use crate::{
-        configure_the_environment,
-        get_csv_headers,
-        glosar_base_de_calculo::LazyFrameExtension,
-        round_float64_columns
+        configure_the_environment, get_csv_headers, glosar_base_de_calculo::LazyFrameExtension,
+        round_float64_columns,
     };
+    use std::{collections::HashMap, env};
 
     // cargo test -- --help
     // cargo test -- --nocapture
@@ -442,20 +479,23 @@ mod test_assignments {
 
         println!("dataframe_01: {dataframe_01}\n");
 
-        let mensagem_ignore_nulls_true: Expr = concat_str([
-            col("str_1"),
-            col("str_2"),
-            col("str_3"),
-            col("str_4"),
-        ], "*", true);
+        let mensagem_ignore_nulls_true: Expr = concat_str(
+            [col("str_1"), col("str_2"), col("str_3"), col("str_4")],
+            "*",
+            true,
+        );
 
         // Need add .fill_null(lit(""))
-        let mensagem_ignore_nulls_false: Expr = concat_str([
-            col("str_1").fill_null(lit("")),
-            col("str_2").fill_null(lit("")),
-            col("str_3").fill_null(lit("")),
-            col("str_4").fill_null(lit("")),
-        ], "*", false);
+        let mensagem_ignore_nulls_false: Expr = concat_str(
+            [
+                col("str_1").fill_null(lit("")),
+                col("str_2").fill_null(lit("")),
+                col("str_3").fill_null(lit("")),
+                col("str_4").fill_null(lit("")),
+            ],
+            "*",
+            false,
+        );
 
         let dataframe_02: DataFrame = dataframe_01
             .lazy()
@@ -467,8 +507,14 @@ mod test_assignments {
 
         println!("dataframe02: {dataframe_02}\n");
 
-        let col_a: Series = Series::new("concat ignore_nulls_true", &["Food*Trick*aa", "Or*bb", "April*Treat*cc", ""]);
-        let col_b: Series = Series::new("concat ignore_nulls_false", &["Food*Trick**aa", "*Or**bb", "April*Treat**cc", "***"]);
+        let col_a: Series = Series::new(
+            "concat ignore_nulls_true",
+            &["Food*Trick*aa", "Or*bb", "April*Treat*cc", ""],
+        );
+        let col_b: Series = Series::new(
+            "concat ignore_nulls_false",
+            &["Food*Trick**aa", "*Or**bb", "April*Treat**cc", "***"],
+        );
 
         assert_eq!(dataframe_02.column("concat ignore_nulls_true")?, &col_a);
         assert_eq!(dataframe_02.column("concat ignore_nulls_false")?, &col_b);
@@ -528,12 +574,10 @@ mod test_assignments {
 
         println!("dataframe01: {dataframe01}\n");
 
-        let lazyframe: LazyFrame = dataframe01
-            .lazy()
-            .with_columns([
-                lit(NULL).alias(verificar).cast(DataType::String),
-                lit(NULL).alias(glosar).cast(DataType::String),
-            ]);
+        let lazyframe: LazyFrame = dataframe01.lazy().with_columns([
+            lit(NULL).alias(verificar).cast(DataType::String),
+            lit(NULL).alias(glosar).cast(DataType::String),
+        ]);
 
         println!("dataframe02: {}\n", lazyframe.clone().collect()?);
 
@@ -542,21 +586,25 @@ mod test_assignments {
         let modulo: Expr = col("integers") % lit(2);
         let situacao: Expr = modulo.eq(lit(0)); // Even Number
 
-        let mensagem: Expr = concat_str([
-            col(glosar),
-            lit("Situação 01:"),
-            col("integers"),
-            lit("is an even"),
-            lit("number"),
-            lit("&"),
-        ], " ", true);
+        let mensagem: Expr = concat_str(
+            [
+                col(glosar),
+                lit("Situação 01:"),
+                col("integers"),
+                lit("is an even"),
+                lit("number"),
+                lit("&"),
+            ],
+            " ",
+            true,
+        );
 
         let lazyframe: LazyFrame = lazyframe
             .with_column(
                 when(situacao)
                     .then(mensagem)
                     .otherwise(col(glosar))
-                .alias(glosar)
+                    .alias(glosar),
             )
             .format_values();
 
@@ -564,13 +612,16 @@ mod test_assignments {
 
         println!("dataframe03: {dataframe03}\n");
 
-        let series: Series = Series::new(glosar, &[
-            None,
-            Some("Situação 01: 2 is an even number"),
-            None,
-            Some("Situação 01: 4 is an even number"),
-            None,
-        ]);
+        let series: Series = Series::new(
+            glosar,
+            &[
+                None,
+                Some("Situação 01: 2 is an even number"),
+                None,
+                Some("Situação 01: 4 is an even number"),
+                None,
+            ],
+        );
 
         assert_eq!(dataframe03.column(glosar)?, &series);
 
@@ -601,23 +652,20 @@ mod test_assignments {
         // Format only the columns with float64
         // input: two columns --> output: two columns
 
-        let lazyframe: LazyFrame = dataframe01
-            .lazy()
-            .with_columns([
-                //cols(selected)
-                all()
-                .apply(|series|
-                    round_float64_columns(series, 2),
-                    GetOutput::same_type()
-                 )
-             ]);
+        let lazyframe: LazyFrame = dataframe01.lazy().with_columns([
+            //cols(selected)
+            all().apply(
+                |series| round_float64_columns(series, 2),
+                GetOutput::same_type(),
+            ),
+        ]);
 
         let dataframe02: DataFrame = lazyframe.clone().collect()?;
 
         println!("dataframe02: {dataframe02}\n");
 
         let series_a: Series = Series::new("float64 A", &[23.65, 0.32, 10.00, 89.02, -3.42, 52.08]);
-        let series_b: Series = Series::new("float64 B", &[10.00,  0.4, 10.01, 89.01, -3.43, 52.1]);
+        let series_b: Series = Series::new("float64 B", &[10.00, 0.4, 10.01, 89.01, -3.43, 52.1]);
 
         assert_eq!(dataframe02.column("float64 A")?, &series_a);
         assert_eq!(dataframe02.column("float64 B")?, &series_b);
@@ -626,12 +674,11 @@ mod test_assignments {
         // input1: two columns --> output: one new column
         // input2: one column  --> output: one new column
 
-        let lazyframe: LazyFrame = lazyframe
-            .with_columns([
-                apuracao1("float64 A", "float64 B", "New Column 1"),
-                apuracao2("float64 A", "New Column 2"),
-                (col("integers") * lit(10) + col("options")).alias("New Column 3"),
-             ]);
+        let lazyframe: LazyFrame = lazyframe.with_columns([
+            apuracao1("float64 A", "float64 B", "New Column 1"),
+            apuracao2("float64 A", "New Column 2"),
+            (col("integers") * lit(10) + col("options")).alias("New Column 3"),
+        ]);
 
         println!("dataframe03: {}\n", lazyframe.collect()?);
 
@@ -640,24 +687,23 @@ mod test_assignments {
 
     fn apuracao1(name_a: &str, name_b: &str, new: &str) -> Expr {
         (col(name_a) * col(name_b) / lit(100))
-        //.over("some_group")
-        .alias(new)
+            //.over("some_group")
+            .alias(new)
     }
 
     fn apuracao2(name_a: &str, new: &str) -> Expr {
         (lit(10) * col(name_a) - lit(2))
-        //.over("some_group")
-        .alias(new)
+            //.over("some_group")
+            .alias(new)
     }
 
     #[test]
     /// `cargo test -- --show-output read_csv_file_v1`
     fn read_csv_file_v1() -> Result<(), Box<dyn Error>> {
-
         env::set_var("POLARS_FMT_TABLE_ROUNDED_CORNERS", "1"); // apply rounded corners to UTF8-styled tables.
         env::set_var("POLARS_FMT_MAX_COLS", "10"); // maximum number of columns shown when formatting DataFrames.
         env::set_var("POLARS_FMT_MAX_ROWS", "10"); // maximum number of rows shown when formatting DataFrames.
-        env::set_var("POLARS_FMT_STR_LEN", "20");  // maximum number of characters printed per string value.
+        env::set_var("POLARS_FMT_STR_LEN", "20"); // maximum number of characters printed per string value.
 
         // wget https://raw.githubusercontent.com/claudiofsr/join_with_assignments/master/src/tests/csv_file01
 
@@ -710,23 +756,21 @@ mod test_assignments {
         // com a ordem das colunas no arquivo CSV.
         headers
             .into_iter()
-            .for_each(|name| {
-                match column_dtypes.get(name) {
-                    Some(dtype) => {
-                        schema.with_column(name.into(), dtype.clone());
-                    },
-                    None => {
-                        eprintln!("Inserir DataType da coluna '{name}' em 'column_dtypes'!");
-                        schema.with_column(name.into(), DataType::String);
-                    }
+            .for_each(|name| match column_dtypes.get(name) {
+                Some(dtype) => {
+                    schema.with_column(name.into(), dtype.clone());
+                }
+                None => {
+                    eprintln!("Inserir DataType da coluna '{name}' em 'column_dtypes'!");
+                    schema.with_column(name.into(), DataType::String);
                 }
             });
 
         let options = StrptimeOptions {
             format: Some("%-d/%-m/%Y".into()),
             strict: false, // If set then polars will return an error if any date parsing fails
-            exact: true,   // If polars may parse matches that not contain the whole string e.g. “foo-2021-01-01-bar” could match “2021-01-01”
-            cache: true,   // use a cache of unique, converted dates to apply the datetime conversion.
+            exact: true, // If polars may parse matches that not contain the whole string e.g. “foo-2021-01-01-bar” could match “2021-01-01”
+            cache: true, // use a cache of unique, converted dates to apply the datetime conversion.
         };
 
         let result_lazyframe_b: PolarsResult<LazyFrame> = LazyCsvReader::new(file_path)
@@ -742,8 +786,8 @@ mod test_assignments {
             //.with_column(col("Alíquota").cast(DataType::Int64))
             .with_column(
                 col("^(Período|Data|Dia).*$") // regex
-                .str()
-                .to_date(options)
+                    .str()
+                    .to_date(options),
             );
 
         // Print column names and their respective types
@@ -752,8 +796,11 @@ mod test_assignments {
             .schema()?
             .iter()
             .enumerate()
-            .for_each(|(index, (column_name, data_type))|{
-                println!("column {:02}: (\"{column_name}\", DataType::{data_type}),", index + 1);
+            .for_each(|(index, (column_name, data_type))| {
+                println!(
+                    "column {:02}: (\"{column_name}\", DataType::{data_type}),",
+                    index + 1
+                );
             });
 
         println!();
@@ -778,11 +825,10 @@ mod test_assignments {
     #[test]
     /// `cargo test -- --show-output read_csv_file_v2`
     fn read_csv_file_v2() -> Result<(), Box<dyn Error>> {
-
         env::set_var("POLARS_FMT_TABLE_ROUNDED_CORNERS", "1"); // apply rounded corners to UTF8-styled tables.
         env::set_var("POLARS_FMT_MAX_COLS", "60"); // maximum number of columns shown when formatting DataFrames.
         env::set_var("POLARS_FMT_MAX_ROWS", "10"); // maximum number of rows shown when formatting DataFrames.
-        env::set_var("POLARS_FMT_STR_LEN", "52");  // maximum number of characters printed per string value.
+        env::set_var("POLARS_FMT_STR_LEN", "52"); // maximum number of characters printed per string value.
 
         let delimiter = ';';
         let file = "src/tests/csv_file02";
@@ -816,8 +862,9 @@ mod test_assignments {
         // --- with_schema --- //
         println!("\n### --- with_schema --- ###\n");
 
-        let lazyframe_b: LazyFrame = get_lazyframe_from_csv(Some(file.into()), Some(delimiter), Right)?
-            .with_row_index(coluna(Right, "count_lines"), Some(0u32));
+        let lazyframe_b: LazyFrame =
+            get_lazyframe_from_csv(Some(file.into()), Some(delimiter), Right)?
+                .with_row_index(coluna(Right, "count_lines"), Some(0u32));
 
         let df_b = lazyframe_b.collect()?;
         println!("df_b: {df_b}\n");

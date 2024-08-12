@@ -1,16 +1,16 @@
+mod analise_do_periodo_de_apuracao;
 mod args;
-mod excel;
 mod columns;
 mod consolidacao_da_natureza;
 mod descricoes;
+mod excel;
 mod filtros;
-mod munkres;
-mod polars_assignments;
-mod analise_do_periodo_de_apuracao;
 mod glosar_base_de_calculo;
 mod legislacao_aliquota_zero;
 mod legislacao_credito_presumido;
 mod legislacao_incidencia_monofasica;
+mod munkres;
+mod polars_assignments;
 
 /// A module that exports the `ExcelWriter` struct which implements the Polars
 /// `SerWriter` trait to serialize a dataframe to an Excel Xlsx file.
@@ -26,29 +26,25 @@ mod write;
 mod xlsx_writer;
 
 pub use self::{
+    analise_do_periodo_de_apuracao::adicionar_coluna_periodo_de_apuracao_inicial_e_final,
     args::*,
-    excel::*,
-    consolidacao_da_natureza::obter_consolidacao_nat,
     columns::{
-        coluna,
-        Column,
+        coluna, Column,
         Side::{self, Left, Middle, Right},
     },
+    consolidacao_da_natureza::obter_consolidacao_nat,
     descricoes::{
-        descricao_da_origem,
-        descricao_do_mes,
-        descricao_do_tipo_de_operacao,
-        descricao_do_tipo_de_credito,
-        descricao_da_natureza_da_bc_dos_creditos,
+        descricao_da_natureza_da_bc_dos_creditos, descricao_da_origem, descricao_do_mes,
+        descricao_do_tipo_de_credito, descricao_do_tipo_de_operacao,
     },
+    excel::*,
     filtros::*,
-    munkres::{munkres_assignments, try_convert, FloatIterExt},
-    polars_assignments::get_dataframe_after_assignments,
-    analise_do_periodo_de_apuracao::adicionar_coluna_periodo_de_apuracao_inicial_e_final,
     glosar_base_de_calculo::glosar_bc,
     legislacao_aliquota_zero::adicionar_coluna_de_aliquota_zero,
     legislacao_credito_presumido::adicionar_coluna_de_credito_presumido,
     legislacao_incidencia_monofasica::adicionar_coluna_de_incidencia_monofasica,
+    munkres::{munkres_assignments, try_convert, FloatIterExt},
+    polars_assignments::get_dataframe_after_assignments,
     write::ExcelWriter,
     xlsx_writer::PolarsXlsxWriter,
 };
@@ -58,17 +54,17 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 
 use std::{
-    any, collections::{HashMap, HashSet}, env,
-    error::Error, fs::File,
+    any,
+    collections::{HashMap, HashSet},
+    env,
+    error::Error,
+    fs::File,
     num::ParseFloatError,
     path::PathBuf,
     process,
 };
 
-use polars::{
-    prelude::*,
-    datatypes::DataType,
-};
+use polars::{datatypes::DataType, prelude::*};
 
 use sysinfo::System;
 
@@ -78,7 +74,7 @@ pub trait DataFrameExtension {
     /// Using the select method is the recommended way to sort columns in polars.
     ///
     /// Some messages can be added.
-    /// 
+    ///
     /// <https://doc.rust-lang.org/std/collections>
     fn sort_by_columns(&self, msg: Option<&str>) -> Result<Self, PolarsError>
     where
@@ -89,31 +85,36 @@ impl DataFrameExtension for DataFrame {
     fn sort_by_columns(&self, opt_msg: Option<&str>) -> Result<DataFrame, PolarsError> {
         // Vec versus HashSet lookup performance.
         // HashSet contains() is O(1).
-        // Vec is like an array, searching for the correct String is an O(n) operation. 
+        // Vec is like an array, searching for the correct String is an O(n) operation.
         // HashMap/HashSet is a hash table, searching for the String is an O(1) operation.
         // https://gist.github.com/daboross/976978d8200caf86e02acb6805961195#file-lib-rs
-        let df_columns: HashSet<&str> = self
-            .get_column_names()
-            .into_iter()
-            .collect();
+        let df_columns: HashSet<&str> = self.get_column_names().into_iter().collect();
 
-        if let Some(msg) = opt_msg { println!("{msg}") }
-        let df_sorted: DataFrame = self
-            .select(
-                Column::get_columns()
-                    .iter()
-                    //.filter(|col| self.column(col.name).is_ok())
-                    .filter(|col| df_columns.contains(&col.name))
-                    .enumerate()
-                    .map(|(index, col)| {
-                        // Print column names and their respective types
-                        if opt_msg.is_some() {
-                            println!("column {:02}: (\"{}\", DataType::{}),", index + 1, col.name, col.dtype);
-                        }
-                        col.name
-                    })
-            )?;
-        if opt_msg.is_some() { println!() }
+        if let Some(msg) = opt_msg {
+            println!("{msg}")
+        }
+        let df_sorted: DataFrame = self.select(
+            Column::get_columns()
+                .iter()
+                //.filter(|col| self.column(col.name).is_ok())
+                .filter(|col| df_columns.contains(&col.name))
+                .enumerate()
+                .map(|(index, col)| {
+                    // Print column names and their respective types
+                    if opt_msg.is_some() {
+                        println!(
+                            "column {:02}: (\"{}\", DataType::{}),",
+                            index + 1,
+                            col.name,
+                            col.dtype
+                        );
+                    }
+                    col.name
+                }),
+        )?;
+        if opt_msg.is_some() {
+            println!()
+        }
 
         Ok(df_sorted)
     }
@@ -126,12 +127,11 @@ pub fn configure_the_environment() {
     env::set_var("POLARS_FMT_TABLE_ROUNDED_CORNERS", "1"); // apply rounded corners to UTF8-styled tables.
     env::set_var("POLARS_FMT_MAX_COLS", "10"); // maximum number of columns shown when formatting DataFrames.
     env::set_var("POLARS_FMT_MAX_ROWS", "10"); // maximum number of rows shown when formatting DataFrames.
-    env::set_var("POLARS_FMT_STR_LEN", "52");  // maximum number of characters printed per string value.
+    env::set_var("POLARS_FMT_STR_LEN", "52"); // maximum number of characters printed per string value.
 }
 
 // https://pola-rs.github.io/polars/sysinfo/index.html
 pub fn show_sysinfo() {
-
     // Please note that we use "new_all" to ensure that all list of
     // components, network interfaces, disks and users are already
     // filled!
@@ -150,16 +150,19 @@ pub fn show_sysinfo() {
             println!("System name:           {sys_name}");
             println!("System kernel version: {sys_kerv}");
             println!("System OS version:     {sys_osve}");
-        },
+        }
         _ => return,
     }
 
     // RAM and swap information
     // 1 Byte = 8 bits
-    let sys_used_memory : u64 = sys.used_memory()  / (1024 * 1024);
+    let sys_used_memory: u64 = sys.used_memory() / (1024 * 1024);
     let sys_total_memory: u64 = sys.total_memory() / (1024 * 1024);
 
-    println!("Memory used/total: {:>8}/{} Mbytes", sys_used_memory, sys_total_memory);
+    println!(
+        "Memory used/total: {:>8}/{} Mbytes",
+        sys_used_memory, sys_total_memory
+    );
 
     // Number of CPUs:
     println!("Number of CPUs: {:>9}\n", sys.cpus().len());
@@ -167,26 +170,21 @@ pub fn show_sysinfo() {
 
 /// See polars-core-0.27.2/src/utils/mod.rs and macro_rules! split_array {...}
 pub fn split_series(series: &Series) -> PolarsResult<Vec<Series>> {
-
     let vec_series: Vec<Series> = (0..series.len())
-        .map(|i| series
-            .slice(i as i64, 1)
-            .explode()
-            .unwrap()
-        )
+        .map(|i| series.slice(i as i64, 1).explode().unwrap())
         .collect();
 
     Ok(vec_series)
 }
 
 pub fn get_option_assignments(series_efd: Series, series_nfe: Series) -> Option<Series> {
-
-    let result_chunkedarray_f64_efd: Result<&ChunkedArray<Float64Type>, PolarsError> = series_efd.f64();
-    let result_chunkedarray_f64_nfe: Result<&ChunkedArray<Float64Type>, PolarsError> = series_nfe.f64();
+    let result_chunkedarray_f64_efd: Result<&ChunkedArray<Float64Type>, PolarsError> =
+        series_efd.f64();
+    let result_chunkedarray_f64_nfe: Result<&ChunkedArray<Float64Type>, PolarsError> =
+        series_nfe.f64();
 
     match (result_chunkedarray_f64_efd, result_chunkedarray_f64_nfe) {
         (Ok(chunkedarray_f64_efd), Ok(chunkedarray_f64_nfe)) => {
-
             let vec_float64_efd: Vec<f64> = chunkedarray_f64_efd
                 .into_iter()
                 .filter_map(verbose_option) //.map_while(verbose_option)
@@ -200,18 +198,25 @@ pub fn get_option_assignments(series_efd: Series, series_nfe: Series) -> Option<
             // if vec_float64_efd.len() * vec_float64_nfe.len() > 0 {
 
             if !vec_float64_efd.is_empty() && !vec_float64_nfe.is_empty() {
-                let assignments: Vec<u64> = munkres_assignments(&vec_float64_efd, &vec_float64_nfe, false);
+                let assignments: Vec<u64> =
+                    munkres_assignments(&vec_float64_efd, &vec_float64_nfe, false);
                 Some(Series::new("new", assignments))
             } else {
                 None
             }
-        },
+        }
         _ => {
             eprintln!("Float64Type PolarsError!");
-            eprintln!("series_efd.dtype(): {} ; series_efd: {series_efd}", series_efd.dtype());
-            eprintln!("series_nfe.dtype(): {} ; series_nfe: {series_nfe}", series_nfe.dtype());
+            eprintln!(
+                "series_efd.dtype(): {} ; series_efd: {series_efd}",
+                series_efd.dtype()
+            );
+            eprintln!(
+                "series_nfe.dtype(): {} ; series_nfe: {series_nfe}",
+                series_nfe.dtype()
+            );
             None
-        },
+        }
     }
 }
 
@@ -228,15 +233,25 @@ fn verbose_option<T>(opt: Option<T>) -> Option<T> {
     }
 }
 
-pub fn get_opt_vectuples(chave_doc: &str, series_efd: Series, series_nfe: Series, series_asg: Series) -> Option<VecTuples> {
+pub fn get_opt_vectuples(
+    chave_doc: &str,
+    series_efd: Series,
+    series_nfe: Series,
+    series_asg: Series,
+) -> Option<VecTuples> {
+    let result_chunkedarray_u64_efd: Result<&ChunkedArray<UInt64Type>, PolarsError> =
+        series_efd.u64();
+    let result_chunkedarray_u64_nfe: Result<&ChunkedArray<UInt64Type>, PolarsError> =
+        series_nfe.u64();
+    let result_chunkedarray_u64_asg: Result<&ChunkedArray<UInt64Type>, PolarsError> =
+        series_asg.u64();
 
-    let result_chunkedarray_u64_efd: Result<&ChunkedArray<UInt64Type>, PolarsError> = series_efd.u64();
-    let result_chunkedarray_u64_nfe: Result<&ChunkedArray<UInt64Type>, PolarsError> = series_nfe.u64();
-    let result_chunkedarray_u64_asg: Result<&ChunkedArray<UInt64Type>, PolarsError> = series_asg.u64();
-
-    match (result_chunkedarray_u64_efd, result_chunkedarray_u64_nfe, result_chunkedarray_u64_asg) {
+    match (
+        result_chunkedarray_u64_efd,
+        result_chunkedarray_u64_nfe,
+        result_chunkedarray_u64_asg,
+    ) {
         (Ok(chunkedarray_u64_efd), Ok(chunkedarray_u64_nfe), Ok(chunkedarray_u64_asg)) => {
-
             let vec_u64_efd: Vec<u64> = chunkedarray_u64_efd
                 .into_iter()
                 .filter_map(verbose_option)
@@ -259,24 +274,36 @@ pub fn get_opt_vectuples(chave_doc: &str, series_efd: Series, series_nfe: Series
             } else {
                 None
             }
-        },
+        }
         _ => {
             eprintln!("UInt64Type PolarsError!");
             eprintln!("chave_doc: {chave_doc}");
-            eprintln!("series_efd.dtype(): {} ; series_efd: {series_efd}", series_efd.dtype());
-            eprintln!("series_nfe.dtype(): {} ; series_nfe: {series_nfe}", series_nfe.dtype());
-            eprintln!("series_asg.dtype(): {} ; series_asg: {series_asg}", series_asg.dtype());
+            eprintln!(
+                "series_efd.dtype(): {} ; series_efd: {series_efd}",
+                series_efd.dtype()
+            );
+            eprintln!(
+                "series_nfe.dtype(): {} ; series_nfe: {series_nfe}",
+                series_nfe.dtype()
+            );
+            eprintln!(
+                "series_asg.dtype(): {} ; series_asg: {series_asg}",
+                series_asg.dtype()
+            );
             None
-        },
+        }
     }
 }
 
-fn line_assignments(chave_doc: &str, slice_lines_efd: &[u64], slice_lines_nfe: &[u64], assignments: &[u64]) -> Option<VecTuples> {
-
+fn line_assignments(
+    chave_doc: &str,
+    slice_lines_efd: &[u64],
+    slice_lines_nfe: &[u64],
+    assignments: &[u64],
+) -> Option<VecTuples> {
     let mut chaves_com_linhas_correlacionadas: VecTuples = Vec::new();
 
     for (row, &col) in assignments.iter().enumerate() {
-
         let opt_line_efd: Option<&u64> = slice_lines_efd.get(row);
         let opt_line_nfe: Option<&u64> = slice_lines_nfe.get(col as usize);
 
@@ -332,30 +359,36 @@ fn download_file_from_the_internet(url: &str, output_file: &str) {
 // This allows you to combine expression into powerful aggregations and column selections.
 // All expressions are evaluated in parallel and your queries are optimized just in time.
 
-pub fn get_lazyframe_from_csv(file_path: Option<PathBuf>, delimiter: Option<char>, side: Side) -> PolarsResult<LazyFrame> {
-
+pub fn get_lazyframe_from_csv(
+    file_path: Option<PathBuf>,
+    delimiter: Option<char>,
+    side: Side,
+) -> PolarsResult<LazyFrame> {
     validate_entries(file_path.clone(), delimiter, side)?;
 
     let mut options = StrptimeOptions {
         format: None,
         strict: false, // If set then polars will return an error if any date parsing fails
-        exact: true,   // If polars may parse matches that not contain the whole string e.g. “foo-2021-01-01-bar” could match “2021-01-01”
-        cache: true,   // use a cache of unique, converted dates to apply the datetime conversion.
+        exact: true, // If polars may parse matches that not contain the whole string e.g. “foo-2021-01-01-bar” could match “2021-01-01”
+        cache: true, // use a cache of unique, converted dates to apply the datetime conversion.
     };
 
     match side {
-        Side::Left   => options.format = Some("%Y-%-m-%-d".into()),
-        Side::Right  => options.format = Some("%-d/%-m/%Y".into()),
-        Side::Middle => return Err(PolarsError::InvalidOperation("The middle side is not valid!".into()))
+        Side::Left => options.format = Some("%Y-%-m-%-d".into()),
+        Side::Right => options.format = Some("%-d/%-m/%Y".into()),
+        Side::Middle => {
+            return Err(PolarsError::InvalidOperation(
+                "The middle side is not valid!".into(),
+            ))
+        }
     }
 
     // Format date
-    let mut lazyframe: LazyFrame = read_csv_lazy(file_path, delimiter, side)?
-        .with_column(
-            col("^(Período|Data|Dia).*$") // regex
+    let mut lazyframe: LazyFrame = read_csv_lazy(file_path, delimiter, side)?.with_column(
+        col("^(Período|Data|Dia).*$") // regex
             .str()
-            .to_date(options)
-        );
+            .to_date(options),
+    );
 
     println!("{}\n", lazyframe.clone().collect()?);
 
@@ -365,8 +398,11 @@ pub fn get_lazyframe_from_csv(file_path: Option<PathBuf>, delimiter: Option<char
         .schema()?
         .iter()
         .enumerate()
-        .for_each(|(index, (column_name, data_type))|{
-            println!("column {:02}: (\"{column_name}\", DataType::{data_type}),", index + 1);
+        .for_each(|(index, (column_name, data_type))| {
+            println!(
+                "column {:02}: (\"{column_name}\", DataType::{data_type}),",
+                index + 1
+            );
         });
 
     println!();
@@ -377,23 +413,27 @@ pub fn get_lazyframe_from_csv(file_path: Option<PathBuf>, delimiter: Option<char
 }
 
 /// If valid, print the variables (file_path, delimiter, side).
-fn validate_entries(file_path: Option<PathBuf>, delimiter: Option<char>, side: Side) -> PolarsResult<()> {
+fn validate_entries(
+    file_path: Option<PathBuf>,
+    delimiter: Option<char>,
+    side: Side,
+) -> PolarsResult<()> {
     match file_path {
         Some(p) if p.is_file() => println!("file path: {p:#?}"),
         _ => {
             eprintln!("fn validate_entries()");
             eprintln!("file_path: {file_path:?}");
-            return Err(PolarsError::InvalidOperation("file_path error!".into()))
-        },
+            return Err(PolarsError::InvalidOperation("file_path error!".into()));
+        }
     };
 
     match delimiter {
-        Some (d) => println!("delimiter: {d:?}"),
+        Some(d) => println!("delimiter: {d:?}"),
         None => {
             eprintln!("fn validate_entries()");
             eprintln!("delimiter: {delimiter:?}");
-            return Err(PolarsError::InvalidOperation("delimiter error!".into()))
-        },
+            return Err(PolarsError::InvalidOperation("delimiter error!".into()));
+        }
     };
 
     match side {
@@ -401,8 +441,10 @@ fn validate_entries(file_path: Option<PathBuf>, delimiter: Option<char>, side: S
         Side::Middle => {
             eprintln!("fn validate_entries()");
             eprintln!("side: {side:?}");
-            return Err(PolarsError::InvalidOperation("The middle side is not valid!".into()))
-        },
+            return Err(PolarsError::InvalidOperation(
+                "The middle side is not valid!".into(),
+            ));
+        }
     };
 
     Ok(())
@@ -432,7 +474,10 @@ Get headers from CSV file (valid UTF-8 or not valid UTF-8).
     }
 ```
 */
-pub fn get_csv_headers(path: impl AsRef<std::path::Path>, delimiter: u8) -> Result<csv::StringRecord, Box<dyn Error>> {
+pub fn get_csv_headers(
+    path: impl AsRef<std::path::Path>,
+    delimiter: u8,
+) -> Result<csv::StringRecord, Box<dyn Error>> {
     let mut reader = csv::ReaderBuilder::new()
         .has_headers(true)
         .delimiter(delimiter)
@@ -446,7 +491,11 @@ pub fn get_csv_headers(path: impl AsRef<std::path::Path>, delimiter: u8) -> Resu
 }
 
 // https://pola-rs.github.io/polars/py-polars/html/reference/lazyframe/index.html
-fn read_csv_lazy(file_path: Option<PathBuf>, delimiter: Option<char>, side: Side) -> PolarsResult<LazyFrame> {
+fn read_csv_lazy(
+    file_path: Option<PathBuf>,
+    delimiter: Option<char>,
+    side: Side,
+) -> PolarsResult<LazyFrame> {
     // Set values that will be interpreted as missing/null.
     let null_values: Vec<String> = svec![
         //"", // foo;"";bar --> foo;;bar
@@ -468,15 +517,13 @@ fn read_csv_lazy(file_path: Option<PathBuf>, delimiter: Option<char>, side: Side
                 // com a ordem das colunas no arquivo CSV.
                 headers
                     .into_iter()
-                    .for_each(|name| {
-                        match cols_dtype.get(name) {
-                            Some(dtype) => {
-                                schema.with_column(name.into(), dtype.clone());
-                            },
-                            None => {
-                                eprintln!("Inserir DataType da coluna '{name}' em Column {side:?}!");
-                                schema.with_column(name.into(), DataType::String);
-                            }
+                    .for_each(|name| match cols_dtype.get(name) {
+                        Some(dtype) => {
+                            schema.with_column(name.into(), dtype.clone());
+                        }
+                        None => {
+                            eprintln!("Inserir DataType da coluna '{name}' em Column {side:?}!");
+                            schema.with_column(name.into(), DataType::String);
                         }
                     });
             }
@@ -501,7 +548,7 @@ fn read_csv_lazy(file_path: Option<PathBuf>, delimiter: Option<char>, side: Side
             }
 
             result_lazyframe
-        },
+        }
         _ => {
             panic!("File path or delimiter error!")
         }
@@ -510,7 +557,6 @@ fn read_csv_lazy(file_path: Option<PathBuf>, delimiter: Option<char>, side: Side
 
 /// Write Dataframe to CSV file
 pub fn write_csv(df: &DataFrame, basename: &str, delimiter: char) -> PolarsResult<()> {
-
     let mut filepath = PathBuf::from(basename);
     filepath.set_extension("csv");
     println!("Write DataFrame to {filepath:?}\n");
@@ -524,7 +570,7 @@ pub fn write_csv(df: &DataFrame, basename: &str, delimiter: char) -> PolarsResul
         .with_separator(delimiter as u8)
         .include_header(true)
         .with_quote_style(QuoteStyle::Necessary)
-        .finish( &mut df_formated)?;
+        .finish(&mut df_formated)?;
 
     Ok(())
 }
@@ -533,25 +579,25 @@ pub fn write_csv(df: &DataFrame, basename: &str, delimiter: char) -> PolarsResul
 ///
 /// Substituir código por sua descrição nas colunas selecionadas.
 fn format_dataframe(df: &DataFrame) -> PolarsResult<DataFrame> {
-
-    let df_formated: DataFrame = df.clone()
+    let df_formated: DataFrame = df
+        .clone()
         .lazy()
         .with_column(
             col("Mês do Período de Apuração")
-            .apply(descricao_do_mes, GetOutput::from_type(DataType::String))
+                .apply(descricao_do_mes, GetOutput::from_type(DataType::String)),
         )
-        .with_column(
-            col("Tipo de Operação")
-            .apply(descricao_do_tipo_de_operacao, GetOutput::from_type(DataType::String))
-        )
-        .with_column(
-            col("Tipo de Crédito")
-            .apply(descricao_do_tipo_de_credito, GetOutput::from_type(DataType::String))
-        )
-        .with_column(
-            col("Natureza da Base de Cálculo dos Créditos")
-            .apply(descricao_da_natureza_da_bc_dos_creditos, GetOutput::from_type(DataType::String))
-        )
+        .with_column(col("Tipo de Operação").apply(
+            descricao_do_tipo_de_operacao,
+            GetOutput::from_type(DataType::String),
+        ))
+        .with_column(col("Tipo de Crédito").apply(
+            descricao_do_tipo_de_credito,
+            GetOutput::from_type(DataType::String),
+        ))
+        .with_column(col("Natureza da Base de Cálculo dos Créditos").apply(
+            descricao_da_natureza_da_bc_dos_creditos,
+            GetOutput::from_type(DataType::String),
+        ))
         .collect()?;
 
     // Verificar a existência da coluna "Indicador de Origem" antes aplicar alterações.
@@ -563,7 +609,7 @@ fn format_dataframe(df: &DataFrame) -> PolarsResult<DataFrame> {
             .lazy()
             .with_column(
                 col("Indicador de Origem")
-                .apply(descricao_da_origem, GetOutput::from_type(DataType::String))
+                    .apply(descricao_da_origem, GetOutput::from_type(DataType::String)),
             )
             .collect()?;
         return Ok(df);
@@ -581,7 +627,6 @@ pub fn find_name(names: &[&str], name: &str) -> bool {
 
 /// Write Dataframe to Parquet file
 pub fn write_pqt(df: &DataFrame, basename: &str) -> PolarsResult<()> {
-
     let mut filepath = PathBuf::from(basename);
     filepath.set_extension("parquet");
     println!("Write DataFrame to {filepath:?}\n");
@@ -594,7 +639,7 @@ pub fn write_pqt(df: &DataFrame, basename: &str) -> PolarsResult<()> {
         .with_statistics(StatisticsOptions::default())
         .set_parallel(true)
         //.with_compression(ParquetCompression::Lz4Raw)
-        .finish( &mut df_formated)?;
+        .finish(&mut df_formated)?;
 
     Ok(())
 }
@@ -611,12 +656,13 @@ pub fn get_cnpj_base(series: Series) -> PolarsResult<Option<Series>> {
             eprintln!("fn get_cnpj_base()");
             eprintln!("Series: {series:?}");
             Err(PolarsError::InvalidOperation(
-            format!(
-                "Not supported for Series with DataType {:?}",
-                series.dtype()
-            )
-            .into()))
-        },
+                format!(
+                    "Not supported for Series with DataType {:?}",
+                    series.dtype()
+                )
+                .into(),
+            ))
+        }
     }
 }
 
@@ -632,22 +678,21 @@ fn cnpj_base(series: Series) -> PolarsResult<Option<Series>> {
         .str()?
         .into_iter()
         .map(|option_str: Option<&str>| {
-            option_str
-                .and_then(|text| {
-                    let mut cnpjs: Vec<String> = extract_cnpjs(text);
+            option_str.and_then(|text| {
+                let mut cnpjs: Vec<String> = extract_cnpjs(text);
 
-                    cnpjs.sort_unstable();
-                    cnpjs.dedup(); // Removes consecutive repeated elements
+                cnpjs.sort_unstable();
+                cnpjs.dedup(); // Removes consecutive repeated elements
 
-                    // Capturar apenas CNPJ base iguais
-                    // Capturar apenas o primeiro CNPJ
+                // Capturar apenas CNPJ base iguais
+                // Capturar apenas o primeiro CNPJ
 
-                    if cnpjs.len() == 1 {
-                        cnpjs.first().cloned()
-                    } else {
-                        None
-                    }
-                })
+                if cnpjs.len() == 1 {
+                    cnpjs.first().cloned()
+                } else {
+                    None
+                }
+            })
         })
         .collect::<StringChunked>()
         .into_series();
@@ -656,16 +701,13 @@ fn cnpj_base(series: Series) -> PolarsResult<Option<Series>> {
 }
 
 pub fn desprezar_pequenos_valores(series: Series, delta: f64) -> PolarsResult<Option<Series>> {
-
     let new_series: Series = series
         .f64()?
         .into_iter()
-        .map(|opt_f64: Option<f64>|
-            match opt_f64 {
-                Some(value) if value.abs() > delta => Some(value),
-                _ => None,
-            }
-        )
+        .map(|opt_f64: Option<f64>| match opt_f64 {
+            Some(value) if value.abs() > delta => Some(value),
+            _ => None,
+        })
         .collect::<Float64Chunked>()
         .into_series();
 
@@ -680,23 +722,21 @@ pub fn add_leading_zeros(series: Series, fill: usize) -> PolarsResult<Option<Ser
             eprintln!("Series: {series:?}");
             eprintln!("Leading Zeroes: {fill}");
             Err(PolarsError::InvalidOperation(
-            format!(
-                "Not supported for Series with DataType {:?}",
-                series.dtype()
-            )
-            .into()))
-        },
+                format!(
+                    "Not supported for Series with DataType {:?}",
+                    series.dtype()
+                )
+                .into(),
+            ))
+        }
     }
 }
 
 fn leading_zeros(series: Series, fill: usize) -> PolarsResult<Option<Series>> {
-
     let new_series: Series = series
         .i64()?
         .into_iter()
-        .map(|option_i64: Option<i64>|
-            option_i64.map(|int64| format!("{int64:0fill$}"))
-        )
+        .map(|option_i64: Option<i64>| option_i64.map(|int64| format!("{int64:0fill$}")))
         .collect::<StringChunked>()
         .into_series();
 
@@ -709,7 +749,7 @@ fn leading_zeros(series: Series, fill: usize) -> PolarsResult<Option<Series>> {
 pub fn round_float64_columns(series: Series, decimals: u32) -> PolarsResult<Option<Series>> {
     match series.dtype() {
         DataType::Float64 => Ok(Some(series.round(decimals)?)),
-        _ => Ok(Some(series))
+        _ => Ok(Some(series)),
     }
 }
 
@@ -717,29 +757,27 @@ pub fn round_series(series: Series, decimals: u32) -> PolarsResult<Option<Series
     match series.dtype() {
         // DataType::Float64 => Ok(Some(series.round(decimals)?)), <-- Bug panicking::panic_fmt
         DataType::Float64 => round_series_f64(series, decimals),
-        DataType::String  => round_series_str(series, decimals),
+        DataType::String => round_series_str(series, decimals),
         _ => {
             eprintln!("fn round_series()");
             eprintln!("Series: {series:?}");
             eprintln!("Decimals: {decimals}");
             Err(PolarsError::InvalidOperation(
-            format!(
-                "Not supported for Series with DataType {:?}",
-                series.dtype()
-            )
-            .into()))
-        },
+                format!(
+                    "Not supported for Series with DataType {:?}",
+                    series.dtype()
+                )
+                .into(),
+            ))
+        }
     }
 }
 
 fn round_series_f64(series: Series, decimals: u32) -> PolarsResult<Option<Series>> {
-
     let new_series: Series = series
         .f64()?
         .into_iter()
-        .map(|opt_f64: Option<f64>|
-            opt_f64.map(|float64| float64.round_float(decimals))
-        )
+        .map(|opt_f64: Option<f64>| opt_f64.map(|float64| float64.round_float(decimals)))
         .collect::<Float64Chunked>()
         .into_series();
 
@@ -747,13 +785,10 @@ fn round_series_f64(series: Series, decimals: u32) -> PolarsResult<Option<Series
 }
 
 fn round_series_str(series: Series, decimals: u32) -> PolarsResult<Option<Series>> {
-
     let new_series: Series = series
         .str()?
         .into_iter()
-        .map(|opt_str: Option<&str>|
-            get_opt_from_str(opt_str, &series, decimals)
-        )
+        .map(|opt_str: Option<&str>| get_opt_from_str(opt_str, &series, decimals))
         .collect::<Float64Chunked>()
         .into_series();
 
@@ -761,14 +796,10 @@ fn round_series_str(series: Series, decimals: u32) -> PolarsResult<Option<Series
 }
 
 fn get_opt_from_str(opt_str: Option<&str>, series: &Series, decimals: u32) -> Option<f64> {
-
     let opt_float64: Option<f64> = match opt_str {
         Some(str) => {
-            let result: Result<f64, ParseFloatError> = str
-                .trim()
-                .replace('.', "")
-                .replace(',', ".")
-                .parse::<f64>();
+            let result: Result<f64, ParseFloatError> =
+                str.trim().replace('.', "").replace(',', ".").parse::<f64>();
 
             match result {
                 Ok(float) => Some(float.round_float(decimals)),
@@ -778,13 +809,13 @@ fn get_opt_from_str(opt_str: Option<&str>, series: &Series, decimals: u32) -> Op
                     process::exit(1)
                 }
             }
-        },
+        }
         None => {
             eprintln!("fn get_opt_from_str()");
             eprintln!("Found None value in column:");
             eprintln!("series: {series}\n");
             None
-        },
+        }
     };
 
     opt_float64
@@ -797,12 +828,13 @@ pub fn formatar_chave_eletronica(series: Series) -> PolarsResult<Option<Series>>
             eprintln!("fn formatar_chave_eletronica()");
             eprintln!("Series: {series:?}");
             Err(PolarsError::InvalidOperation(
-            format!(
-                "Not supported for Series with DataType {:?}",
-                series.dtype()
-            )
-            .into()))
-        },
+                format!(
+                    "Not supported for Series with DataType {:?}",
+                    series.dtype()
+                )
+                .into(),
+            ))
+        }
     }
 }
 
@@ -823,20 +855,18 @@ fn format_digits(series: Series) -> PolarsResult<Option<Series>> {
 /// Then, we use the map method to transform the optional string into an optional string
 /// containing only the ASCII digit characters.
 fn retain_only_digits(opt_str: Option<&str>) -> Option<String> {
-    opt_str
-        .as_ref()
-        .and_then(|string| {
-            let digits: String = string
-                .chars()
-                .filter(|c| c.is_ascii_digit())
-                .collect::<String>();
+    opt_str.as_ref().and_then(|string| {
+        let digits: String = string
+            .chars()
+            .filter(|c| c.is_ascii_digit())
+            .collect::<String>();
 
-            if !digits.is_empty() {
-                Some(digits)
-            } else {
-                None
-            }
-        })
+        if !digits.is_empty() {
+            Some(digits)
+        } else {
+            None
+        }
+    })
 }
 
 /**
@@ -862,9 +892,9 @@ $     the end of text (or end-of-line with multi-line mode)
 
 */
 pub fn extract_cnpjs(input: &str) -> Vec<String> {
-
     static FIND_CNPJS: Lazy<Regex> = Lazy::new(|| {
-        Regex::new(r"(?x)
+        Regex::new(
+            r"(?x)
             (?:\A|\W) # beginning of text or not word ; or (?:^|\W)
             (\w{2})   # capture 2 alphanumeric
             \.?
@@ -876,15 +906,15 @@ pub fn extract_cnpjs(input: &str) -> Vec<String> {
             -?
             \d{2}     # check 2 digits
             (?:\z|\W) # end of text or not digit ; or (?:$|\W)
-        ").unwrap()
+        ",
+        )
+        .unwrap()
     });
 
     FIND_CNPJS
         .captures_iter(input)
         .map(|caps| caps.extract())
-        .map(|(_full, [a, b, c])| {
-            [a, ".", b, ".", c].concat()
-        })
+        .map(|(_full, [a, b, c])| [a, ".", b, ".", c].concat())
         .collect()
 }
 
@@ -900,7 +930,6 @@ mod test_functions {
     #[test]
     /// `cargo test -- --show-output find_cnpj_base`
     fn find_cnpj_base() -> PolarsResult<()> {
-
         let mut result = Vec::new();
 
         // Exemplo com CNPJ fictício
@@ -916,29 +945,27 @@ mod test_functions {
         let option_strs = [Some(text_0), Some(text_1), Some(text_2), Some(text_3), None];
 
         for (index, option_str) in option_strs.iter().enumerate() {
-
             println!("text_{index}: {option_str:?}");
 
-            let cnpj_base: Option<String> = option_str
-                .and_then(|text| {
-                    let mut cnpjs: Vec<String> = extract_cnpjs(text);
+            let cnpj_base: Option<String> = option_str.and_then(|text| {
+                let mut cnpjs: Vec<String> = extract_cnpjs(text);
 
-                    println!("cnpjs: {cnpjs:?}");
+                println!("cnpjs: {cnpjs:?}");
 
-                    cnpjs.sort_unstable();
-                    cnpjs.dedup(); // Removes consecutive repeated elements
+                cnpjs.sort_unstable();
+                cnpjs.dedup(); // Removes consecutive repeated elements
 
-                    println!("cnpjs uniques: {cnpjs:?}");
+                println!("cnpjs uniques: {cnpjs:?}");
 
-                    // Capturar apenas CNPJ base iguais
-                    // Capturar apenas o primeiro CNPJ
+                // Capturar apenas CNPJ base iguais
+                // Capturar apenas o primeiro CNPJ
 
-                    if cnpjs.len() == 1 {
-                        cnpjs.first().cloned()
-                    } else {
-                        None
-                    }
-                });
+                if cnpjs.len() == 1 {
+                    cnpjs.first().cloned()
+                } else {
+                    None
+                }
+            });
 
             println!("cnpj_base: {cnpj_base:?}\n");
 
@@ -989,22 +1016,11 @@ mod test_functions {
     #[test]
     /// `cargo test -- --show-output test_round_f64`
     fn test_round_f64() {
-
         let decimals: u32 = 2;
 
-        let numbers: Vec<f64> = vec![
-            0.025,
-            4.354999,
-            4.365,
-            0.01499999999999,
-        ];
+        let numbers: Vec<f64> = vec![0.025, 4.354999, 4.365, 0.01499999999999];
 
-        let result: Vec<f64> = vec![
-            0.03,
-            4.35,
-            4.37,
-            0.01,
-        ];
+        let result: Vec<f64> = vec![0.03, 4.35, 4.37, 0.01];
 
         let mut rounded_number: Vec<f64> = Vec::new();
 
@@ -1021,7 +1037,7 @@ mod test_functions {
     #[test]
     /// `cargo test -- --show-output function_returning_multiple_values`
     fn function_returning_multiple_values() -> Result<(), Box<dyn Error>> {
-    // https://stackoverflow.com/questions/70959170/is-there-a-way-to-apply-a-udf-function-returning-multiple-values-in-rust-polars
+        // https://stackoverflow.com/questions/70959170/is-there-a-way-to-apply-a-udf-function-returning-multiple-values-in-rust-polars
 
         let df = df![
             "a" => [1.0, 2.0, 3.0],
@@ -1033,19 +1049,22 @@ mod test_functions {
             .select([map_multiple(
                 |columns| {
                     Ok(Some(
-                             columns[0].f64()?.into_no_null_iter()
-                        .zip(columns[1].f64()?.into_no_null_iter())
-                        .map(|(a, b)| {
-                            let out = black_box(a, b);
-                            Series::new("", [out.0, out.1, out.2])
-                        })
-                        .collect::<ChunkedArray<ListType>>()
-                        .into_series()))
+                        columns[0]
+                            .f64()?
+                            .into_no_null_iter()
+                            .zip(columns[1].f64()?.into_no_null_iter())
+                            .map(|(a, b)| {
+                                let out = black_box(a, b);
+                                Series::new("", [out.0, out.1, out.2])
+                            })
+                            .collect::<ChunkedArray<ListType>>()
+                            .into_series(),
+                    ))
                 },
                 [col("a"), col("b")],
                 GetOutput::from_type(DataType::Float64),
-            ).alias("Multiple Values")
-            ])
+            )
+            .alias("Multiple Values")])
             .collect()?;
 
         //dbg!(df);
@@ -1065,17 +1084,18 @@ mod test_functions {
         */
 
         let column_multiple_values: &Series = df.column("Multiple Values")?;
-        let vec_opt_lines_efd: Vec<Option<Series>> = column_multiple_values.list()?.into_iter().collect();
+        let vec_opt_lines_efd: Vec<Option<Series>> =
+            column_multiple_values.list()?.into_iter().collect();
 
         // É necessário formatar o número de casas decimais
         let series_formatted: Vec<Option<Series>> = vec_opt_lines_efd
             .iter()
-            .map(|opt_series|
+            .map(|opt_series| {
                 opt_series
-                .as_ref()
-                .map(|series| round_series(series.clone(), 1).unwrap())
-                .unwrap()
-            )
+                    .as_ref()
+                    .map(|series| round_series(series.clone(), 1).unwrap())
+                    .unwrap()
+            })
             .collect();
 
         let vec_series: Vec<Series> = series_formatted.into_iter().flatten().collect();
@@ -1096,24 +1116,20 @@ mod test_functions {
 
         let first_list = vec![2.0, 3.3, 1.0];
 
-        assert!(
-            first_list
+        assert!(first_list
             .into_iter()
             .zip(vec_lines?[0].clone())
-            .all(|(a, b)|
-                {
-                    println!("a: {a:>3} ; b: {b:>3}");
-                    a == b
-                }
-            )
-        );
+            .all(|(a, b)| {
+                println!("a: {a:>3} ; b: {b:>3}");
+                a == b
+            }));
 
         Ok(())
     }
 
     /// Your function that takes 2 argument and returns 3
     fn black_box(a: f64, b: f64) -> (f64, f64, f64) {
-        (a+b, 5.4 * a - 2.1 * b, a*b)
+        (a + b, 5.4 * a - 2.1 * b, a * b)
     }
 
     #[test]
@@ -1138,13 +1154,21 @@ mod test_functions {
     #[test]
     /// `cargo test -- --show-output test_get_option_assignments`
     fn test_get_option_assignments() -> Result<(), Box<dyn Error>> {
-
         let mut results = Vec::new();
 
         for (index, (vec_efd, vec_nfe)) in [
-            (vec![Some(1.4), Some(0.0), Some(23.1), Some(3.5), Some(5.7)], vec![Some(1.3), Some(0.2), Some(22.1), Some(4.2), Some(5.8)]),
-            (vec![Some(1.4), Some(0.0), Some(23.1),      None, Some(5.7)], vec![Some(1.3), Some(0.2), Some(22.1), Some(4.2), Some(5.8)]),
-        ].iter().enumerate() {
+            (
+                vec![Some(1.4), Some(0.0), Some(23.1), Some(3.5), Some(5.7)],
+                vec![Some(1.3), Some(0.2), Some(22.1), Some(4.2), Some(5.8)],
+            ),
+            (
+                vec![Some(1.4), Some(0.0), Some(23.1), None, Some(5.7)],
+                vec![Some(1.3), Some(0.2), Some(22.1), Some(4.2), Some(5.8)],
+            ),
+        ]
+        .iter()
+        .enumerate()
+        {
             println!("Example {}:", index + 1);
 
             println!("vec_efd: {vec_efd:?}");
@@ -1166,10 +1190,7 @@ mod test_functions {
             println!();
         }
 
-        let valid = vec![
-            vec![0, 1, 2, 3, 4],
-            vec![0, 1, 2, 4, 3],
-        ];
+        let valid = vec![vec![0, 1, 2, 3, 4], vec![0, 1, 2, 4, 3]];
 
         assert_eq!(valid, results);
 

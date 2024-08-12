@@ -3,7 +3,7 @@ name = "join_with_assignments"
 authors = ["Claudio F S Rodrigues <claudiofsrodrigues@gmail.com>"]
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.79"
+rust-version = "1.80"
 homepage = "https://github.com/claudiofsr/join_with_assignments"
 repository = "https://github.com/claudiofsr/join_with_assignments"
 description = """
@@ -38,8 +38,8 @@ pathfinding = "4.10"
 rayon = "1.10"
 regex = "1.10"
 serde = { version = "1.0", features = [ "derive" ] }
-sysinfo = "0.30"
-tabled = { version = "0.15", features = ["ansi"] }
+sysinfo = "0.31"
+tabled = { version = "0.16", features = ["ansi"] }
 toml = "0.8"
 
 [dependencies.clap]
