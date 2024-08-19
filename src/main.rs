@@ -18,6 +18,7 @@ Example of use:
     rm -v  ~/.config/join_with_assignments/default-config.toml
     join_with_assignments -1 'Info do Contribuinte EFD Contribuicoes.csv' -2 nfe_float64.csv -a '|' -b ';' -d ';' -c true -p true
 
+    cargo run -- -1 'Dados - An/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - An/nfe_float64.csv' -c true -p true -r true -s 201601 -f 201612
     cargo run -- -1 'Dados - Ar/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Ar/nfe_float64.csv' -c true -p true -r true -s 202110 -f 202309
     cargo run -- -1 'Dados - Au/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Au/nfe_float64.csv' -c true -p true -r true -s 201708 -f 202312
     cargo run -- -1 'Dados - Bo/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Bo/nfe_float64.csv' -c true -p true -r true -s 202010 -f 202012
@@ -28,6 +29,7 @@ Example of use:
     cargo run -- -1 'Dados - Pg/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Pg/nfe_float64.csv' -c true -p true -r true -s 201907 -f 202206
     cargo run -- -1 'Dados - Tc/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Tc/nfe_float64.csv' -c true -p true -r true -s 201604 -f 201812
 
+    join_with_assignments -1 'Dados - An/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - An/nfe_float64.csv' -c true -p true -r true -s 201601 -f 201612
     join_with_assignments -1 'Dados - Ar/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Ar/nfe_float64.csv' -c true -p true -r true -s 202110 -f 202309
     join_with_assignments -1 'Dados - Au/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Au/nfe_float64.csv' -c true -p true -r true -s 201708 -f 202312
     join_with_assignments -1 'Dados - Bo/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Bo/nfe_float64.csv' -c true -p true -r true -s 202010 -f 202012
