@@ -87,8 +87,8 @@ fn analisar_colunas_selecionadas(series: &Series) -> Result<Option<Series>, Pola
     let struct_chunked: &StructChunked = series.struct_()?;
 
     // Get the fields as Series
-    let ser_codigoncm: &Series = &struct_chunked.fields()[0];
-    let ser_descricao: &Series = &struct_chunked.fields()[1];
+    let ser_codigoncm: &Series = &struct_chunked.fields_as_series()[0];
+    let ser_descricao: &Series = &struct_chunked.fields_as_series()[1];
 
     // Get columns with into_iter()
     let vec_opt_str_ncm: Vec<Option<&str>> = ser_codigoncm.str()?.into_iter().collect();
