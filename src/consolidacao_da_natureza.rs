@@ -136,6 +136,27 @@ fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame) -> Result<LazyFrame, Bo
                 .cast(DataType::Boolean)
                 .alias("RecBrutaTotal"),
         )
+
+        /*
+        // Correção de CST: 63 -> 60
+        .with_column(
+            when(col("Código de Situação Tributária (CST)").eq(63))
+                .then(lit(60))
+                .otherwise(col("Código de Situação Tributária (CST)"))
+                .cast(DataType::Int64)
+                .alias("Código de Situação Tributária (CST)"),
+        )
+
+        // Correção de 'Código do Tipo de Crédito': 206 -> 106
+        .with_column(
+            when(col("Código do Tipo de Crédito").eq(206))
+                .then(lit(106))
+                .otherwise(col("Código do Tipo de Crédito"))
+                .cast(DataType::Int64)
+                .alias("Código do Tipo de Crédito"),
+        )
+        */
+
         .with_column(
             col("CNPJ dos Estabelecimentos do Contribuinte")
                 .apply(get_cnpj_base, GetOutput::from_type(DataType::String))
