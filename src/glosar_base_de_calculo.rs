@@ -183,12 +183,10 @@ fn operacoes_de_credito() -> Expr {
         .and(codigo_nat_01_a_18())
 }
 
+/// Código de Regime Tributário (CRT) igual a 1
 fn optante_do_simples_nacional() -> Expr {
-    // Código de Regime Tributário - CRT
     let regime_tributario: &str = coluna(Right, "regime_tributario"); // "CRT : NF (Todos)"
-    let optante_do_simples_nacional: Expr = col(regime_tributario).eq(lit(1));
-
-    optante_do_simples_nacional
+    col(regime_tributario).eq(lit(1))
 }
 
 fn analisar_situacao01(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>> {
@@ -267,6 +265,7 @@ fn analisar_situacao03(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     let glosar: &str = coluna(Middle, "glosar");
     let cfop: &str = coluna(Right, "cfop");
     let origem_do_item: &str = coluna(Right, "origem"); // "Registro de Origem do Item : NF Item (Todos)"
+    let regime_tributario: &str = coluna(Right, "regime_tributario"); // "CRT : NF (Todos)"
 
     // let aliq_pis: &str = coluna(Right, "aliq_pis");
     // let aliq_cof: &str = coluna(Right, "aliq_cof");
@@ -296,10 +295,10 @@ fn analisar_situacao03(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     // let aliquotas_zero: Expr = col(aliq_pis).eq(lit(0)).and(col(aliq_cof).eq(lit(0)));
 
     let filter: Expr = operacoes_de_credito()
-        .and(optante_do_simples_nacional().not())
-        .and(cst_50_a_56())
-        .and(nfe)
-        .and(cfop_de_insumos.not());
+        .and(cst_50_a_56()) // Excluir crédito Presumido da Agroindústria
+        .and(col(regime_tributario).is_null().or(optante_do_simples_nacional().not()))
+        .and(col(origem_do_item).is_null().or(nfe))
+        .and(col(cfop).is_null().or(cfop_de_insumos.not()));
     //.and(aliquotas_zero);
 
     // Adicionar coluna temporária
