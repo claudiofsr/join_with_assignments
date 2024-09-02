@@ -11,8 +11,10 @@ Example of use:
 
     clear && cargo test -- --nocapture
     clear && cargo run -- --help
-    cargo b -r && cargo install --path=.
+    cargo fmt --all -- --check
     rustfmt src/excel.rs
+    cargo doc --open
+    cargo b -r && cargo install --path=.
 
     cat ~/.config/join_with_assignments/default-config.toml
     rm -v  ~/.config/join_with_assignments/default-config.toml
