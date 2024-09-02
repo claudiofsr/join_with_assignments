@@ -1,6 +1,5 @@
-use once_cell::sync::Lazy;
 use polars::{datatypes::DataType, prelude::*};
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::LazyLock as Lazy};
 
 /// Example:
 ///

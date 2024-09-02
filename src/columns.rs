@@ -1,6 +1,5 @@
-use once_cell::sync::Lazy;
 use polars::datatypes::DataType;
-use std::collections::{HashMap, HashSet};
+use std::{collections::{HashMap, HashSet}, sync::LazyLock as Lazy};
 
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub enum Side {

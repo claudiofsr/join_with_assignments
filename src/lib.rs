@@ -50,9 +50,8 @@ pub use self::{
 };
 
 use claudiofsr_lib::{svec, RoundFloat};
-use once_cell::sync::Lazy;
+use polars::{datatypes::DataType, prelude::*};
 use regex::Regex;
-
 use std::{
     any,
     collections::{HashMap, HashSet},
@@ -62,10 +61,8 @@ use std::{
     num::ParseFloatError,
     path::PathBuf,
     process,
+    sync::LazyLock as Lazy,
 };
-
-use polars::{datatypes::DataType, prelude::*};
-
 use sysinfo::System;
 
 pub type VecTuples = Vec<(String, u64, u64)>;

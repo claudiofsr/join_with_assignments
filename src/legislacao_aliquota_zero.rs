@@ -1,9 +1,7 @@
-use once_cell::sync::Lazy;
+use polars::{prelude::*, series::Series};
 use rayon::prelude::*;
 use regex::Regex;
-use std::error::Error;
-
-use polars::{prelude::*, series::Series};
+use std::{error::Error, sync::LazyLock as Lazy};
 
 use crate::filtros::operacoes_de_entrada_ou_saida;
 
