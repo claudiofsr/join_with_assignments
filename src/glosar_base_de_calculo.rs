@@ -296,7 +296,11 @@ fn analisar_situacao03(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
 
     let filter: Expr = operacoes_de_credito()
         .and(cst_50_a_56()) // Excluir crédito Presumido da Agroindústria
-        .and(col(regime_tributario).is_null().or(optante_do_simples_nacional().not()))
+        .and(
+            col(regime_tributario)
+                .is_null()
+                .or(optante_do_simples_nacional().not()),
+        )
         .and(col(origem_do_item).is_null().or(nfe))
         .and(col(cfop).is_null().or(cfop_de_insumos.not()));
     //.and(aliquotas_zero);
