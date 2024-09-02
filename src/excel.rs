@@ -10,7 +10,7 @@ use crate::{
 };
 use polars::prelude::*;
 use regex::Regex;
-use rust_xlsxwriter::{Format, FormatAlign, Workbook, Worksheet, XlsxColor};
+use rust_xlsxwriter::{Color, Format, FormatAlign, Workbook, Worksheet};
 
 const FONT_SIZE: f64 = 10.0;
 const MAX_NUMBER_OF_ROWS: usize = 1_000_000;
@@ -303,19 +303,19 @@ fn auto_color(df: &DataFrame, worksheet: &mut Worksheet, sheet_name: &str) -> Po
     let color_saldoc: u32 = u32::from_str_radix(color, radix).unwrap();
 
     // BG Color: Saldo de Crédito Passível de Desconto ou Ressarcimento
-    let format_saldoc: Format = Format::new().set_background_color(XlsxColor::RGB(color_saldoc));
+    let format_saldoc: Format = Format::new().set_background_color(Color::RGB(color_saldoc));
 
     let color_bcsoma: u32 = u32::from_str_radix("bfbfbf", radix).unwrap();
 
     // BG Color: Base de Cálculo dos Créditos - Alíquota Básica (Soma)
-    let format_bcsoma: Format = Format::new().set_background_color(XlsxColor::RGB(color_bcsoma));
+    let format_bcsoma: Format = Format::new().set_background_color(Color::RGB(color_bcsoma));
 
     let color_debito: u32 = u32::from_str_radix("ccc0da", radix).unwrap();
-    let format_debito: Format = Format::new().set_background_color(XlsxColor::RGB(color_debito));
+    let format_debito: Format = Format::new().set_background_color(Color::RGB(color_debito));
 
     // BG Color: "Crédito vinculado à Receita Bruta Não Cumulativa"
     let format_credito_nao_cumulativo: Format = Format::new()
-        .set_background_color(XlsxColor::RGB(color_saldoc))
+        .set_background_color(Color::RGB(color_saldoc))
         .set_num_format("#,##0.00");
 
     let mut selected_rows = HashMap::new();
