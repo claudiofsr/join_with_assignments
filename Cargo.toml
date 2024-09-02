@@ -83,9 +83,9 @@ features = [
 
 [dependencies.rust_xlsxwriter]
 version = "0.74.0"
+# https://github.com/jmcnamara/rust_xlsxwriter/blob/main/CHANGELOG.md
 # git = "https://github.com/jmcnamara/rust_xlsxwriter.git"
-# Change polars version dependencies to "0.39.2":
-# path = "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/rust_xlsxwriter-0.69.0b"
+# path = "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/rust_xlsxwriter-0.74.0"
 features = [
     "chrono",
     "polars",
