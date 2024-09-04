@@ -82,7 +82,7 @@ features = [
 ]
 
 [dependencies.rust_xlsxwriter]
-version = "0.74.0"
+version = "0.75.0"
 # https://github.com/jmcnamara/rust_xlsxwriter/blob/main/CHANGELOG.md
 # git = "https://github.com/jmcnamara/rust_xlsxwriter.git"
 # path = "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/rust_xlsxwriter-0.74.0"
