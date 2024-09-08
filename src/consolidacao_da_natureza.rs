@@ -73,6 +73,8 @@ fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame) -> Result<LazyFrame, Bo
     //let pa_ano: i32 = 2015;
     //let pa_trimestres = Series::from_iter([1, 2, 3, 4]);
 
+    let cst: &str = coluna(Left, "cst"); // "Código de Situação Tributária (CST)"
+    let reg: &str = coluna(Left, "registro");
     let top: &str = coluna(Left, "tipo_operacao");
 
     // Tipo de Operação: 1 a 7, tal que:
@@ -80,6 +82,12 @@ fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame) -> Result<LazyFrame, Bo
     // 5: Desconto da Contribuição Apurada no Próprio Período;
     // 6: Desconto Efetuado em Período Posterior; 7: Detalhamento.
     let operacoes_desejadas: Expr = col(top).is_not_null().and(col(top).neq(lit(7)));
+
+    //let series = Series::new(reg, ["C170"]);
+    //let registros_selecionados = col(reg).is_in(lit(series));
+
+    //let pattern: Expr = lit(r"(i?)C170|C100"); // regex
+    //let registros_selecionados = col(reg).str().contains(pattern, false);
 
     // Selecionar colunas nesta ordem
     let selected: [Expr; 19] = [
@@ -90,8 +98,8 @@ fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame) -> Result<LazyFrame, Bo
         col("Tipo de Operação"),
         col("Código do Tipo de Crédito"),
         col("Tipo de Crédito"),
-        col("Código de Situação Tributária (CST)"),
-        col("Registro"),
+        col(cst),
+        col(reg),
         col("Código Fiscal de Operações e Prestações (CFOP)"),
         col("Código NCM"),
         col("Alíquota de PIS/PASEP (em percentual)"),
@@ -137,13 +145,21 @@ fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame) -> Result<LazyFrame, Bo
                 .alias("RecBrutaTotal"),
         )
         /*
+        // Correção: CST 9 && Registro C170 --> CST 49
+        .with_column(
+            when(col(cst).eq(9).and(registros_selecionados))
+                .then(lit(49))
+                .otherwise(col(cst))
+                .cast(DataType::Int64)
+                .alias(cst),
+        )
         // Correção de CST: 63 -> 60
         .with_column(
-            when(col("Código de Situação Tributária (CST)").eq(63))
+            when(col(cst).eq(63))
                 .then(lit(60))
-                .otherwise(col("Código de Situação Tributária (CST)"))
+                .otherwise(col(cst))
                 .cast(DataType::Int64)
-                .alias("Código de Situação Tributária (CST)"),
+                .alias(cst),
         )
         // Correção de 'Código do Tipo de Crédito': 206 -> 106
         .with_column(
