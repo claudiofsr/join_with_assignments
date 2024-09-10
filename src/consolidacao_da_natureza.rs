@@ -76,6 +76,7 @@ fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame) -> Result<LazyFrame, Bo
     let cst: &str = coluna(Left, "cst"); // "Código de Situação Tributária (CST)"
     let reg: &str = coluna(Left, "registro");
     let top: &str = coluna(Left, "tipo_operacao");
+    let val: &str = coluna(Left, "valor_item");
 
     // Tipo de Operação: 1 a 7, tal que:
     // 1: Entrada; 2: Saída; 3: Ajuste de Acréscimo; 4: Ajuste de Redução;
@@ -83,9 +84,8 @@ fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame) -> Result<LazyFrame, Bo
     // 6: Desconto Efetuado em Período Posterior; 7: Detalhamento.
     let operacoes_desejadas: Expr = col(top).is_not_null().and(col(top).neq(lit(7)));
 
-    //let series = Series::new(reg, ["C170"]);
-    //let registros_selecionados = col(reg).is_in(lit(series));
-
+    let series = Series::new(reg, ["C170"]);
+    let registros_selecionados = col(reg).is_in(lit(series));
     //let pattern: Expr = lit(r"(i?)C170|C100"); // regex
     //let registros_selecionados = col(reg).str().contains(pattern, false);
 
@@ -144,15 +144,16 @@ fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame) -> Result<LazyFrame, Bo
                 .cast(DataType::Boolean)
                 .alias("RecBrutaTotal"),
         )
-        /*
-        // Correção: CST 9 && Registro C170 --> CST 49
+        //*
+        // Correção: CST 9 && Registro C170 --> "valor_item" = 0.0
         .with_column(
             when(col(cst).eq(9).and(registros_selecionados))
-                .then(lit(49))
-                .otherwise(col(cst))
-                .cast(DataType::Int64)
-                .alias(cst),
+                .then(lit(0.0))
+                .otherwise(col(val))
+                .cast(DataType::Float64)
+                .alias(val),
         )
+        /*
         // Correção de CST: 63 -> 60
         .with_column(
             when(col(cst).eq(63))
