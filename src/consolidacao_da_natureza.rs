@@ -29,7 +29,7 @@ pub fn obter_consolidacao_nat(
 
     let lazyframe: LazyFrame = dataframe.clone().lazy();
 
-    let lazyframe: LazyFrame = selecionar_colunas_apos_filtros(lazyframe)?;
+    let lazyframe: LazyFrame = selecionar_colunas_apos_filtros(lazyframe, auditar)?;
 
     let lazyframe: LazyFrame = groupby_and_agg_values(lazyframe)?;
 
@@ -69,7 +69,7 @@ pub fn obter_consolidacao_nat(
 /// Reter apenas as colunas de interesse.
 ///
 /// Em seguida, aplicar filtros.
-fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>> {
+fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame, auditar: bool) -> Result<LazyFrame, Box<dyn Error>> {
     //let pa_ano: i32 = 2015;
     //let pa_trimestres = Series::from_iter([1, 2, 3, 4]);
 
@@ -147,7 +147,7 @@ fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame) -> Result<LazyFrame, Bo
         //*
         // Correção: CST 9 && Registro C170 --> "valor_item" = 0.0
         .with_column(
-            when(col(cst).eq(9).and(registros_selecionados))
+            when(col(cst).eq(9).and(registros_selecionados).and(auditar))
                 .then(lit(0.0))
                 .otherwise(col(val))
                 .cast(DataType::Float64)
@@ -156,7 +156,7 @@ fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame) -> Result<LazyFrame, Bo
         /*
         // Correção de CST: 63 -> 60
         .with_column(
-            when(col(cst).eq(63))
+            when(col(cst).eq(63).and(auditar))
                 .then(lit(60))
                 .otherwise(col(cst))
                 .cast(DataType::Int64)
@@ -164,7 +164,7 @@ fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame) -> Result<LazyFrame, Bo
         )
         // Correção de 'Código do Tipo de Crédito': 206 -> 106
         .with_column(
-            when(col("Código do Tipo de Crédito").eq(206))
+            when(col("Código do Tipo de Crédito").eq(206).and(auditar))
                 .then(lit(106))
                 .otherwise(col("Código do Tipo de Crédito"))
                 .cast(DataType::Int64)
