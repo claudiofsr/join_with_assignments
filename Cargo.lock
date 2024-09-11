@@ -444,9 +444,9 @@ checksum = "1462739cb27611015575c0c11df5df7601141071f07518d56fcc1be504cbec97"
 
 [[package]]
 name = "claudiofsr_lib"
-version = "0.12.2"
+version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "19d2347db3ef01f6164c8192ff6d3513434c4874a730056f651420bb5b36130c"
+checksum = "f05520a3953ec9fdcdaf4a2c7547f262b99fd0620f0294996fa52d9e543c2d90"
 dependencies = [
  "blake3",
  "chrono",
@@ -2404,9 +2404,9 @@ dependencies = [
 
 [[package]]
 name = "unicode-ident"
-version = "1.0.12"
+version = "1.0.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3354b9ac3fae1ff6755cb6db53683adb661634f67557942dea4facebec0fee4b"
+checksum = "e91b56cd4cadaeb79bbf1a5645f6b4f8dc5bde8834ad5894a8db35fda9efa1fe"
 
 [[package]]
 name = "unicode-reverse"
