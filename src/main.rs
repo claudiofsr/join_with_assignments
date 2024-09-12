@@ -43,11 +43,11 @@ Example of use:
     join_with_assignments -1 'Dados - Tc/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Tc/nfe_float64.csv' -c true -p true -r true -s 201604 -f 201812
 
     // Verificação dos arquivos:
-    sha512sum df*.csv "Dados - An/"df*.csv
-    b3sum df*.csv "Dados - An/"df*.csv
+    sha512sum df*.csv "Dados - Nd/"df*.csv
+    b3sum df*.csv "Dados - Nd/"df*.csv
 
     file1="df_itens_de_docs_fiscais_result.csv"
-    file2="Dados - Da/df_itens_de_docs_fiscais_result.csv"
+    file2="Dados - Nd/df_itens_de_docs_fiscais_result.csv"
     diff $file1 $file2
     line=1
     diff <(head -n $line $file1 | tail -n 1) <(head -n $line $file2 | tail -n 1)

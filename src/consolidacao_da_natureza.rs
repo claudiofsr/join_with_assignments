@@ -84,7 +84,7 @@ fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame, auditar: bool) -> Resul
     // 6: Desconto Efetuado em Período Posterior; 7: Detalhamento.
     let operacoes_desejadas: Expr = col(top).is_not_null().and(col(top).neq(lit(7)));
 
-    let series = Series::new(reg, ["C170"]);
+    let series = Series::new(reg.into(), ["C170"]);
     let registros_selecionados = col(reg).is_in(lit(series));
     //let pattern: Expr = lit(r"(i?)C170|C100"); // regex
     //let registros_selecionados = col(reg).str().contains(pattern, false);
@@ -233,7 +233,7 @@ fn groupby_and_agg_values(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Err
     let condition_e = col("RecBrutaCumulativa");
     let condition_f = col("RecBrutaTotal").or(operacoes_de_ajustes_ou_descontos());
 
-    let series = Series::new(reg, ["M100", "1100"]);
+    let series = Series::new(reg.into(), ["M100", "1100"]);
     //let pattern: Expr = lit(r"(i?)M100|1100"); // regex
 
     let registros_selecionados = col(reg).is_in(lit(series));
@@ -923,7 +923,7 @@ fn adicionar_saldo_de_cred_passivel_de_ressarcimento_pis(
     //let aliq_pis: &str = coluna(Left, "aliq_pis");
     //let aliq_cof: &str = coluna(Left, "aliq_cof");
 
-    let series = Series::new(natureza, [31, 41, 51, 61, 91, 201, 211, 221]);
+    let series = Series::new(natureza.into(), [31, 41, 51, 61, 91, 201, 211, 221]);
     let nat_pis: Expr = col(natureza).is_in(lit(series));
 
     let saldo_de_pis: LazyFrame = lazyframe
@@ -973,7 +973,7 @@ fn adicionar_saldo_de_cred_passivel_de_ressarcimento_cofins(
     //let aliq_pis: &str = coluna(Left, "aliq_pis");
     //let aliq_cof: &str = coluna(Left, "aliq_cof");
 
-    let series = Series::new(natureza, [35, 45, 55, 65, 95, 205, 215, 225]);
+    let series = Series::new(natureza.into(), [35, 45, 55, 65, 95, 205, 215, 225]);
     let nat_cofins: Expr = col(natureza).is_in(lit(series));
 
     let saldo_de_pis: LazyFrame = lazyframe
@@ -1274,7 +1274,7 @@ mod tests {
         let natureza: &Series = dataframe02.column("Registro")?;
 
         let series: Series = Series::new(
-            "Registro",
+            "Registro".into(),
             &[
                 "CTe",
                 "nº par",
@@ -1489,7 +1489,7 @@ mod tests {
         // Get columns from dataframe
         let anular: &Series = df04.column("Anular")?;
 
-        let series = Series::new("Anular", [Some(15), Some(25), Some(100)]);
+        let series = Series::new("Anular".into(), [Some(15), Some(25), Some(100)]);
 
         assert_eq!(anular, &series);
 

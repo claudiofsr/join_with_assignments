@@ -455,10 +455,10 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
     let cnpj_particip: &str = coluna(Left, "cnpj_particip"); // "CNPJ do Participante",
     let num_doc: &str = coluna(Left, "num_doc"); // "Nº do Documento Fiscal",
 
-    let series: Series = Series::new("c", ["12.345.678/0009-01"]);
+    let series: Series = Series::new("c".into(), ["12.345.678/0009-01"]);
     let cnpj: Expr = col(cnpj_particip).is_in(lit(series));
 
-    let series: Series = Series::new("n", [654321]);
+    let series: Series = Series::new("n".into(), [654321]);
     let num_doc: Expr = col(num_doc).is_in(lit(series));
 
     let situacao_06: Expr = operacoes_de_credito().and(cnpj).and(num_doc);

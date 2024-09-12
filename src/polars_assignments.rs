@@ -238,7 +238,7 @@ fn join_lazyframes(
                         )
                         .collect();
 
-                    let new_series = Series::new("New", vec_series);
+                    let new_series = Series::new("New".into(), vec_series);
 
                     Ok(Some(new_series))
                 },
@@ -508,11 +508,11 @@ mod test_assignments {
         println!("dataframe02: {dataframe_02}\n");
 
         let col_a: Series = Series::new(
-            "concat ignore_nulls_true",
+            "concat ignore_nulls_true".into(),
             &["Food*Trick*aa", "Or*bb", "April*Treat*cc", ""],
         );
         let col_b: Series = Series::new(
-            "concat ignore_nulls_false",
+            "concat ignore_nulls_false".into(),
             &["Food*Trick**aa", "*Or**bb", "April*Treat**cc", "***"],
         );
 
@@ -613,7 +613,7 @@ mod test_assignments {
         println!("dataframe03: {dataframe03}\n");
 
         let series: Series = Series::new(
-            glosar,
+            glosar.into(),
             &[
                 None,
                 Some("Situação 01: 2 is an even number"),
@@ -664,8 +664,8 @@ mod test_assignments {
 
         println!("dataframe02: {dataframe02}\n");
 
-        let series_a: Series = Series::new("float64 A", &[23.65, 0.32, 10.00, 89.02, -3.42, 52.08]);
-        let series_b: Series = Series::new("float64 B", &[10.00, 0.4, 10.01, 89.01, -3.43, 52.1]);
+        let series_a: Series = Series::new("float64 A".into(), &[23.65, 0.32, 10.00, 89.02, -3.42, 52.08]);
+        let series_b: Series = Series::new("float64 B".into(), &[10.00, 0.4, 10.01, 89.01, -3.43, 52.1]);
 
         assert_eq!(dataframe02.column("float64 A")?, &series_a);
         assert_eq!(dataframe02.column("float64 B")?, &series_b);
@@ -750,7 +750,7 @@ mod test_assignments {
         ]);
 
         let headers = get_csv_headers(file_path, delimiter as u8)?;
-        let mut schema: Schema = Schema::new();
+        let mut schema: Schema = Schema::default();
 
         // Colunas adicionadas a Schema de acordo
         // com a ordem das colunas no arquivo CSV.
@@ -793,7 +793,7 @@ mod test_assignments {
         // Print column names and their respective types
         // Iterates over the `(&name, &dtype)` pairs in this schema
         lazyframe_b
-            .schema()?
+            .collect_schema()?
             .iter()
             .enumerate()
             .for_each(|(index, (column_name, data_type))| {

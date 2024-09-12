@@ -97,8 +97,8 @@ fn add_column_from_df_to_another(
     let joined: DataFrame = df_result
         .clone()
         .rename(
-            valor_bc,          // original_name
-            valor_bc_auditado, // new_name
+            valor_bc,                 // original_name
+            valor_bc_auditado.into(), // new_name
         )?
         .with_column(
             // Select a column and copy it to another df
@@ -268,7 +268,7 @@ fn auto_fit(df: &DataFrame, worksheet: &mut Worksheet) -> PolarsResult<()> {
             let mut text_width = text.chars().count(); // chars number
 
             // Aplicar ajustes
-            if [natureza, tipo_credito].contains(&col_name) {
+            if [natureza, tipo_credito].contains(&col_name.as_str()) {
                 text_width = text_width * 82 / 100
             }
 

@@ -49,7 +49,7 @@ pub use self::{
     xlsx_writer::PolarsXlsxWriter,
 };
 
-use claudiofsr_lib::{svec, RoundFloat};
+use claudiofsr_lib::RoundFloat;
 use polars::{datatypes::DataType, prelude::*};
 use regex::Regex;
 use std::{
@@ -85,7 +85,11 @@ impl DataFrameExtension for DataFrame {
         // Vec is like an array, searching for the correct String is an O(n) operation.
         // HashMap/HashSet is a hash table, searching for the String is an O(1) operation.
         // https://gist.github.com/daboross/976978d8200caf86e02acb6805961195#file-lib-rs
-        let df_columns: HashSet<&str> = self.get_column_names().into_iter().collect();
+        let df_columns: HashSet<&str> = self
+            .get_column_names()
+            .into_iter()
+            .map(|s| s.as_str())
+            .collect();
 
         if let Some(msg) = opt_msg {
             println!("{msg}")
@@ -197,7 +201,7 @@ pub fn get_option_assignments(series_efd: Series, series_nfe: Series) -> Option<
             if !vec_float64_efd.is_empty() && !vec_float64_nfe.is_empty() {
                 let assignments: Vec<u64> =
                     munkres_assignments(&vec_float64_efd, &vec_float64_nfe, false);
-                Some(Series::new("new", assignments))
+                Some(Series::new("new".into(), assignments))
             } else {
                 None
             }
@@ -391,8 +395,9 @@ pub fn get_lazyframe_from_csv(
 
     // Print column names and their respective types
     // Iterates over the `(&name, &dtype)` pairs in this schema
+    // Schema: a map from column names to data types
     lazyframe
-        .schema()?
+        .collect_schema()?
         .iter()
         .enumerate()
         .for_each(|(index, (column_name, data_type))| {
@@ -494,24 +499,27 @@ fn read_csv_lazy(
     side: Side,
 ) -> PolarsResult<LazyFrame> {
     // Set values that will be interpreted as missing/null.
-    let null_values: Vec<String> = svec![
+    let null_values: Vec<PlSmallStr> = vec![
         //"", // foo;"";bar --> foo;;bar
         " ",
         "<N/D>",
         "*DIVERSOS*",
-    ];
+    ]
+    .into_iter()
+    .map(|s| s.into())
+    .collect();
 
     match (file_path, delimiter) {
         (Some(path), Some(separator)) => {
-            let mut schema: Schema = Schema::new();
+            // Schema: a map from column names to data types
+            let mut schema: Schema = Schema::default();
 
             // HashMap<name, dtype> used to make Schema
             let cols_dtype: HashMap<&str, DataType> = Column::get_cols_dtype(side);
 
             // headers, nomes das colunas, primeira linha do arquivo CSV.
             if let Ok(headers) = get_csv_headers(&path, separator as u8) {
-                // Colunas adicionadas a Schema de acordo
-                // com a ordem das colunas no arquivo CSV.
+                // Colunas adicionadas a Schema de acordo com a ordem das colunas no arquivo CSV.
                 headers
                     .into_iter()
                     .for_each(|name| match cols_dtype.get(name) {
@@ -598,7 +606,7 @@ fn format_dataframe(df: &DataFrame) -> PolarsResult<DataFrame> {
         .collect()?;
 
     // Verificar a existência da coluna "Indicador de Origem" antes aplicar alterações.
-    let col_names: Vec<&str> = df_formated.get_column_names();
+    let col_names: Vec<&PlSmallStr> = df_formated.get_column_names();
 
     if find_name(&col_names, "Indicador de Origem") {
         let df = df_formated
@@ -618,7 +626,7 @@ fn format_dataframe(df: &DataFrame) -> PolarsResult<DataFrame> {
 /// Searching a &str into Vec<&str>
 ///
 /// <https://stackoverflow.com/questions/57633089/searching-a-string-into-vecstring-in-rust>
-pub fn find_name(names: &[&str], name: &str) -> bool {
+pub fn find_name(names: &[&PlSmallStr], name: &str) -> bool {
     names.iter().any(|&x| x == name)
 }
 
@@ -979,7 +987,7 @@ mod test_functions {
 
         assert_eq!(valid, result);
 
-        let series: Series = Series::new("CNPJ do Remetente", &option_strs);
+        let series: Series = Series::new("CNPJ do Remetente".into(), &option_strs);
 
         println!("series: {series:?}\n");
 
@@ -987,7 +995,7 @@ mod test_functions {
 
         println!("s: {s:?}\n");
 
-        assert_eq!(Some(Series::new("", &valid)), s);
+        assert_eq!(Some(Series::new("".into(), &valid)), s);
 
         Ok(())
     }
@@ -1052,7 +1060,7 @@ mod test_functions {
                             .zip(columns[1].f64()?.into_no_null_iter())
                             .map(|(a, b)| {
                                 let out = black_box(a, b);
-                                Series::new("", [out.0, out.1, out.2])
+                                Series::new("".into(), [out.0, out.1, out.2])
                             })
                             .collect::<ChunkedArray<ListType>>()
                             .into_series(),
@@ -1134,7 +1142,7 @@ mod test_functions {
     fn collect_values_into_vec() -> Result<(), Box<dyn Error>> {
         // https://stackoverflow.com/questions/71376935/how-to-get-a-vec-from-polars-series-or-chunkedarray
 
-        let series = Series::new("a", 0..10i32);
+        let series = Series::new("a".into(), 0..10i32);
         println!("series: {series}");
 
         let vec_opt_i32: Vec<Option<i32>> = series.i32()?.into_iter().collect();
@@ -1169,11 +1177,11 @@ mod test_functions {
             println!("Example {}:", index + 1);
 
             println!("vec_efd: {vec_efd:?}");
-            let series_efd = Series::new("efd", vec_efd);
+            let series_efd = Series::new("efd".into(), vec_efd);
             println!("series_efd: {series_efd}");
 
             println!("vec_nfe: {vec_nfe:?}");
-            let series_nfe = Series::new("efd", vec_nfe);
+            let series_nfe = Series::new("efd".into(), vec_nfe);
             println!("series_nfe: {series_nfe}");
 
             // fn get_option_assignments(series_efd: Series, series_nfe: Series) -> Option<Series>

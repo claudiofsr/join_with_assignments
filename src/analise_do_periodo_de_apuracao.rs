@@ -106,7 +106,7 @@ fn sub_month(
         })
         .collect();
 
-    Ok(Some(Series::new("a", date)))
+    Ok(Some(Series::new("a".into(), date)))
 }
 
 pub fn adicionar_meses(
@@ -152,7 +152,7 @@ fn add_month(
         })
         .collect();
 
-    Ok(Some(Series::new("a", date)))
+    Ok(Some(Series::new("a".into(), date)))
 }
 
 fn get_year_and_month(naive_date: NaiveDate, dt: Option<u32>) -> (i32, u32) {

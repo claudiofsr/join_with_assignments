@@ -230,7 +230,7 @@ impl PolarsXlsxWriter {
 
             // Store the column names for use as table headers.
             if options.table.has_header_row() {
-                worksheet.write(row_offset, col_num, column.name())?;
+                worksheet.write(row_offset, col_num, column.name().to_string())?;
             }
 
             //println!("column: {column}");
