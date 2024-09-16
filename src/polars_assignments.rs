@@ -664,8 +664,12 @@ mod test_assignments {
 
         println!("dataframe02: {dataframe02}\n");
 
-        let series_a: Series = Series::new("float64 A".into(), &[23.65, 0.32, 10.00, 89.02, -3.42, 52.08]);
-        let series_b: Series = Series::new("float64 B".into(), &[10.00, 0.4, 10.01, 89.01, -3.43, 52.1]);
+        let series_a: Series = Series::new(
+            "float64 A".into(),
+            &[23.65, 0.32, 10.00, 89.02, -3.42, 52.08],
+        );
+        let series_b: Series =
+            Series::new("float64 B".into(), &[10.00, 0.4, 10.01, 89.01, -3.43, 52.1]);
 
         assert_eq!(dataframe02.column("float64 A")?, &series_a);
         assert_eq!(dataframe02.column("float64 B")?, &series_b);
@@ -792,16 +796,14 @@ mod test_assignments {
 
         // Print column names and their respective types
         // Iterates over the `(&name, &dtype)` pairs in this schema
-        lazyframe_b
-            .collect_schema()?
-            .iter()
-            .enumerate()
-            .for_each(|(index, (column_name, data_type))| {
+        lazyframe_b.collect_schema()?.iter().enumerate().for_each(
+            |(index, (column_name, data_type))| {
                 println!(
                     "column {:02}: (\"{column_name}\", DataType::{data_type}),",
                     index + 1
                 );
-            });
+            },
+        );
 
         println!();
 

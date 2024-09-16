@@ -69,14 +69,17 @@ pub fn obter_consolidacao_nat(
 /// Reter apenas as colunas de interesse.
 ///
 /// Em seguida, aplicar filtros.
-fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame, auditar: bool) -> Result<LazyFrame, Box<dyn Error>> {
+fn selecionar_colunas_apos_filtros(
+    lazyframe: LazyFrame,
+    auditar: bool,
+) -> Result<LazyFrame, Box<dyn Error>> {
     //let pa_ano: i32 = 2015;
     //let pa_trimestres = Series::from_iter([1, 2, 3, 4]);
 
     let cst: &str = coluna(Left, "cst"); // "Código de Situação Tributária (CST)"
-    let reg: &str = coluna(Left, "registro");      // "Registro"
+    let reg: &str = coluna(Left, "registro"); // "Registro"
     let top: &str = coluna(Left, "tipo_operacao"); // "Tipo de Operação"
-    let val: &str = coluna(Left, "valor_item");    // "Valor Total do Item"
+    let val: &str = coluna(Left, "valor_item"); // "Valor Total do Item"
 
     // Tipo de Operação: 1 a 7, tal que:
     // 1: Entrada; 2: Saída; 3: Ajuste de Acréscimo; 4: Ajuste de Redução;
