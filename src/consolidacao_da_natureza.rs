@@ -74,9 +74,9 @@ fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame, auditar: bool) -> Resul
     //let pa_trimestres = Series::from_iter([1, 2, 3, 4]);
 
     let cst: &str = coluna(Left, "cst"); // "Código de Situação Tributária (CST)"
-    let reg: &str = coluna(Left, "registro");
-    let top: &str = coluna(Left, "tipo_operacao");
-    let val: &str = coluna(Left, "valor_item");
+    let reg: &str = coluna(Left, "registro");      // "Registro"
+    let top: &str = coluna(Left, "tipo_operacao"); // "Tipo de Operação"
+    let val: &str = coluna(Left, "valor_item");    // "Valor Total do Item"
 
     // Tipo de Operação: 1 a 7, tal que:
     // 1: Entrada; 2: Saída; 3: Ajuste de Acréscimo; 4: Ajuste de Redução;
@@ -95,7 +95,7 @@ fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame, auditar: bool) -> Resul
         col("Ano do Período de Apuração"),
         col("Trimestre do Período de Apuração"),
         col("Mês do Período de Apuração"),
-        col("Tipo de Operação"),
+        col(top),
         col("Código do Tipo de Crédito"),
         col("Tipo de Crédito"),
         col(cst),
@@ -106,7 +106,7 @@ fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame, auditar: bool) -> Resul
         col("Alíquota de COFINS (em percentual)"),
         col("Natureza da Base de Cálculo dos Créditos"),
         col("Valor da Base de Cálculo das Contribuições"),
-        col("Valor Total do Item"),
+        col(val),
         col("RecBrutaNCumulativa"),
         col("RecBrutaCumulativa"),
         col("RecBrutaTotal"),
