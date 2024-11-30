@@ -106,6 +106,16 @@ pub struct Arguments {
     #[arg(short('f'), long, required = false)]
     pub date_final: Option<u32>,
 
+    /// Apply filter: Retain only credit entries (50 <= CST <= 66)
+    /// 
+    /// Reter apenas operações de crédito
+    /// 
+    /// Ou seja, imprimir nos arquivos finais itens de operações com alguna
+    /// 
+    /// Natureza da Base de Cálculo.
+    #[arg(short, long, required = false)]
+    pub operacoes_de_creditos: Option<bool>,
+
     /// Print CSV files
     #[arg(short('c'), long, required = false)]
     pub print_csv: Option<bool>,
@@ -135,6 +145,7 @@ impl default::Default for Arguments {
             delimiter_output: Some(';'),
             date_start: None,
             date_final: None,
+            operacoes_de_creditos: Some(false),
             print_csv: Some(false),
             print_parquet: Some(false),
             remove_null_columns: Some(true),
@@ -218,6 +229,7 @@ mod tests {
             delimiter_output: Some(';'),
             date_start: None,
             date_final: None,
+            operacoes_de_creditos: Some(false),
             print_csv: Some(false),
             print_parquet: Some(false),
             remove_null_columns: Some(true),
@@ -233,6 +245,7 @@ mod tests {
             delimiter_input_1: Some('|'),
             delimiter_input_2: Some(';'),
             delimiter_output: Some(';'),
+            operacoes_de_creditos: Some(false),
             print_csv: Some(false),
             print_parquet: Some(false),
             remove_null_columns: Some(true),

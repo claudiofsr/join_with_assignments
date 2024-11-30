@@ -26,6 +26,7 @@ Example of use:
     cargo run -- -1 'Dados - Bo/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Bo/nfe_float64.csv' -c true -p true -r true -s 202010 -f 202012
     cargo run -- -1 'Dados - Br/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Br/nfe_float64.csv' -c true -p true -r true -s 202109 -f 202303
     cargo run -- -1 'Dados - Da/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Da/nfe_float64.csv' -c true -p true -r true -s 202201 -f 202206
+    cargo run -- -1 'Dados - Fa/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Fa/nfe_float64.csv' -c true -p true -r true -s 202104 -f 202112 -o true
     cargo run -- -1 'Dados - Le/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Le/nfe_float64.csv' -c true -p true -r true -s 202204 -f 202306
     cargo run -- -1 'Dados - Nd/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Nd/nfe_float64.csv' -c true -p true -r true -s 202107 -f 202112
     cargo run -- -1 'Dados - Pg/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Pg/nfe_float64.csv' -c true -p true -r true -s 201907 -f 202206
@@ -37,6 +38,7 @@ Example of use:
     join_with_assignments -1 'Dados - Bo/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Bo/nfe_float64.csv' -c true -p true -r true -s 202010 -f 202012
     join_with_assignments -1 'Dados - Br/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Br/nfe_float64.csv' -c true -p true -r true -s 202109 -f 202303
     join_with_assignments -1 'Dados - Da/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Da/nfe_float64.csv' -c true -p true -r true -s 202201 -f 202206
+    join_with_assignments -1 'Dados - Fa/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Fa/nfe_float64.csv' -c true -p true -r true -s 202104 -f 202112 -o true
     join_with_assignments -1 'Dados - Le/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Le/nfe_float64.csv' -c true -p true -r true -s 202204 -f 202306
     join_with_assignments -1 'Dados - Nd/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Nd/nfe_float64.csv' -c true -p true -r true -s 202107 -f 202112
     join_with_assignments -1 'Dados - Pg/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Pg/nfe_float64.csv' -c true -p true -r true -s 201907 -f 202206
@@ -75,6 +77,14 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let df_consolidacao_natureza_da_bcalc_result: DataFrame =
         obter_consolidacao_nat(&df_itens_de_docs_fiscais_result, true)?;
+
+    let (df_itens_de_docs_fiscais, df_itens_de_docs_fiscais_result) = if args.operacoes_de_creditos == Some(true) {
+        let df_itens_de_docs_fiscais = apply_filter(df_itens_de_docs_fiscais)?;
+        let df_itens_de_docs_fiscais_result = apply_filter(df_itens_de_docs_fiscais_result)?;
+        (df_itens_de_docs_fiscais, df_itens_de_docs_fiscais_result)
+    } else {
+        (df_itens_de_docs_fiscais, df_itens_de_docs_fiscais_result)
+    };
 
     let dataframes: [DataFrame; 4] = [
         df_itens_de_docs_fiscais,

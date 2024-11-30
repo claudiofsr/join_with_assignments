@@ -1,3 +1,5 @@
+use std::error::Error;
+
 use crate::{
     coluna,
     Side::{
@@ -382,4 +384,19 @@ A Receita Bruta Cumulativa é identificada pelas alíquotas de pis = 0,65% e cof
 */
 pub fn receita_bruta_cumulativa() -> Expr {
     saida_de_receita_bruta().and(aliquota_de_receita_cumulativa())
+}
+
+// Retain only credit entries (50 <= CST <= 66)
+pub fn apply_filter(df: DataFrame) -> Result<DataFrame, Box<dyn Error>> {
+    let df_filtered = df
+        .lazy()
+        .filter(
+            not(
+                operacoes_de_entrada_ou_saida()
+                .and(entrada_de_credito().not())
+            )
+        )
+        .collect()?;
+
+    Ok(df_filtered)
 }

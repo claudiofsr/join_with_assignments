@@ -39,7 +39,7 @@ rayon = "1.10"
 regex = "1.10"
 serde = { version = "1.0", features = [ "derive" ] }
 sysinfo = "0.32"
-tabled = { version = "0.16", features = ["ansi"] }
+tabled = { version = "0.17", features = ["ansi"] }
 toml = "0.8"
 
 [dependencies.clap]
