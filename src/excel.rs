@@ -8,6 +8,7 @@ use crate::{
         //Right,
     },
 };
+
 use polars::prelude::*;
 use regex::Regex;
 use rust_xlsxwriter::{Color, Format, FormatAlign, Workbook, Worksheet};
@@ -63,15 +64,29 @@ pub fn write_xlsx(args: &Arguments, dfs: &[DataFrame]) -> PolarsResult<()> {
         ),
     ] {
         let number_of_rows = df.height();
-        let number_of_sheet = number_of_rows.div_ceil(MAX_NUMBER_OF_ROWS);
+        let number_of_sheet = number_of_rows.div_ceil(MAX_NUMBER_OF_ROWS); 
 
-        for index in 0..number_of_sheet {
-            let offset = (MAX_NUMBER_OF_ROWS * index) as i64;
-            let data = df.slice_par(offset, MAX_NUMBER_OF_ROWS);
+        //println!("number_of_rows: {number_of_rows}");
+        //println!("number_of_sheet: {number_of_sheet}\n");
+
+        for count in 1 ..= number_of_sheet {
+            let offset = MAX_NUMBER_OF_ROWS * (count - 1);
+
+            let length = if count >= number_of_sheet {
+                number_of_rows % MAX_NUMBER_OF_ROWS
+            } else {
+                MAX_NUMBER_OF_ROWS
+            };
+
+            //println!("count: {count}");
+            //println!("offset: {offset}");
+            //println!("length: {length}\n");
+
+            let data = df.slice_par(offset as i64, length);
 
             let mut new_name = sheet_name.to_string();
-            if index >= 1 {
-                new_name = format!("{} {}", sheet_name, index + 1);
+            if count >= 2 {
+                new_name = format!("{} {}", sheet_name, count);
             }
 
             let worksheet = make_worksheet(&data, &new_name)?;
@@ -385,26 +400,26 @@ fn format_to_excel(data_frame: &DataFrame) -> PolarsResult<DataFrame> {
 }
 
 /// Format DataType
-fn format_data(series: Series) -> PolarsResult<Option<Series>> {
-    match series.dtype() {
-        DataType::Int64 => Ok(Some(series.cast(&DataType::Int32)?)),
-        DataType::UInt64 => Ok(Some(series.cast(&DataType::UInt32)?)),
-        DataType::String => truncate_series(series), // to_n_chars(series)
-        _ => Ok(Some(series)),
+fn format_data(col: Column) -> PolarsResult<Option<Column>> {
+    match col.dtype() {
+        DataType::Int64 => Ok(Some(col.cast(&DataType::Int32)?)),
+        DataType::UInt64 => Ok(Some(col.cast(&DataType::UInt32)?)),
+        DataType::String => truncate_col(col), // to_n_chars(col)
+        _ => Ok(Some(col)),
     }
 }
 
-fn truncate_series(series: Series) -> PolarsResult<Option<Series>> {
-    let new_series: Series = series
+fn truncate_col(col: Column) -> PolarsResult<Option<Column>> {
+    let new_col: Column = col
         .str()?
         .into_iter()
         .map(
             |option_str: Option<&str>| option_str.map(|s| truncate_string(s, 32767)), // 2 ^ 15 - 1
         )
         .collect::<StringChunked>()
-        .into_series();
+        .into_column();
 
-    Ok(Some(new_series))
+    Ok(Some(new_col))
 }
 
 // https://stackoverflow.com/questions/38461429/how-can-i-truncate-a-string-to-have-at-most-n-characters

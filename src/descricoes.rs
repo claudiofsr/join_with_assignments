@@ -185,16 +185,16 @@ static NATUREZA_DA_BASE_DE_CALCULO_DOS_CREDITOS: Lazy<HashMap<i64, &'static str>
         ])
     });
 
-pub fn descricao_da_origem(series: Series) -> Result<Option<Series>, PolarsError> {
-    let result_option_series = match series.dtype() {
-        DataType::Int64 => indicador_da_origem(series),
+pub fn descricao_da_origem(col: Column) -> Result<Option<Column>, PolarsError> {
+    let result_option_series = match col.dtype() {
+        DataType::Int64 => indicador_da_origem(col),
         _ => {
             eprintln!("fn descricao_da_origem()");
-            eprintln!("Series: {series:?}");
+            eprintln!("Column: {col:?}");
             Err(PolarsError::InvalidOperation(
                 format!(
                     "Not supported for Series with DataType {:?}",
-                    series.dtype()
+                    col.dtype()
                 )
                 .into(),
             ))
@@ -204,8 +204,8 @@ pub fn descricao_da_origem(series: Series) -> Result<Option<Series>, PolarsError
     result_option_series
 }
 
-fn indicador_da_origem(series: Series) -> Result<Option<Series>, PolarsError> {
-    let new_series: Series = series
+fn indicador_da_origem(col: Column) -> Result<Option<Column>, PolarsError> {
+    let new_col: Column = col
         .i64()?
         .into_iter()
         .map(|option_i64: Option<i64>| {
@@ -218,32 +218,32 @@ fn indicador_da_origem(series: Series) -> Result<Option<Series>, PolarsError> {
             })
         })
         .collect::<StringChunked>()
-        .into_series();
+        .into_column();
 
-    Ok(Some(new_series))
+    Ok(Some(new_col))
 }
 
-pub fn descricao_do_tipo_de_operacao(series: Series) -> Result<Option<Series>, PolarsError> {
-    let result_option_series = match series.dtype() {
-        DataType::Int64 => tipo_de_operacao(series),
+pub fn descricao_do_tipo_de_operacao(col: Column) -> Result<Option<Column>, PolarsError> {
+    let result_option_cols = match col.dtype() {
+        DataType::Int64 => tipo_de_operacao(col),
         _ => {
             eprintln!("fn descricao_do_tipo_de_operacao()");
-            eprintln!("Series: {series:?}");
+            eprintln!("Column: {col:?}");
             Err(PolarsError::InvalidOperation(
                 format!(
                     "Not supported for Series with DataType {:?}",
-                    series.dtype()
+                    col.dtype()
                 )
                 .into(),
             ))
         }
     };
 
-    result_option_series
+    result_option_cols
 }
 
-fn tipo_de_operacao(series: Series) -> Result<Option<Series>, PolarsError> {
-    let new_series: Series = series
+fn tipo_de_operacao(col: Column) -> Result<Option<Column>, PolarsError> {
+    let new_col: Column = col
         .i64()?
         .into_iter()
         .map(|option_i64: Option<i64>| {
@@ -256,21 +256,21 @@ fn tipo_de_operacao(series: Series) -> Result<Option<Series>, PolarsError> {
             })
         })
         .collect::<StringChunked>()
-        .into_series();
+        .into_column();
 
-    Ok(Some(new_series))
+    Ok(Some(new_col))
 }
 
-pub fn descricao_do_tipo_de_credito(series: Series) -> Result<Option<Series>, PolarsError> {
-    let result_option_series = match series.dtype() {
-        DataType::Int64 => tipo_descricao(series),
+pub fn descricao_do_tipo_de_credito(col: Column) -> Result<Option<Column>, PolarsError> {
+    let result_option_series = match col.dtype() {
+        DataType::Int64 => tipo_descricao(col),
         _ => {
             eprintln!("fn descricao_do_tipo_de_credito()");
-            eprintln!("Series: {series:?}");
+            eprintln!("Column: {col:?}");
             Err(PolarsError::InvalidOperation(
                 format!(
                     "Not supported for Series with DataType {:?}",
-                    series.dtype()
+                    col.dtype()
                 )
                 .into(),
             ))
@@ -280,8 +280,8 @@ pub fn descricao_do_tipo_de_credito(series: Series) -> Result<Option<Series>, Po
     result_option_series
 }
 
-fn tipo_descricao(series: Series) -> Result<Option<Series>, PolarsError> {
-    let new_series: Series = series
+fn tipo_descricao(col: Column) -> Result<Option<Column>, PolarsError> {
+    let new_col: Column = col
         .i64()?
         .into_iter()
         .map(|option_i64: Option<i64>| {
@@ -291,32 +291,32 @@ fn tipo_descricao(series: Series) -> Result<Option<Series>, PolarsError> {
             })
         })
         .collect::<StringChunked>()
-        .into_series();
+        .into_column();
 
-    Ok(Some(new_series))
+    Ok(Some(new_col))
 }
 
-pub fn descricao_do_mes(series: Series) -> Result<Option<Series>, PolarsError> {
-    let result_option_series = match series.dtype() {
-        DataType::Int64 => tipo_mes(series),
+pub fn descricao_do_mes(col: Column) -> Result<Option<Column>, PolarsError> {
+    let result_option_cols = match col.dtype() {
+        DataType::Int64 => tipo_mes(col),
         _ => {
             eprintln!("fn descricao_do_mes()");
-            eprintln!("Series: {series:?}");
+            eprintln!("Column: {col:?}");
             Err(PolarsError::InvalidOperation(
                 format!(
                     "Not supported for Series with DataType {:?}",
-                    series.dtype()
+                    col.dtype()
                 )
                 .into(),
             ))
         }
     };
 
-    result_option_series
+    result_option_cols
 }
 
-fn tipo_mes(series: Series) -> Result<Option<Series>, PolarsError> {
-    let new_series: Series = series
+fn tipo_mes(col: Column) -> Result<Option<Column>, PolarsError> {
+    let new_col: Column = col
         .i64()?
         .into_iter()
         .map(|option_i64: Option<i64>| {
@@ -326,23 +326,23 @@ fn tipo_mes(series: Series) -> Result<Option<Series>, PolarsError> {
             })
         })
         .collect::<StringChunked>()
-        .into_series();
+        .into_column();
 
-    Ok(Some(new_series))
+    Ok(Some(new_col))
 }
 
 pub fn descricao_da_natureza_da_bc_dos_creditos(
-    series: Series,
-) -> Result<Option<Series>, PolarsError> {
-    let result_option_series = match series.dtype() {
-        DataType::Int64 => natureza_da_bc_dos_creditos(series),
+    col: Column
+) -> Result<Option<Column>, PolarsError> {
+    let result_option_series = match col.dtype() {
+        DataType::Int64 => natureza_da_bc_dos_creditos(col),
         _ => {
             eprintln!("fn descricao_da_natureza_da_bc_dos_creditos()");
-            eprintln!("Series: {series:?}");
+            eprintln!("Column: {col:?}");
             Err(PolarsError::InvalidOperation(
                 format!(
                     "Not supported for Series with DataType {:?}",
-                    series.dtype()
+                    col.dtype()
                 )
                 .into(),
             ))
@@ -352,8 +352,8 @@ pub fn descricao_da_natureza_da_bc_dos_creditos(
     result_option_series
 }
 
-fn natureza_da_bc_dos_creditos(series: Series) -> Result<Option<Series>, PolarsError> {
-    let new_series: Series = series
+fn natureza_da_bc_dos_creditos(col: Column) -> Result<Option<Column>, PolarsError> {
+    let new_col: Column = col
         .i64()?
         .into_iter()
         .map(|opt_int64: Option<i64>| {
@@ -372,7 +372,7 @@ fn natureza_da_bc_dos_creditos(series: Series) -> Result<Option<Series>, PolarsE
             })
         })
         .collect::<StringChunked>()
-        .into_series();
+        .into_column();
 
-    Ok(Some(new_series))
+    Ok(Some(new_col))
 }

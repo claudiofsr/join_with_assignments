@@ -45,7 +45,7 @@ pub fn adicionar_coluna_de_incidencia_monofasica(
             // Adicionar 2 colunas temporárias
             as_struct([col(side_a[0]).cast(DataType::String), col(side_a[1])].to_vec())
                 .apply(
-                    |series: Series| analisar_colunas_selecionadas(&series),
+                    |col: Column| analisar_colunas_selecionadas(&col),
                     GetOutput::same_type(),
                 ) // GetOutput::from_type(DataType::String)
                 .alias(side_a[2]),
@@ -53,7 +53,7 @@ pub fn adicionar_coluna_de_incidencia_monofasica(
         .with_column(
             as_struct([col(side_b[0]).cast(DataType::String), col(side_b[1])].to_vec())
                 .apply(
-                    |series: Series| analisar_colunas_selecionadas(&series),
+                    |col: Column| analisar_colunas_selecionadas(&col),
                     GetOutput::same_type(),
                 ) // GetOutput::from_type(DataType::String)
                 .alias(side_b[2]),
@@ -82,9 +82,9 @@ pub fn adicionar_coluna_de_incidencia_monofasica(
     Ok(lazyframe)
 }
 
-fn analisar_colunas_selecionadas(series: &Series) -> Result<Option<Series>, PolarsError> {
+fn analisar_colunas_selecionadas(col: &Column) -> Result<Option<Column>, PolarsError> {
     // add feature "dtype-struct"
-    let struct_chunked: &StructChunked = series.struct_()?;
+    let struct_chunked: &StructChunked = col.struct_()?;
 
     // Get the fields as Series
     let ser_codigoncm: &Series = &struct_chunked.fields_as_series()[0];
@@ -113,7 +113,7 @@ fn analisar_colunas_selecionadas(series: &Series) -> Result<Option<Series>, Pola
         .collect::<StringChunked>()
         .into_series();
 
-    Ok(Some(new_series))
+    Ok(Some(polars::prelude::Column::Series(new_series)))
 }
 
 /// Base Legal conforme código NCM e descrição do item.

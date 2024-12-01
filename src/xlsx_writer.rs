@@ -15,7 +15,6 @@ use polars::export::arrow::temporal_conversions::{
 };
 use polars::prelude::*;
 use rust_xlsxwriter::{Format, Table, Workbook, Worksheet};
-
 pub struct PolarsXlsxWriter {
     pub(crate) workbook: Workbook,
     pub(crate) options: WriterOptions,
@@ -28,7 +27,6 @@ impl Default for PolarsXlsxWriter {
 }
 
 impl PolarsXlsxWriter {
-    /// Create a new `PolarsXlsxWriter` instance.
     pub fn new() -> PolarsXlsxWriter {
         let mut workbook = Workbook::new();
         workbook.add_worksheet();
@@ -149,13 +147,6 @@ impl PolarsXlsxWriter {
         self
     }
 
-    pub fn set_autofilter(&mut self, enable: bool) -> &mut PolarsXlsxWriter {
-        let table = self.options.table.clone().set_autofilter(enable);
-        self.options.table = table;
-
-        self
-    }
-
     pub fn set_table(&mut self, table: &Table) -> &mut PolarsXlsxWriter {
         self.options.table = table.clone();
         self
@@ -222,21 +213,26 @@ impl PolarsXlsxWriter {
     ) -> Result<(), PolarsError> {
         let header_offset = u32::from(options.table.has_header_row());
 
-        //println!("worksheet.name(): {}", worksheet.name());
-
         // Iterate through the dataframe column by column.
         for (col_num, column) in df.get_columns().iter().enumerate() {
             let col_num = col_offset + col_num as u16;
 
             // Store the column names for use as table headers.
             if options.table.has_header_row() {
-                worksheet.write(row_offset, col_num, column.name().to_string())?;
+                worksheet.write(row_offset, col_num, column.name().as_str())?;
             }
-
+            
             //println!("column: {column}");
 
+            let series = match column.as_series() {
+                Some(s) => s,
+                None => continue,
+            };
+
+            // let series = column.as_materialized_series();  
+
             // Write the row data for each column/type.
-            for (row_num, data) in column.iter().enumerate() {
+            for (row_num, data) in series.iter().enumerate() {
                 let row_num = header_offset + row_offset + row_num as u32;
 
                 // Map the Polars Series AnyValue types to Excel/rust_xlsxwriter
@@ -288,6 +284,9 @@ impl PolarsXlsxWriter {
                     }
                     AnyValue::String(value) => {
                         worksheet.write_string(row_num, col_num, value)?;
+                    }
+                    AnyValue::StringOwned(value) => {
+                        worksheet.write_string(row_num, col_num, value.as_str())?;
                     }
                     AnyValue::Boolean(value) => {
                         worksheet.write_boolean(row_num, col_num, value)?;
@@ -413,7 +412,6 @@ impl WriterOptions {
             datetime_format: "yyyy\\-mm\\-dd\\ hh:mm:ss".into(),
             null_string: None,
             float_format: Format::default(),
-            //float_format: Format::new().set_num_format("$#,##0.0000"),
             table: Table::new(),
             zoom: 100,
             screen_gridlines: true,

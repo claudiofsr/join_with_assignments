@@ -45,7 +45,7 @@ pub fn adicionar_coluna_de_aliquota_zero(
             // Adicionar 2 colunas temporárias
             as_struct([col(side_a[0]).cast(DataType::String), col(side_a[1])].to_vec())
                 .apply(
-                    |series: Series| analisar_colunas_selecionadas(&series),
+                    |col: Column| analisar_colunas_selecionadas(&col),
                     GetOutput::same_type(),
                 ) // GetOutput::from_type(DataType::String)
                 .alias(side_a[2]),
@@ -53,7 +53,7 @@ pub fn adicionar_coluna_de_aliquota_zero(
         .with_column(
             as_struct([col(side_b[0]).cast(DataType::String), col(side_b[1])].to_vec())
                 .apply(
-                    |series: Series| analisar_colunas_selecionadas(&series),
+                    |col: Column| analisar_colunas_selecionadas(&col),
                     GetOutput::same_type(),
                 ) // GetOutput::from_type(DataType::String)
                 .alias(side_b[2]),
@@ -82,9 +82,9 @@ pub fn adicionar_coluna_de_aliquota_zero(
     Ok(lazyframe)
 }
 
-fn analisar_colunas_selecionadas(series: &Series) -> Result<Option<Series>, PolarsError> {
+fn analisar_colunas_selecionadas(col: &Column) -> Result<Option<Column>, PolarsError> {
     // add feature "dtype-struct"
-    let struct_chunked: &StructChunked = series.struct_()?;
+    let struct_chunked: &StructChunked = col.struct_()?;
 
     // Get the fields as Series
     let ser_codigoncm: &Series = &struct_chunked.fields_as_series()[0];
@@ -113,7 +113,7 @@ fn analisar_colunas_selecionadas(series: &Series) -> Result<Option<Series>, Pola
         .collect::<StringChunked>()
         .into_series();
 
-    Ok(Some(new_series))
+    Ok(Some(Column::Series(new_series)))
 }
 
 /// Base Legal conforme código NCM e descrição do item.
@@ -509,16 +509,16 @@ mod tests {
             "cars"=> ["beetle", "audi", "beetle", "beetle", "beetle"]
         )?;
 
-        println!("dataframe: {df}\n");
+        println!("dataframe 1: {df}\n");
 
-        fn multiply(s: &mut [Series]) -> Result<Option<Series>, PolarsError> {
-            // Get the fields as Series
-            let series_0: &Series = &s[0];
-            let series_1: &Series = &s[1];
+        fn multiply(s: &mut [Column]) -> Result<Option<Column>, PolarsError> {
+            // Get the fields as Columns
+            let col_0: &Column = &s[0];
+            let col_1: &Column = &s[1];
 
             // Get columns with into_iter()
-            let vec_opt_0: Vec<Option<i32>> = series_0.i32()?.into_iter().collect();
-            let vec_opt_1: Vec<Option<i32>> = series_1.i32()?.into_iter().collect();
+            let vec_opt_0: Vec<Option<i32>> = col_0.i32()?.into_iter().collect();
+            let vec_opt_1: Vec<Option<i32>> = col_1.i32()?.into_iter().collect();
 
             // https://docs.rs/rayon/latest/rayon/iter/struct.MultiZip.html
             // MultiZip is an iterator that zips up a tuple of parallel iterators to produce tuples of their items.
@@ -531,9 +531,10 @@ mod tests {
                 .collect::<Int32Chunked>()
                 .into_series();
 
-            Ok(Some(new_series))
+            Ok(Some(new_series.into()))
         }
 
+        // geany polars-0.44.2/tests/it/lazy/queries.rs
         // let multiply = |s: &mut [Series]| Ok(Some( &(&s[0] * &s[0]) * &(&s[1] - 2) ));
 
         let df: DataFrame = df
@@ -548,22 +549,24 @@ mod tests {
             )
             .collect()?;
 
-        println!("dataframe: {df}\n");
+        println!("dataframe 2: {df}\n");
 
-        let out: &ChunkedArray<Int32Type> = df.column("Map Multiple")?.i32()?;
+        let out: Vec<i32> = df
+            .column("Map Multiple")?
+            .i32()?
+            .into_iter()
+            .flatten()
+            .collect();
 
-        assert_eq!(
-            Vec::from(out),
-            &[Some(3), Some(8), Some(9), Some(0), Some(-25)]
-        );
+        assert_eq!(out, &[3, 8, 9, 0, -25]);
 
         let groupby = df
             .lazy()
-            .group_by([col("cars")])
+            .group_by_stable([col("cars")])
             .agg([apply_multiple(
                 multiply,
                 [col("A"), col("B")],
-                GetOutput::from_type(DataType::Float64),
+                GetOutput::from_type(DataType::Int32),
                 true,
             )])
             .sort(["cars"], Default::default())
@@ -621,7 +624,7 @@ mod tests {
         let columns: Vec<&str> = vec!["Alíquota Zero"];
 
         // Get columns from dataframe
-        let cst_values: &Series = dataframe02.column(columns[0])?;
+        let cst_values: &Column = dataframe02.column(columns[0])?;
 
         // Get columns values with into_iter()
         let vec_opt_str: Vec<Option<&str>> = cst_values.str()?.into_iter().collect();

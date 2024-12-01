@@ -50,7 +50,7 @@ pub use self::{
 };
 
 use claudiofsr_lib::RoundFloat;
-use polars::{datatypes::DataType, prelude::*};
+use polars::{datatypes::DataType, prelude::*, prelude::Column as PColumn};
 use regex::Regex;
 use std::{
     any,
@@ -654,16 +654,16 @@ pub fn write_pqt(df: &DataFrame, basename: &str) -> PolarsResult<()> {
 /// #### Exemplo fictício:
 ///
 /// Se CNPJ: `12.345.678/0009-23`, então CNPJ Base: `12.345.678`.
-pub fn get_cnpj_base(series: Series) -> PolarsResult<Option<Series>> {
-    match series.dtype() {
-        DataType::String => cnpj_base(series),
+pub fn get_cnpj_base(col: PColumn) -> PolarsResult<Option<PColumn>> {
+    match col.dtype() {
+        DataType::String => cnpj_base(col),
         _ => {
             eprintln!("fn get_cnpj_base()");
-            eprintln!("Series: {series:?}");
+            eprintln!("Polars Column: {col:?}");
             Err(PolarsError::InvalidOperation(
                 format!(
                     "Not supported for Series with DataType {:?}",
-                    series.dtype()
+                    col.dtype()
                 )
                 .into(),
             ))
@@ -678,8 +678,8 @@ pub fn get_cnpj_base(series: Series) -> PolarsResult<Option<Series>> {
 /// `12.345.678/0009-23` -> `12.345.678`
 ///
 /// `<N/D> [Info do CT-e: 12.345.678/0009-23] [Info do CT-e: <N/D>] [Info do CT-e: 12.345.678/0009-23]` -> `12.345.678`
-fn cnpj_base(series: Series) -> PolarsResult<Option<Series>> {
-    let new_series: Series = series
+fn cnpj_base(col: PColumn) -> PolarsResult<Option<PColumn>> {
+    let new_col: PColumn = col
         .str()?
         .into_iter()
         .map(|option_str: Option<&str>| {
@@ -700,13 +700,13 @@ fn cnpj_base(series: Series) -> PolarsResult<Option<Series>> {
             })
         })
         .collect::<StringChunked>()
-        .into_series();
+        .into_column();
 
-    Ok(Some(new_series))
+    Ok(Some(new_col))
 }
 
-pub fn desprezar_pequenos_valores(series: Series, delta: f64) -> PolarsResult<Option<Series>> {
-    let new_series: Series = series
+pub fn desprezar_pequenos_valores(col: PColumn, delta: f64) -> PolarsResult<Option<PColumn>> {
+    let new_col: PColumn = col
         .f64()?
         .into_iter()
         .map(|opt_f64: Option<f64>| match opt_f64 {
@@ -714,9 +714,9 @@ pub fn desprezar_pequenos_valores(series: Series, delta: f64) -> PolarsResult<Op
             _ => None,
         })
         .collect::<Float64Chunked>()
-        .into_series();
+        .into_column();
 
-    Ok(Some(new_series))
+    Ok(Some(new_col))
 }
 
 pub fn add_leading_zeros(series: Series, fill: usize) -> PolarsResult<Option<Series>> {
@@ -751,26 +751,31 @@ fn leading_zeros(series: Series, fill: usize) -> PolarsResult<Option<Series>> {
 /// Filtra colunas do tipo float64.
 ///
 /// Posteriormente, arredonda os valores da coluna
-pub fn round_float64_columns(series: Series, decimals: u32) -> PolarsResult<Option<Series>> {
+pub fn round_float64_columns(col: PColumn, decimals: u32) -> PolarsResult<Option<PColumn>> {
+    let series = match col.as_series() {
+        Some(s) => s,
+        None => return Ok(Some(col)),
+    };
+    
     match series.dtype() {
-        DataType::Float64 => Ok(Some(series.round(decimals)?)),
-        _ => Ok(Some(series)),
+        DataType::Float64 => Ok(Some(PColumn::Series(series.round(decimals)?))),
+        _ => Ok(Some(col)),
     }
 }
 
-pub fn round_series(series: Series, decimals: u32) -> PolarsResult<Option<Series>> {
-    match series.dtype() {
+pub fn round_column(col: PColumn, decimals: u32) -> PolarsResult<Option<PColumn>> {
+    match col.dtype() {
         // DataType::Float64 => Ok(Some(series.round(decimals)?)), <-- Bug panicking::panic_fmt
-        DataType::Float64 => round_series_f64(series, decimals),
-        DataType::String => round_series_str(series, decimals),
+        DataType::Float64 => round_column_f64(col, decimals),
+        DataType::String => round_column_str(col, decimals),
         _ => {
             eprintln!("fn round_series()");
-            eprintln!("Series: {series:?}");
+            eprintln!("Column: {col:?}");
             eprintln!("Decimals: {decimals}");
             Err(PolarsError::InvalidOperation(
                 format!(
                     "Not supported for Series with DataType {:?}",
-                    series.dtype()
+                    col.dtype()
                 )
                 .into(),
             ))
@@ -778,29 +783,29 @@ pub fn round_series(series: Series, decimals: u32) -> PolarsResult<Option<Series
     }
 }
 
-fn round_series_f64(series: Series, decimals: u32) -> PolarsResult<Option<Series>> {
-    let new_series: Series = series
+fn round_column_f64(col: PColumn, decimals: u32) -> PolarsResult<Option<PColumn>> {
+    let new_col: PColumn = col
         .f64()?
         .into_iter()
         .map(|opt_f64: Option<f64>| opt_f64.map(|float64| float64.round_float(decimals)))
         .collect::<Float64Chunked>()
-        .into_series();
+        .into_column();
 
-    Ok(Some(new_series))
+    Ok(Some(new_col))
 }
 
-fn round_series_str(series: Series, decimals: u32) -> PolarsResult<Option<Series>> {
-    let new_series: Series = series
+fn round_column_str(col: PColumn, decimals: u32) -> PolarsResult<Option<PColumn>> {
+    let new_col: PColumn = col
         .str()?
         .into_iter()
-        .map(|opt_str: Option<&str>| get_opt_from_str(opt_str, &series, decimals))
+        .map(|opt_str: Option<&str>| get_opt_from_str(opt_str, &col, decimals))
         .collect::<Float64Chunked>()
-        .into_series();
+        .into_column();
 
-    Ok(Some(new_series))
+    Ok(Some(new_col))
 }
 
-fn get_opt_from_str(opt_str: Option<&str>, series: &Series, decimals: u32) -> Option<f64> {
+fn get_opt_from_str(opt_str: Option<&str>, col: &PColumn, decimals: u32) -> Option<f64> {
     let opt_float64: Option<f64> = match opt_str {
         Some(str) => {
             let result: Result<f64, ParseFloatError> =
@@ -818,7 +823,7 @@ fn get_opt_from_str(opt_str: Option<&str>, series: &Series, decimals: u32) -> Op
         None => {
             eprintln!("fn get_opt_from_str()");
             eprintln!("Found None value in column:");
-            eprintln!("series: {series}\n");
+            eprintln!("col: {col:?}\n");
             None
         }
     };
@@ -826,16 +831,16 @@ fn get_opt_from_str(opt_str: Option<&str>, series: &Series, decimals: u32) -> Op
     opt_float64
 }
 
-pub fn formatar_chave_eletronica(series: Series) -> PolarsResult<Option<Series>> {
-    match series.dtype() {
-        DataType::String => format_digits(series),
+pub fn formatar_chave_eletronica(col: PColumn) -> PolarsResult<Option<PColumn>> {
+    match col.dtype() {
+        DataType::String => format_digits(col),
         _ => {
             eprintln!("fn formatar_chave_eletronica()");
-            eprintln!("Series: {series:?}");
+            eprintln!("Column: {col:?}");
             Err(PolarsError::InvalidOperation(
                 format!(
                     "Not supported for Series with DataType {:?}",
-                    series.dtype()
+                    col.dtype()
                 )
                 .into(),
             ))
@@ -844,15 +849,15 @@ pub fn formatar_chave_eletronica(series: Series) -> PolarsResult<Option<Series>>
 }
 
 // https://docs.rs/polars/latest/polars/prelude/string/struct.StringNameSpace.html#
-fn format_digits(series: Series) -> PolarsResult<Option<Series>> {
-    let new_series: Series = series
+fn format_digits(col: PColumn) -> PolarsResult<Option<PColumn>> {
+    let new_col: PColumn = col
         .str()?
         .into_iter()
         .map(retain_only_digits)
         .collect::<StringChunked>()
-        .into_series();
+        .into_column();
 
-    Ok(Some(new_series))
+    Ok(Some(new_col))
 }
 
 /// We use the as_ref method to get a reference to the optional string (opt_str).
@@ -991,11 +996,11 @@ mod test_functions {
 
         println!("series: {series:?}\n");
 
-        let s = get_cnpj_base(series)?;
+        let s = get_cnpj_base(PColumn::Series(series))?;
 
         println!("s: {s:?}\n");
 
-        assert_eq!(Some(Series::new("".into(), &valid)), s);
+        assert_eq!(Some(PColumn::new("".into(), &valid)), s);
 
         Ok(())
     }
@@ -1063,7 +1068,7 @@ mod test_functions {
                                 Series::new("".into(), [out.0, out.1, out.2])
                             })
                             .collect::<ChunkedArray<ListType>>()
-                            .into_series(),
+                            .into_column(),
                     ))
                 },
                 [col("a"), col("b")],
@@ -1088,27 +1093,26 @@ mod test_functions {
         └─────────────────┘
         */
 
-        let column_multiple_values: &Series = df.column("Multiple Values")?;
+        let column_multiple_values = df.column("Multiple Values")?;
         let vec_opt_lines_efd: Vec<Option<Series>> =
             column_multiple_values.list()?.into_iter().collect();
 
         // É necessário formatar o número de casas decimais
-        let series_formatted: Vec<Option<Series>> = vec_opt_lines_efd
+        let col_formatted: Vec<Option<PColumn>> = vec_opt_lines_efd
             .iter()
-            .map(|opt_series| {
+            .flat_map(|opt_series| {
                 opt_series
                     .as_ref()
-                    .map(|series| round_series(series.clone(), 1).unwrap())
-                    .unwrap()
+                    .and_then(|series| round_column(PColumn::Series(series.clone()), 1).ok())
             })
             .collect();
 
-        let vec_series: Vec<Series> = series_formatted.into_iter().flatten().collect();
+        let vec_col: Vec<PColumn> = col_formatted.into_iter().flatten().collect();
 
-        let vec_lines: Result<Vec<Vec<f64>>, Box<dyn Error>> = vec_series
+        let vec_lines: Result<Vec<Vec<f64>>, Box<dyn Error>> = vec_col
             .iter()
-            .map(|series| {
-                let chunkedarray_f64: &ChunkedArray<Float64Type> = series.f64()?;
+            .map(|col| {
+                let chunkedarray_f64: &ChunkedArray<Float64Type> = col.f64()?;
 
                 let vec_float64: Vec<f64> = chunkedarray_f64
                     .into_iter()

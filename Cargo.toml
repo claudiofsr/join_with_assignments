@@ -33,7 +33,7 @@ claudiofsr_lib = "0.14"
 colored = "2.1"
 confy = "0.6"
 csv = "1.3"
-hashbrown = { version = "0.14.5", features = ["raw"] }
+hashbrown = { version = "0.15.2", features = ["raw-entry"] }
 pathfinding = "4.11"
 rayon = "1.10"
 regex = "1.10"
@@ -52,11 +52,11 @@ features = [
 ]
 
 [dependencies.polars]
-version = "0.43.1"
+version = "0.44.2"
 # git = "https://github.com/pola-rs/polars.git"
 # rev = "8a6bf4b"
-# https://github.com/pola-rs/polars/releases/tag/rs-0.43.0
-# https://github.com/pola-rs/polars/releases/tag/rs-0.43.1
+# https://github.com/pola-rs/polars/releases/tag/rs-0.44.0
+# https://github.com/pola-rs/polars/releases/tag/rs-0.44.2
 # git clone https://github.com/pola-rs/polars.git
 # path = "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/polars-0.40.0"
 features = [
@@ -70,6 +70,7 @@ features = [
     "dtype-duration",
     "dtype-categorical",
     "dtype-i16",    # fix: "unsupported data type when reading CSV: i16 when reading CSV"
+    "find_many",
     "is_in",        # Check for membership in Series
     "lazy",         # Lazy API
     "list_eval",    # Apply expressions over list elements
@@ -83,10 +84,10 @@ features = [
 ]
 
 [dependencies.rust_xlsxwriter]
-version = "0.79.4"
+# version = "0.79.4"
 # https://github.com/jmcnamara/rust_xlsxwriter/blob/main/CHANGELOG.md
 # git = "https://github.com/jmcnamara/rust_xlsxwriter.git"
-# path = "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/rust_xlsxwriter-0.79.4b"
+path = "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/rust_xlsxwriter-0.79.4b"
 features = [
     "chrono",
     "polars",

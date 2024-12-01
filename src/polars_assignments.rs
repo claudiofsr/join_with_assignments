@@ -6,7 +6,7 @@ use polars::{datatypes::DataType, prelude::*};
 use crate::{
     args::Arguments,
     coluna, formatar_chave_eletronica, get_lazyframe_from_csv, get_opt_vectuples,
-    get_option_assignments, round_series, DataFrameExtension,
+    get_option_assignments, round_column, DataFrameExtension,
     Side::{Left, Middle, Right},
     VecTuples,
 };
@@ -84,7 +84,7 @@ fn format_fazyframe_a(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>>
             GetOutput::from_type(DataType::String),
         ))
         .with_columns([cols(columns_with_float64).apply(
-            |series| round_series(series, 2),
+            |series| round_column(series, 2),
             GetOutput::from_type(DataType::Float64),
         )]);
 
@@ -128,7 +128,7 @@ fn format_fazyframe_b(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>>
         ))
         .with_columns([
             cols(columns_with_float64).apply(
-                |series| round_series(series, 2),
+                |series| round_column(series, 2),
                 GetOutput::from_type(DataType::Float64),
             ), //all()
                //.apply(|series| round_float64_columns(series, 2), GetOutput::same_type())
@@ -240,7 +240,7 @@ fn join_lazyframes(
 
                     let new_series = Series::new("New".into(), vec_series);
 
-                    Ok(Some(new_series))
+                    Ok(Some(new_series.into()))
                 },
                 GetOutput::from_type(DataType::UInt64),
             )
@@ -257,10 +257,10 @@ fn join_lazyframes(
 
 fn get_vec_from_assignments(dataframe: DataFrame) -> Result<Vec<Option<VecTuples>>, PolarsError> {
     // Get columns from dataframe
-    let aggregation: &Series = dataframe.column(coluna(Left, "chave"))?;
-    let lines_efd: &Series = dataframe.column(coluna(Left, "count_lines"))?;
-    let lines_nfe: &Series = dataframe.column(coluna(Right, "count_lines"))?;
-    let assignmen: &Series = dataframe.column("Munkres Assignments")?;
+    let aggregation: &Column = dataframe.column(coluna(Left, "chave"))?;
+    let lines_efd: &Column = dataframe.column(coluna(Left, "count_lines"))?;
+    let lines_nfe: &Column = dataframe.column(coluna(Right, "count_lines"))?;
+    let assignmen: &Column = dataframe.column("Munkres Assignments")?;
 
     // Get columns with into_iter()
     let vec_opt_aggregation: Vec<Option<&str>> = aggregation.str()?.into_iter().collect();
@@ -507,11 +507,11 @@ mod test_assignments {
 
         println!("dataframe02: {dataframe_02}\n");
 
-        let col_a: Series = Series::new(
+        let col_a = Column::new(
             "concat ignore_nulls_true".into(),
             &["Food*Trick*aa", "Or*bb", "April*Treat*cc", ""],
         );
-        let col_b: Series = Series::new(
+        let col_b = Column::new(
             "concat ignore_nulls_false".into(),
             &["Food*Trick**aa", "*Or**bb", "April*Treat**cc", "***"],
         );
@@ -612,7 +612,7 @@ mod test_assignments {
 
         println!("dataframe03: {dataframe03}\n");
 
-        let series: Series = Series::new(
+        let col = Column::new(
             glosar.into(),
             &[
                 None,
@@ -623,7 +623,7 @@ mod test_assignments {
             ],
         );
 
-        assert_eq!(dataframe03.column(glosar)?, &series);
+        assert_eq!(dataframe03.column(glosar)?, &col);
 
         Ok(())
     }
@@ -664,15 +664,14 @@ mod test_assignments {
 
         println!("dataframe02: {dataframe02}\n");
 
-        let series_a: Series = Series::new(
+        let col_a = Column::new(
             "float64 A".into(),
             &[23.65, 0.32, 10.00, 89.02, -3.42, 52.08],
         );
-        let series_b: Series =
-            Series::new("float64 B".into(), &[10.00, 0.4, 10.01, 89.01, -3.43, 52.1]);
+        let col_b = Column::new("float64 B".into(), &[10.00, 0.4, 10.01, 89.01, -3.43, 52.1]);
 
-        assert_eq!(dataframe02.column("float64 A")?, &series_a);
-        assert_eq!(dataframe02.column("float64 B")?, &series_b);
+        assert_eq!(dataframe02.column("float64 A")?, &col_a);
+        assert_eq!(dataframe02.column("float64 B")?, &col_b);
 
         // Example 2:
         // input1: two columns --> output: one new column
@@ -731,7 +730,7 @@ mod test_assignments {
         println!("df_a: {df_a}\n");
 
         // Get columns from dataframe
-        let values_pa: &Series = df_a.column(value_p)?;
+        let values_pa: &Column = df_a.column(value_p)?;
 
         // Get columns with into_iter()
         let vec_a: Vec<f64> = values_pa.f64()?.into_iter().flatten().collect();
@@ -811,7 +810,7 @@ mod test_assignments {
         println!("df_b: {df_b}\n");
 
         // Get columns from dataframe
-        let values_pb: &Series = df_b.column(value_p)?;
+        let values_pb: &Column = df_b.column(value_p)?;
 
         // Get columns with into_iter()
         let vec_b: Vec<f64> = values_pb.f64()?.into_iter().flatten().collect();
@@ -855,7 +854,7 @@ mod test_assignments {
         println!("df_a: {df_a}\n");
 
         // Get columns from dataframe
-        let values_pa: &Series = df_a.column(valor_item)?;
+        let values_pa: &Column = df_a.column(valor_item)?;
 
         // Get columns with into_iter()
         let vec_a: Vec<f64> = values_pa.f64()?.into_iter().flatten().collect();
@@ -872,7 +871,7 @@ mod test_assignments {
         println!("df_b: {df_b}\n");
 
         // Get columns from dataframe
-        let values_pb: &Series = df_b.column(valor_item)?;
+        let values_pb: &Column = df_b.column(valor_item)?;
 
         // Get columns with into_iter()
         let vec_b: Vec<f64> = values_pb.f64()?.into_iter().flatten().collect();

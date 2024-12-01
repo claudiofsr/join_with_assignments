@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use polars::{prelude::*, series::Series};
+use polars::prelude::*;
 
 use chrono::{
     Datelike, // let year = naive_date.year(); let month = naive_date.month();
@@ -41,7 +41,7 @@ pub fn adicionar_coluna_periodo_de_apuracao_inicial_e_final(
             // Subtrair 62 dias, aproximadamente dois meses
             // col(pa_ini) - chrono::Duration::days(62).lit()
             col(pa_ini).apply(
-                move |series: Series| subtrair_meses(series, 2, dt_start),
+                move |col: Column| subtrair_meses(col, 2, dt_start),
                 GetOutput::from_type(DataType::Date),
             ),
         )
@@ -49,7 +49,7 @@ pub fn adicionar_coluna_periodo_de_apuracao_inicial_e_final(
             // Adicionar 31 dias, aproximadamente um mês
             // col(pa_fim) + chrono::Duration::days(31).lit()
             col(pa_fim).apply(
-                move |series: Series| adicionar_meses(series, 1, dt_final),
+                move |col: Column| adicionar_meses(col, 1, dt_final),
                 GetOutput::from_type(DataType::Date),
             ),
         );
@@ -61,19 +61,19 @@ pub fn adicionar_coluna_periodo_de_apuracao_inicial_e_final(
 
 /// Subtrair numero_de_mes de Series compostas de datas
 pub fn subtrair_meses(
-    series: Series,
+    col: Column,
     numero_de_mes: u32,
     dt: Option<u32>,
-) -> Result<Option<Series>, PolarsError> {
-    match series.dtype() {
-        DataType::Date => sub_month(series, numero_de_mes, dt),
+) -> Result<Option<Column>, PolarsError> {
+    match col.dtype() {
+        DataType::Date => sub_month(col, numero_de_mes, dt),
         _ => {
             eprintln!("fn subtrair_meses()");
-            eprintln!("Series: {series:?}");
+            eprintln!("Column: {col:?}");
             Err(PolarsError::InvalidOperation(
                 format!(
                     "Not supported for Series with DataType {:?}",
-                    series.dtype()
+                    col.dtype()
                 )
                 .into(),
             ))
@@ -85,11 +85,11 @@ pub fn subtrair_meses(
 // https://stackoverflow.com/questions/76297868/convert-str-to-naivedate-datatype-in-rust-polars
 // https://stackoverflow.com/questions/75074357/filter-a-polars-dataframe-by-date-in-rust
 fn sub_month(
-    series: Series,
+    col: Column,
     numero_de_mes: u32,
     dt: Option<u32>,
-) -> Result<Option<Series>, PolarsError> {
-    let date: Vec<Option<NaiveDate>> = series
+) -> Result<Option<Column>, PolarsError> {
+    let date: Vec<Option<NaiveDate>> = col
         .date()?
         .as_date_iter()
         .map(|opt_naive_date: Option<NaiveDate>| {
@@ -106,23 +106,23 @@ fn sub_month(
         })
         .collect();
 
-    Ok(Some(Series::new("a".into(), date)))
+    Ok(Some(Column::new("a".into(), date)))
 }
 
 pub fn adicionar_meses(
-    series: Series,
+    col: Column,
     numero_de_mes: u32,
     dt: Option<u32>,
-) -> Result<Option<Series>, PolarsError> {
-    match series.dtype() {
-        DataType::Date => add_month(series, numero_de_mes, dt),
+) -> Result<Option<Column>, PolarsError> {
+    match col.dtype() {
+        DataType::Date => add_month(col, numero_de_mes, dt),
         _ => {
             eprintln!("fn adicionar_meses()");
-            eprintln!("Series: {series:?}");
+            eprintln!("Column: {col:?}");
             Err(PolarsError::InvalidOperation(
                 format!(
                     "Not supported for Series with DataType {:?}",
-                    series.dtype()
+                    col.dtype()
                 )
                 .into(),
             ))
@@ -131,11 +131,11 @@ pub fn adicionar_meses(
 }
 
 fn add_month(
-    series: Series,
+    col: Column,
     numero_de_mes: u32,
     dt: Option<u32>,
-) -> Result<Option<Series>, PolarsError> {
-    let date: Vec<Option<NaiveDate>> = series
+) -> Result<Option<Column>, PolarsError> {
+    let date: Vec<Option<NaiveDate>> = col
         .date()?
         .as_date_iter()
         .map(|opt_naive_date: Option<NaiveDate>| {
@@ -152,7 +152,7 @@ fn add_month(
         })
         .collect();
 
-    Ok(Some(Series::new("a".into(), date)))
+    Ok(Some(Column::new("a".into(), date)))
 }
 
 fn get_year_and_month(naive_date: NaiveDate, dt: Option<u32>) -> (i32, u32) {

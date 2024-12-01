@@ -6,7 +6,7 @@ use crate::{
     adicionar_coluna_de_incidencia_monofasica,
     adicionar_coluna_periodo_de_apuracao_inicial_e_final, coluna,
     filtros::{codigo_nat_01_a_18, cst_50_a_56, cst_50_a_66, operacoes_de_entrada_ou_saida},
-    get_cnpj_base, round_series, Arguments, DataFrameExtension,
+    get_cnpj_base, round_column, Arguments, DataFrameExtension,
     Side::{Left, Middle, Right},
 };
 
@@ -64,7 +64,7 @@ impl LazyFrameExtension for LazyFrame {
 
         self.with_columns([
             col(valor_bc).apply(
-                |series| round_series(series, 2),
+                |series| round_column(series, 2),
                 GetOutput::from_type(DataType::Float64),
             ),
             col(glosar)
@@ -402,11 +402,11 @@ fn analisar_situacao04(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
         lit("[Descrição CTe - Indicador do 'papel' do tomador do serviço de Conhecimento] e"),
         lit("[CNPJ Base do Remetente] e [CNPJ Base do Destinatário] e [Valor Total de Documentos Vinculados]."),
         lit("Valor da Base de Cálculo = "),
-        col(valor_bc).apply(|series| round_series(series, 2), GetOutput::from_type(DataType::Float64)),
+        col(valor_bc).apply(|col| round_column(col, 2), GetOutput::from_type(DataType::Float64)),
         lit("-"),
-        col(valor_cte_vinculado).apply(|series| round_series(series, 2), GetOutput::from_type(DataType::Float64)),
+        col(valor_cte_vinculado).apply(|col| round_column(col, 2), GetOutput::from_type(DataType::Float64)),
         lit("="),
-        valor_justo.clone().apply(|series| round_series(series, 2), GetOutput::from_type(DataType::Float64)),
+        valor_justo.clone().apply(|col| round_column(col, 2), GetOutput::from_type(DataType::Float64)),
         lit("&"),
     ], " ", true);
 
@@ -439,9 +439,9 @@ fn analisar_situacao05(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>
         lit("Situação 05:"),
         lit("Excluir valor do ICMS destacado em Nota Fiscal da Base de Cálculo das Contribuições."),
         lit("O valor da Base de Cálculo foi alterado de"),
-        col(valor_bc).apply(|series| round_series(series, 2), GetOutput::from_type(DataType::Float64)),
+        col(valor_bc).apply(|col| round_column(col, 2), GetOutput::from_type(DataType::Float64)),
         lit("para"),
-        delta.clone().apply(|series| round_series(series, 2), GetOutput::from_type(DataType::Float64)),
+        delta.clone().apply(|col| round_column(col, 2), GetOutput::from_type(DataType::Float64)),
         lit("&"),
     ], " ", true);
 
@@ -922,8 +922,8 @@ mod tests {
 
         println!("result:\n{result:?}\n");
 
-        let series: &Series = result.column(glosar)?;
-        let vec_option: Vec<Option<&str>> = series.str()?.into_iter().collect();
+        let col: &Column = result.column(glosar)?;
+        let vec_option: Vec<Option<&str>> = col.str()?.into_iter().collect();
 
         assert_eq!(
             vec_option,
@@ -1040,13 +1040,13 @@ mod tests {
         println!("dataframe02: {dataframe02}\n");
 
         // Get columns from dataframe
-        let bcal_values: &Series = dataframe02.column(valor_bc)?;
+        let bcal_values: &Column = dataframe02.column(valor_bc)?;
 
         // Get columns with into_iter()
         let vec_bcal_values: Vec<f64> = bcal_values.f64()?.into_iter().flatten().collect();
 
         // Get columns from dataframe
-        let glosar: &Series = dataframe02.column(glosar)?;
+        let glosar: &Column = dataframe02.column(glosar)?;
         let glosar_col: Vec<&str> = glosar.str()?.into_iter().flatten().collect();
 
         println!("glosar_col: {glosar_col:#?}\n");
@@ -1092,7 +1092,7 @@ mod tests {
         println!("df_itens_de_docs_fiscais_result: {df_itens_de_docs_fiscais_result}\n");
 
         // Get columns from dataframe
-        let bcal_values: &Series = df_itens_de_docs_fiscais_result.column(valor_bc)?;
+        let bcal_values: &Column = df_itens_de_docs_fiscais_result.column(valor_bc)?;
 
         // Get columns with into_iter()
         let vec_opt_bcal_values: Vec<Option<f64>> = bcal_values.f64()?.into_iter().collect();
@@ -1100,7 +1100,7 @@ mod tests {
         println!("vec_opt_bcal_values: {vec_opt_bcal_values:?}\n");
 
         // Get columns from dataframe
-        let glosar: &Series = df_itens_de_docs_fiscais_result.column(glosar)?;
+        let glosar: &Column = df_itens_de_docs_fiscais_result.column(glosar)?;
         let glosar_values: Vec<Option<&str>> = glosar.str()?.into_iter().collect();
         println!("glosar_values: {glosar_values:#?}\n");
 

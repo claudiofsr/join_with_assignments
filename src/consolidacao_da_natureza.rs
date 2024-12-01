@@ -1044,19 +1044,19 @@ fn formatar_valores(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>> {
     let lazy_formated: LazyFrame = lazyframe
         .with_columns([when(operacoes_de_saida())
             .then(cols(valores).apply(
-                |series| round_float64_columns(series, 4),
+                |col| round_float64_columns(col, 4),
                 GetOutput::same_type(),
             ))
             .otherwise(cols(valores).apply(
-                |series| round_float64_columns(series, 4),
+                |col| round_float64_columns(col, 4),
                 GetOutput::same_type(),
             ))])
         .with_columns([cols(aliquotas).apply(
-            |series| round_float64_columns(series, 4),
+            |col| round_float64_columns(col, 4),
             GetOutput::same_type(),
         )])
         .with_columns([cols(colunas_float64).apply(
-            |series| desprezar_pequenos_valores(series, SMALL_VALUE),
+            |col| desprezar_pequenos_valores(col, SMALL_VALUE),
             GetOutput::same_type(),
         )]);
 
@@ -1140,7 +1140,7 @@ where
 }
 */
 
-pub fn set_some_i64_value(series: Series, opt_value: Option<i64>) -> PolarsResult<Option<Series>> {
+pub fn set_some_i64_value(col: Column, opt_value: Option<i64>) -> PolarsResult<Option<Column>> {
     /*
     // A vector with all elements equal to the same value.
     let values = vec![opt_value; series.len()];
@@ -1148,34 +1148,36 @@ pub fn set_some_i64_value(series: Series, opt_value: Option<i64>) -> PolarsResul
     Ok(Some(series))
     */
 
-    let new_series: Series = series
+    let new_col: Column = col
         .i64()?
         .into_iter()
         .map(|_option_i64| opt_value)
-        .collect();
+        .collect::<Int64Chunked>()
+        .into_column();
 
-    Ok(Some(new_series))
+    Ok(Some(new_col))
 }
 
-pub fn set_some_f64_value(series: Series, opt_value: Option<f64>) -> PolarsResult<Option<Series>> {
-    let new_series: Series = series
+pub fn set_some_f64_value(col: Column, opt_value: Option<f64>) -> PolarsResult<Option<Column>> {
+    let new_col: Column = col
         .f64()?
         .into_iter()
         .map(|_option_f64| opt_value)
-        .collect();
+        .collect::<Float64Chunked>()
+        .into_column();
 
-    Ok(Some(new_series))
+    Ok(Some(new_col))
 }
 
-pub fn set_some_str_value(series: Series, opt_value: Option<&str>) -> PolarsResult<Option<Series>> {
-    let new_series: Series = series
+pub fn set_some_str_value(col: Column, opt_value: Option<&str>) -> PolarsResult<Option<Column>> {
+    let new_col: Column = col
         .str()?
         .into_iter()
         .map(|_option_utf8| opt_value)
         .collect::<StringChunked>()
-        .into_series();
+        .into_column();
 
-    Ok(Some(new_series))
+    Ok(Some(new_col))
 }
 
 #[cfg(test)]
@@ -1254,14 +1256,14 @@ mod tests {
         let lazyframe: LazyFrame = lazyframe.with_columns([
             //when(col("contador") % lit(2) == lit(0))
             when(col("contador").map(
-                move |series| {
+                move |col| {
                     Ok(Some(
-                        series
+                        col
                             .u32()?
                             .into_iter()
                             .map(|opt_u32: Option<u32>| opt_u32.map(|value| value % 2 == 0))
                             .collect::<BooleanChunked>()
-                            .into_series(),
+                            .into_column()
                     ))
                 },
                 GetOutput::from_type(DataType::Boolean),
@@ -1275,9 +1277,9 @@ mod tests {
         println!("dataframe02: {dataframe02}\n");
 
         // Get columns from dataframe
-        let natureza: &Series = dataframe02.column("Registro")?;
+        let natureza: &Column = dataframe02.column("Registro")?;
 
-        let series: Series = Series::new(
+        let col: Column = Column::new(
             "Registro".into(),
             &[
                 "CTe",
@@ -1293,7 +1295,7 @@ mod tests {
             ],
         );
 
-        assert_eq!(natureza, &series);
+        assert_eq!(natureza, &col);
 
         Ok(())
     }
@@ -1491,11 +1493,11 @@ mod tests {
         */
 
         // Get columns from dataframe
-        let anular: &Series = df04.column("Anular")?;
+        let anular: &Column = df04.column("Anular")?;
 
-        let series = Series::new("Anular".into(), [Some(15), Some(25), Some(100)]);
+        let col = Column::new("Anular".into(), [Some(15), Some(25), Some(100)]);
 
-        assert_eq!(anular, &series);
+        assert_eq!(anular, &col);
 
         Ok(())
     }
