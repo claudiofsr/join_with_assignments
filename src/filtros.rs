@@ -1,6 +1,4 @@
-use crate::{
-    coluna, Arguments, Side::Left
-};
+use crate::{coluna, Arguments, Side::Left};
 
 use claudiofsr_lib::{
     CFOP_DE_EXPORTACAO, CFOP_VENDA_DE_IMOBILIZADO, CODIGO_DA_NATUREZA_BC, CST_CREDITO,
@@ -384,12 +382,10 @@ pub fn apply_filter(data_frame: DataFrame, args: &Arguments) -> Result<DataFrame
     if args.operacoes_de_creditos == Some(true) {
         data_frame
             .lazy()
-            .filter(
-                not(
-                    operacoes_de_entrada_ou_saida()
-                    .and(entrada_de_credito().not())
-                )
-            )
+            .filter(not(
+                operacoes_de_entrada_ou_saida()
+                .and(entrada_de_credito().not())
+            ))
             .collect()
     } else {
         Ok(data_frame)
