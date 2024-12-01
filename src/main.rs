@@ -78,13 +78,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let df_consolidacao_natureza_da_bcalc_result: DataFrame =
         obter_consolidacao_nat(&df_itens_de_docs_fiscais_result, true)?;
 
-    let (df_itens_de_docs_fiscais, df_itens_de_docs_fiscais_result) = if args.operacoes_de_creditos == Some(true) {
-        let df_itens_de_docs_fiscais = apply_filter(df_itens_de_docs_fiscais)?;
-        let df_itens_de_docs_fiscais_result = apply_filter(df_itens_de_docs_fiscais_result)?;
-        (df_itens_de_docs_fiscais, df_itens_de_docs_fiscais_result)
-    } else {
-        (df_itens_de_docs_fiscais, df_itens_de_docs_fiscais_result)
-    };
+    let df_itens_de_docs_fiscais = apply_filter(df_itens_de_docs_fiscais, &args)?;
+    let df_itens_de_docs_fiscais_result = apply_filter(df_itens_de_docs_fiscais_result, &args)?;
 
     let dataframes: [DataFrame; 4] = [
         df_itens_de_docs_fiscais,

@@ -1,12 +1,5 @@
-use std::error::Error;
-
 use crate::{
-    coluna,
-    Side::{
-        Left,
-        //Middle,
-        //Right,
-    },
+    coluna, Arguments, Side::Left
 };
 
 use claudiofsr_lib::{
@@ -387,16 +380,18 @@ pub fn receita_bruta_cumulativa() -> Expr {
 }
 
 // Retain only credit entries (50 <= CST <= 66)
-pub fn apply_filter(df: DataFrame) -> Result<DataFrame, Box<dyn Error>> {
-    let df_filtered = df
-        .lazy()
-        .filter(
-            not(
-                operacoes_de_entrada_ou_saida()
-                .and(entrada_de_credito().not())
+pub fn apply_filter(data_frame: DataFrame, args: &Arguments) -> Result<DataFrame, PolarsError> {
+    if args.operacoes_de_creditos == Some(true) {
+        data_frame
+            .lazy()
+            .filter(
+                not(
+                    operacoes_de_entrada_ou_saida()
+                    .and(entrada_de_credito().not())
+                )
             )
-        )
-        .collect()?;
-
-    Ok(df_filtered)
+            .collect()
+    } else {
+        Ok(data_frame)
+    }
 }
