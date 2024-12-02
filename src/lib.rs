@@ -50,7 +50,7 @@ pub use self::{
 };
 
 use claudiofsr_lib::RoundFloat;
-use polars::{datatypes::DataType, prelude::*, prelude::Column as PColumn};
+use polars::{datatypes::DataType, prelude::Column as PColumn, prelude::*};
 use regex::Regex;
 use std::{
     any,
@@ -661,11 +661,7 @@ pub fn get_cnpj_base(col: PColumn) -> PolarsResult<Option<PColumn>> {
             eprintln!("fn get_cnpj_base()");
             eprintln!("Polars Column: {col:?}");
             Err(PolarsError::InvalidOperation(
-                format!(
-                    "Not supported for Series with DataType {:?}",
-                    col.dtype()
-                )
-                .into(),
+                format!("Not supported for Series with DataType {:?}", col.dtype()).into(),
             ))
         }
     }
@@ -756,9 +752,9 @@ pub fn round_float64_columns(col: PColumn, decimals: u32) -> PolarsResult<Option
         Some(s) => s,
         None => return Ok(Some(col)),
     };
-    
+
     match series.dtype() {
-        DataType::Float64 => Ok(Some(PColumn::Series(series.round(decimals)?))),
+        DataType::Float64 => Ok(Some(series.round(decimals)?.into())),
         _ => Ok(Some(col)),
     }
 }
@@ -773,11 +769,7 @@ pub fn round_column(col: PColumn, decimals: u32) -> PolarsResult<Option<PColumn>
             eprintln!("Column: {col:?}");
             eprintln!("Decimals: {decimals}");
             Err(PolarsError::InvalidOperation(
-                format!(
-                    "Not supported for Series with DataType {:?}",
-                    col.dtype()
-                )
-                .into(),
+                format!("Not supported for Series with DataType {:?}", col.dtype()).into(),
             ))
         }
     }
@@ -838,11 +830,7 @@ pub fn formatar_chave_eletronica(col: PColumn) -> PolarsResult<Option<PColumn>> 
             eprintln!("fn formatar_chave_eletronica()");
             eprintln!("Column: {col:?}");
             Err(PolarsError::InvalidOperation(
-                format!(
-                    "Not supported for Series with DataType {:?}",
-                    col.dtype()
-                )
-                .into(),
+                format!("Not supported for Series with DataType {:?}", col.dtype()).into(),
             ))
         }
     }
@@ -996,11 +984,11 @@ mod test_functions {
 
         println!("series: {series:?}\n");
 
-        let s = get_cnpj_base(PColumn::Series(series))?;
+        let col = get_cnpj_base(series.into())?;
 
-        println!("s: {s:?}\n");
+        println!("column: {col:?}\n");
 
-        assert_eq!(Some(PColumn::new("".into(), &valid)), s);
+        assert_eq!(Some(PColumn::new("".into(), &valid)), col);
 
         Ok(())
     }
@@ -1099,11 +1087,9 @@ mod test_functions {
 
         // É necessário formatar o número de casas decimais
         let col_formatted: Vec<Option<PColumn>> = vec_opt_lines_efd
-            .iter()
+            .into_iter()
             .flat_map(|opt_series| {
-                opt_series
-                    .as_ref()
-                    .and_then(|series| round_column(PColumn::Series(series.clone()), 1).ok())
+                opt_series.and_then(|series| round_column(series.into(), 1).ok())
             })
             .collect();
 

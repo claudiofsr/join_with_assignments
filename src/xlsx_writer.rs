@@ -221,7 +221,7 @@ impl PolarsXlsxWriter {
             if options.table.has_header_row() {
                 worksheet.write(row_offset, col_num, column.name().as_str())?;
             }
-            
+
             //println!("column: {column}");
 
             let series = match column.as_series() {
@@ -229,7 +229,7 @@ impl PolarsXlsxWriter {
                 None => continue,
             };
 
-            // let series = column.as_materialized_series();  
+            // let series = column.as_materialized_series();
 
             // Write the row data for each column/type.
             for (row_num, data) in series.iter().enumerate() {

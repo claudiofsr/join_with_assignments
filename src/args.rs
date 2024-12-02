@@ -107,11 +107,11 @@ pub struct Arguments {
     pub date_final: Option<u32>,
 
     /// Apply filter: Retain only credit entries (50 <= CST <= 66)
-    /// 
+    ///
     /// Reter apenas operações de crédito
-    /// 
+    ///
     /// Ou seja, imprimir nos arquivos finais itens de operações com alguna
-    /// 
+    ///
     /// Natureza da Base de Cálculo.
     #[arg(short, long, required = false)]
     pub operacoes_de_creditos: Option<bool>,

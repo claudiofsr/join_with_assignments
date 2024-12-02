@@ -64,12 +64,12 @@ pub fn write_xlsx(args: &Arguments, dfs: &[DataFrame]) -> PolarsResult<()> {
         ),
     ] {
         let number_of_rows = df.height();
-        let number_of_sheet = number_of_rows.div_ceil(MAX_NUMBER_OF_ROWS); 
+        let number_of_sheet = number_of_rows.div_ceil(MAX_NUMBER_OF_ROWS);
 
         //println!("number_of_rows: {number_of_rows}");
         //println!("number_of_sheet: {number_of_sheet}\n");
 
-        for count in 1 ..= number_of_sheet {
+        for count in 1..=number_of_sheet {
             let offset = MAX_NUMBER_OF_ROWS * (count - 1);
 
             let length = if count >= number_of_sheet {

@@ -383,8 +383,7 @@ pub fn apply_filter(data_frame: DataFrame, args: &Arguments) -> Result<DataFrame
         data_frame
             .lazy()
             .filter(not(
-                operacoes_de_entrada_ou_saida()
-                .and(entrada_de_credito().not())
+                operacoes_de_entrada_ou_saida().and(entrada_de_credito().not())
             ))
             .collect()
     } else {

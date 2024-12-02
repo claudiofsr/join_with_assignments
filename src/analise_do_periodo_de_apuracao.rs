@@ -71,11 +71,7 @@ pub fn subtrair_meses(
             eprintln!("fn subtrair_meses()");
             eprintln!("Column: {col:?}");
             Err(PolarsError::InvalidOperation(
-                format!(
-                    "Not supported for Series with DataType {:?}",
-                    col.dtype()
-                )
-                .into(),
+                format!("Not supported for Series with DataType {:?}", col.dtype()).into(),
             ))
         }
     }
@@ -120,11 +116,7 @@ pub fn adicionar_meses(
             eprintln!("fn adicionar_meses()");
             eprintln!("Column: {col:?}");
             Err(PolarsError::InvalidOperation(
-                format!(
-                    "Not supported for Series with DataType {:?}",
-                    col.dtype()
-                )
-                .into(),
+                format!("Not supported for Series with DataType {:?}", col.dtype()).into(),
             ))
         }
     }

@@ -96,7 +96,7 @@ fn analisar_colunas_selecionadas(col: &Column) -> Result<Option<Column>, PolarsE
 
     // https://docs.rs/rayon/latest/rayon/iter/struct.MultiZip.html
     // MultiZip is an iterator that zips up a tuple of parallel iterators to produce tuples of their items.
-    let new_series: Series = (vec_opt_str_ncm, vec_opt_str_dsc)
+    let col: Column = (vec_opt_str_ncm, vec_opt_str_dsc)
         .into_par_iter() // rayon: parallel iterator
         .map(
             |(opt_str_ncm, opt_str_dsc)| match (opt_str_ncm, opt_str_dsc) {
@@ -111,9 +111,9 @@ fn analisar_colunas_selecionadas(col: &Column) -> Result<Option<Column>, PolarsE
             },
         )
         .collect::<StringChunked>()
-        .into_series();
+        .into_column();
 
-    Ok(Some(polars::prelude::Column::Series(new_series)))
+    Ok(Some(col))
 }
 
 /// Base Legal conforme código NCM e descrição do item.

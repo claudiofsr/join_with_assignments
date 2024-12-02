@@ -1043,18 +1043,13 @@ fn formatar_valores(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>> {
 
     let lazy_formated: LazyFrame = lazyframe
         .with_columns([when(operacoes_de_saida())
-            .then(cols(valores).apply(
-                |col| round_float64_columns(col, 4),
-                GetOutput::same_type(),
-            ))
-            .otherwise(cols(valores).apply(
-                |col| round_float64_columns(col, 4),
-                GetOutput::same_type(),
-            ))])
-        .with_columns([cols(aliquotas).apply(
-            |col| round_float64_columns(col, 4),
-            GetOutput::same_type(),
-        )])
+            .then(cols(valores).apply(|col| round_float64_columns(col, 4), GetOutput::same_type()))
+            .otherwise(
+                cols(valores).apply(|col| round_float64_columns(col, 4), GetOutput::same_type()),
+            )])
+        .with_columns([
+            cols(aliquotas).apply(|col| round_float64_columns(col, 4), GetOutput::same_type())
+        ])
         .with_columns([cols(colunas_float64).apply(
             |col| desprezar_pequenos_valores(col, SMALL_VALUE),
             GetOutput::same_type(),
@@ -1258,12 +1253,11 @@ mod tests {
             when(col("contador").map(
                 move |col| {
                     Ok(Some(
-                        col
-                            .u32()?
+                        col.u32()?
                             .into_iter()
                             .map(|opt_u32: Option<u32>| opt_u32.map(|value| value % 2 == 0))
                             .collect::<BooleanChunked>()
-                            .into_column()
+                            .into_column(),
                     ))
                 },
                 GetOutput::from_type(DataType::Boolean),

@@ -192,11 +192,7 @@ pub fn descricao_da_origem(col: Column) -> Result<Option<Column>, PolarsError> {
             eprintln!("fn descricao_da_origem()");
             eprintln!("Column: {col:?}");
             Err(PolarsError::InvalidOperation(
-                format!(
-                    "Not supported for Series with DataType {:?}",
-                    col.dtype()
-                )
-                .into(),
+                format!("Not supported for Series with DataType {:?}", col.dtype()).into(),
             ))
         }
     };
@@ -230,11 +226,7 @@ pub fn descricao_do_tipo_de_operacao(col: Column) -> Result<Option<Column>, Pola
             eprintln!("fn descricao_do_tipo_de_operacao()");
             eprintln!("Column: {col:?}");
             Err(PolarsError::InvalidOperation(
-                format!(
-                    "Not supported for Series with DataType {:?}",
-                    col.dtype()
-                )
-                .into(),
+                format!("Not supported for Series with DataType {:?}", col.dtype()).into(),
             ))
         }
     };
@@ -268,11 +260,7 @@ pub fn descricao_do_tipo_de_credito(col: Column) -> Result<Option<Column>, Polar
             eprintln!("fn descricao_do_tipo_de_credito()");
             eprintln!("Column: {col:?}");
             Err(PolarsError::InvalidOperation(
-                format!(
-                    "Not supported for Series with DataType {:?}",
-                    col.dtype()
-                )
-                .into(),
+                format!("Not supported for Series with DataType {:?}", col.dtype()).into(),
             ))
         }
     };
@@ -303,11 +291,7 @@ pub fn descricao_do_mes(col: Column) -> Result<Option<Column>, PolarsError> {
             eprintln!("fn descricao_do_mes()");
             eprintln!("Column: {col:?}");
             Err(PolarsError::InvalidOperation(
-                format!(
-                    "Not supported for Series with DataType {:?}",
-                    col.dtype()
-                )
-                .into(),
+                format!("Not supported for Series with DataType {:?}", col.dtype()).into(),
             ))
         }
     };
@@ -332,7 +316,7 @@ fn tipo_mes(col: Column) -> Result<Option<Column>, PolarsError> {
 }
 
 pub fn descricao_da_natureza_da_bc_dos_creditos(
-    col: Column
+    col: Column,
 ) -> Result<Option<Column>, PolarsError> {
     let result_option_series = match col.dtype() {
         DataType::Int64 => natureza_da_bc_dos_creditos(col),
@@ -340,11 +324,7 @@ pub fn descricao_da_natureza_da_bc_dos_creditos(
             eprintln!("fn descricao_da_natureza_da_bc_dos_creditos()");
             eprintln!("Column: {col:?}");
             Err(PolarsError::InvalidOperation(
-                format!(
-                    "Not supported for Series with DataType {:?}",
-                    col.dtype()
-                )
-                .into(),
+                format!("Not supported for Series with DataType {:?}", col.dtype()).into(),
             ))
         }
     };
