@@ -89,6 +89,7 @@ features = [
 # git = "https://github.com/jmcnamara/rust_xlsxwriter.git"
 path = "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/rust_xlsxwriter-0.79.4b"
 features = [
+    "constant_memory",
     "chrono",
     "polars",
     "ryu",
