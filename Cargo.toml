@@ -38,7 +38,7 @@ pathfinding = "4.11"
 rayon = "1.10"
 regex = "1.10"
 serde = { version = "1.0", features = [ "derive" ] }
-sysinfo = "0.32"
+sysinfo = "0.33"
 tabled = { version = "0.17", features = ["ansi"] }
 toml = "0.8"
 
@@ -52,11 +52,11 @@ features = [
 ]
 
 [dependencies.polars]
-version = "0.44.2"
+version = "0.45.1"
 # git = "https://github.com/pola-rs/polars.git"
 # rev = "8a6bf4b"
 # https://github.com/pola-rs/polars/releases/tag/rs-0.44.0
-# https://github.com/pola-rs/polars/releases/tag/rs-0.44.2
+# https://github.com/pola-rs/polars/releases/tag/rs-0.45.0.1
 # git clone https://github.com/pola-rs/polars.git
 # path = "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/polars-0.40.0"
 features = [
@@ -83,10 +83,11 @@ features = [
 ]
 
 [dependencies.rust_xlsxwriter]
-version = "0.80.0"
+# version = "0.80.0"
 # https://github.com/jmcnamara/rust_xlsxwriter/blob/main/CHANGELOG.md
 # git = "https://github.com/jmcnamara/rust_xlsxwriter.git"
-# path = "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/rust_xlsxwriter-0.79.4b"
+path = "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/rust_xlsxwriter-0.80.0b"
+
 features = [
     # "constant_memory",
     "chrono",
