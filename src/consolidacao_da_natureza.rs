@@ -2,15 +2,10 @@ use polars::{datatypes::DataType, prelude::*};
 use std::error::Error;
 
 use crate::{
-    cfop_de_exportacao, coluna, cst_01_a_09, cst_49, cst_50_a_66, csts, desprezar_pequenos_valores,
-    entrada_de_credito, get_cnpj_base, operacoes_de_ajustes_ou_descontos, operacoes_de_saida,
-    receita_bruta_cumulativa, receita_bruta_nao_cumulativa, round_float64_columns,
-    saida_de_receita_bruta,
-    Side::{
-        Left,
-        //Middle,
-        //Right,
-    },
+    cfop_de_exportacao, coluna, cst_01_a_09, cst_49, cst_50_a_66, csts, csts_nao_tributados,
+    desprezar_pequenos_valores, entrada_de_credito, get_cnpj_base,
+    operacoes_de_ajustes_ou_descontos, operacoes_de_saida, receita_bruta_cumulativa,
+    receita_bruta_nao_cumulativa, round_float64_columns, saida_de_receita_bruta, Side::Left,
 };
 
 const SMALL_VALUE: f64 = 0.009; // menor que um centavo
@@ -87,8 +82,8 @@ fn selecionar_colunas_apos_filtros(
     // 6: Desconto Efetuado em Período Posterior; 7: Detalhamento.
     let operacoes_desejadas: Expr = col(top).is_not_null().and(col(top).neq(lit(7)));
 
-    let series = Series::new(reg.into(), ["C170"]);
-    let registros_selecionados = col(reg).is_in(lit(series));
+    //let series = Series::new(reg.into(), ["C170"]);
+    //let registros_selecionados = col(reg).is_in(lit(series));
     //let pattern: Expr = lit(r"(i?)C170|C100"); // regex
     //let registros_selecionados = col(reg).str().contains(pattern, false);
 
@@ -147,7 +142,7 @@ fn selecionar_colunas_apos_filtros(
                 .cast(DataType::Boolean)
                 .alias("RecBrutaTotal"),
         )
-        //*
+        /*
         // Correção: CST 9 && Registro C170 --> "valor_item" = 0.0
         .with_column(
             //when(col(cst).eq(9).and(registros_selecionados).and(auditar))
@@ -157,6 +152,7 @@ fn selecionar_colunas_apos_filtros(
                 .cast(DataType::Float64)
                 .alias(val),
         )
+        */
         /*
         // Correção de CST: 63 -> 60
         .with_column(
@@ -538,11 +534,7 @@ fn analisar_operacoes_de_saida(
 
 /// Analisar débitos omitidos em Operações de Saída
 fn analisar_debitos_omitidos(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>> {
-    let cst: &str = coluna(Left, "cst");
     let ncm: &str = coluna(Left, "ncm");
-
-    let series: Series = [4, 6, 7, 8, 9, 49].iter().collect();
-    let operacoes_nao_tributadas: Expr = col(cst).is_in(lit(series));
 
     // NCM 2309.90.xx ou 230990xx
     let pattern: Expr = lit(r"^\D*2309\.?90"); // regex
@@ -554,9 +546,8 @@ fn analisar_debitos_omitidos(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn 
     // Estas operações devem ser tributadas: revenda de mercadorias de NCM 2309.90
 
     let debitos_omitidos_ncm_2309: LazyFrame = lazyframe
-        .clone()
         .filter(operacoes_de_saida())
-        .filter(operacoes_nao_tributadas)
+        .filter(csts_nao_tributados())
         .filter(cfop_de_exportacao().not())
         .filter(ncm_2309)
         .group_by([
@@ -604,7 +595,7 @@ fn analisar_debitos_omitidos(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn 
         .with_columns([cols(["RBNC_NTributada", "RBNC_Exportação"])
             .apply(|s| set_some_f64_value(s, None), GetOutput::same_type())]);
 
-    Ok(debitos_omitidos_ncm_2309)
+    Ok(debitos_omitidos_ncm_2309.collect()?.lazy())
 }
 
 /// Agregar colunas para em seguida remover colunas temporárias

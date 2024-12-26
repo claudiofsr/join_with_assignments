@@ -916,6 +916,10 @@ pub fn extract_cnpjs(input: &str) -> Vec<String> {
         .collect()
 }
 
+pub fn quit() {
+    std::process::exit(0);
+}
+
 #[cfg(test)]
 mod test_functions {
     use super::*;

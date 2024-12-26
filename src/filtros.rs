@@ -7,7 +7,8 @@ use claudiofsr_lib::{
 
 use polars::prelude::*;
 
-const CST_OUTRAS_OPERACOES: [u32; 1] = [49];
+const CST_OUTRAS_OPERACOES: [u16; 1] = [49];
+const CSTS_NAO_TRIBUTADOS: [u16; 6] = [4, 6, 7, 8, 9, 49];
 
 /// Entre as opções da coluna "tipo_operacao":
 ///
@@ -103,6 +104,13 @@ pub fn cst_01_a_09() -> Expr {
 /// CST de Outras Operações de Saída
 pub fn cst_49() -> Expr {
     csts(CST_OUTRAS_OPERACOES)
+}
+
+/// CSTs de Operações de Saída Não Tributadas
+///
+/// CST: [4, 6, 7, 8, 9, 49]
+pub fn csts_nao_tributados() -> Expr {
+    csts(CSTS_NAO_TRIBUTADOS)
 }
 
 /// CST com direito ao desconto de crédito das Contribuições:
