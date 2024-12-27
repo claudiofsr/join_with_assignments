@@ -509,7 +509,7 @@ fn read_csv_lazy(
     .map(|s| s.into())
     .collect();
 
-    match (file_path, delimiter) {
+    match (&file_path, delimiter) {
         (Some(path), Some(separator)) => {
             // Schema: a map from column names to data types
             let mut schema: Schema = Schema::default();
@@ -518,7 +518,7 @@ fn read_csv_lazy(
             let cols_dtype: HashMap<&str, DataType> = Column::get_cols_dtype(side);
 
             // headers, nomes das colunas, primeira linha do arquivo CSV.
-            if let Ok(headers) = get_csv_headers(&path, separator as u8) {
+            if let Ok(headers) = get_csv_headers(path, separator as u8) {
                 // Colunas adicionadas a Schema de acordo com a ordem das colunas no arquivo CSV.
                 headers
                     .into_iter()
@@ -533,7 +533,7 @@ fn read_csv_lazy(
                     });
             }
 
-            let result_lazyframe: PolarsResult<LazyFrame> = LazyCsvReader::new(&path)
+            let result_lazyframe: PolarsResult<LazyFrame> = LazyCsvReader::new(path)
                 .with_encoding(CsvEncoding::LossyUtf8)
                 .with_try_parse_dates(false) // use regex
                 .with_separator(separator as u8)
@@ -549,12 +549,14 @@ fn read_csv_lazy(
 
             // Add error description
             if result_lazyframe.is_err() {
-                eprintln!("\nError: Failed to read the file {:?}", path);
+                eprintln!("\nError: Failed to read the file {:#?}", path);
             }
 
             result_lazyframe
         }
         _ => {
+            eprintln!("File path: {:#?}", file_path);
+            eprintln!("Delimiter: {:#?}", delimiter);
             panic!("File path or delimiter error!")
         }
     }
