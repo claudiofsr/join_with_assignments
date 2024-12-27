@@ -3,7 +3,7 @@ name = "join_with_assignments"
 authors = ["Claudio F S Rodrigues <claudiofsrodrigues@gmail.com>"]
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.81"
+rust-version = "1.83"
 homepage = "https://github.com/claudiofsr/join_with_assignments"
 repository = "https://github.com/claudiofsr/join_with_assignments"
 description = """
@@ -76,7 +76,7 @@ features = [
     "list_gather",  # Take sublist by multiple indices
     "parquet",      # Read Apache Parquet format
     "regex",        # Use regexes in column selection
-    "repeat_by",
+    "repeat_by",    # Repeat element in an Array N times, where N is given by another array.
     "round_series", # Round underlying float types of Series
     "serde-lazy",   # Support for serde serialization and deserialization.
     "strings",      # Extra string utilities for Utf8Chunked
