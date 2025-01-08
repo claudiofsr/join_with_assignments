@@ -1,11 +1,12 @@
 use polars::{datatypes::DataType, prelude::*};
-use std::error::Error;
+use std::{error::Error, ops::Neg};
 
 use crate::{
     cfop_de_exportacao, coluna, cst_01_a_09, cst_49, cst_50_a_66, csts, csts_nao_tributados,
     desprezar_pequenos_valores, entrada_de_credito, get_cnpj_base,
     operacoes_de_ajustes_ou_descontos, operacoes_de_saida, receita_bruta_cumulativa,
-    receita_bruta_nao_cumulativa, round_float64_columns, saida_de_receita_bruta, Side::Left,
+    receita_bruta_nao_cumulativa, receita_nao_nula, round_float64_columns, saida_de_receita_bruta,
+    Side::Left,
 };
 
 const SMALL_VALUE: f64 = 0.009; // menor que um centavo
@@ -352,8 +353,6 @@ fn ratear_creditos(receita: &str) -> Expr {
     let cst: &str = coluna(Left, "cst"); // "Código de Situação Tributária (CST)"
     let valor_bc: &str = coluna(Left, "valor_bc"); // "Valor da Base de Cálculo das Contribuições"
 
-    let receita_positiva: Expr = col("ReceitaBrutaTotal").gt(lit(0)); // Evitar divisão por Zero!
-
     // modulo operation returns the remainder of a division
     // `a % b = a - b * floor(a / b)`
 
@@ -385,7 +384,7 @@ fn ratear_creditos(receita: &str) -> Expr {
     let cst_rec_bruta_cumulativa: Expr = lit(receita == "RecBrutaCumulativa");
     let cst_rec_bruta_total: Expr = lit(receita == "ReceitaBrutaTotal");
 
-    when(cst_50_a_66().and(receita_positiva))
+    when(cst_50_a_66().and(receita_nao_nula()))
         .then(
             when(cst_56_ou_66) // ratear valor para as colunas 1 e 2 e 3
                 .then(col(valor_bc) * col(receita) / col("RecBrutaNCumulativa"))
@@ -449,12 +448,10 @@ fn analisar_operacoes_de_saida(
     auditar: bool,
     union_args: UnionArgs,
 ) -> Result<LazyFrame, Box<dyn Error>> {
-    let receita_positiva: Expr = col("ReceitaBrutaTotal").gt(lit(0)); // Evitar divisão por Zero!
-
     let receita_bruta_valores: LazyFrame = lazyframe
         .clone()
         .filter(operacoes_de_saida())
-        .filter(receita_positiva)
+        .filter(receita_nao_nula())
         .group_by([
             col("CNPJ Base"),
             col("Ano do Período de Apuração"),
@@ -548,7 +545,7 @@ fn analisar_debitos_omitidos(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn 
     let debitos_omitidos_ncm_2309: LazyFrame = lazyframe
         .filter(operacoes_de_saida())
         .filter(csts_nao_tributados())
-        .filter(cfop_de_exportacao().not())
+        //.filter(cfop_de_exportacao().not())
         .filter(ncm_2309)
         .group_by([
             col("CNPJ Base"),
@@ -574,23 +571,25 @@ fn analisar_debitos_omitidos(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn 
                 .apply(|s| set_some_i64_value(s, Some(90)), GetOutput::same_type()),
         ])
         .agg([
-            col("Valor da Base de Cálculo das Contribuições").sum(),
-            col("Valor Total do Item").sum(),
-            col("RBNC_Tributada").sum(),
-            col("RBNC_NTributada").sum(),
-            col("RBNC_Exportação").sum(),
-            col("RecBrutaNCumulativa").sum(),
-            col("RecBrutaCumulativa").sum(),
-            col("ReceitaBrutaTotal").sum(),
+            // Após soma, negativar valores
+            col("Valor da Base de Cálculo das Contribuições")
+                .sum()
+                .neg(),
+            col("Valor Total do Item").sum().neg(),
+            col("RBNC_Tributada").sum().neg(),
+            col("RBNC_NTributada").sum().neg(),
+            col("RBNC_Exportação").sum().neg(),
+            col("RecBrutaNCumulativa").sum().neg(),
+            col("RecBrutaCumulativa").sum().neg(),
+            col("ReceitaBrutaTotal").sum().neg(),
         ])
         .with_column(
-            (col("Valor Total do Item") * lit(-1)) // Valores Negativos
-                .alias("Valor da Base de Cálculo das Contribuições"),
+            // sobrescrever valor
+            col("Valor Total do Item").alias("Valor da Base de Cálculo das Contribuições"),
         )
         .with_column(
             // concentar valores dos Débitos na coluna: RBNC_Tributada.
-            (col("Valor Total do Item") * lit(-1)) // Valores Negativos
-                .alias("RBNC_Tributada"),
+            col("Valor Total do Item").alias("RBNC_Tributada"),
         )
         .with_columns([cols(["RBNC_NTributada", "RBNC_Exportação"])
             .apply(|s| set_some_f64_value(s, None), GetOutput::same_type())]);

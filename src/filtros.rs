@@ -10,6 +10,13 @@ use polars::prelude::*;
 const CST_OUTRAS_OPERACOES: [u16; 1] = [49];
 const CSTS_NAO_TRIBUTADOS: [u16; 6] = [4, 6, 7, 8, 9, 49];
 
+/// Filtrar ReceitaBrutaTotal não Nula
+///
+/// Evitar divisão por Zero
+pub fn receita_nao_nula() -> Expr {
+    col("ReceitaBrutaTotal").neq(lit(0))
+}
+
 /// Entre as opções da coluna "tipo_operacao":
 ///
 /// 1: Entrada, 2: Saída, 3 e 4: Ajustes, 5 e 6: Descontos, 7: Detalhamento.
