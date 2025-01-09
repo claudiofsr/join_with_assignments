@@ -2,7 +2,7 @@ use crate::{coluna, Arguments, Side::Left};
 
 use claudiofsr_lib::{
     CFOP_DE_EXPORTACAO, CFOP_VENDA_DE_IMOBILIZADO, CODIGO_DA_NATUREZA_BC, CSTS_NAO_TRIBUTADOS,
-    CST_CREDITO, CST_CREDITO_BASICO, CST_OUTRAS_OPERACOES, CST_RECEITA_BRUTA, PATTERN,
+    CST_CREDITO, CST_CREDITO_BASICO, CST_RECEITA_BRUTA, PATTERN,
 };
 
 use polars::prelude::*;
@@ -105,11 +105,6 @@ fn operacoes_v3(range: impl Iterator<Item = u32>) -> Expr {
 /// Intervalo de CST: valores entre 1 a 49.
 pub fn cst_de_receita_bruta() -> Expr {
     csts(CST_RECEITA_BRUTA)
-}
-
-/// CST de Outras Operações de Saída
-pub fn cst_49() -> Expr {
-    csts(CST_OUTRAS_OPERACOES)
 }
 
 /// CSTs de Operações de Saída Não Tributadas

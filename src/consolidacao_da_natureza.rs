@@ -2,8 +2,8 @@ use polars::{datatypes::DataType, prelude::*};
 use std::{error::Error, ops::Neg};
 
 use crate::{
-    cfop_de_exportacao, coluna, cst_49, cst_50_a_66, cst_de_receita_bruta, csts,
-    csts_nao_tributados, desprezar_pequenos_valores, entrada_de_credito, get_cnpj_base,
+    cfop_de_exportacao, coluna, cst_50_a_66, cst_de_receita_bruta, csts, csts_nao_tributados,
+    desprezar_pequenos_valores, entrada_de_credito, get_cnpj_base,
     operacoes_de_ajustes_ou_descontos, operacoes_de_saida, receita_bruta_cumulativa,
     receita_bruta_nao_cumulativa, receita_nao_nula, round_float64_columns, saida_de_receita_bruta,
     Side::Left,
@@ -119,8 +119,7 @@ fn selecionar_colunas_apos_filtros(
             entrada_de_credito()
                 .or(saida_de_receita_bruta())
                 //.or(receita_bruta_nao_cumulativa())
-                .or(operacoes_de_ajustes_ou_descontos())
-                .or(cst_49()),
+                .or(operacoes_de_ajustes_ou_descontos()),
         )
         .with_column(
             when(receita_bruta_nao_cumulativa())
@@ -219,7 +218,7 @@ fn groupby_and_agg_values(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Err
     let valor_bc: &str = coluna(Left, "valor_bc"); // "Valor da Base de Cálculo das Contribuições"
 
     let range_a: [u32; 4] = [1, 2, 3, 5]; // RBNC_Tributada
-    let range_b: [u32; 4] = [4, 6, 7, 9]; // RBNC_NTributada
+    let range_b: [u32; 5] = [4, 6, 7, 9, 49]; // RBNC_NTributada
     let range_c: [u32; 1] = [8]; // RBNC_Exportação
 
     let filter_a = csts(range_a);
