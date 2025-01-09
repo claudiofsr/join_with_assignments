@@ -1,14 +1,11 @@
 use crate::{coluna, Arguments, Side::Left};
 
 use claudiofsr_lib::{
-    CFOP_DE_EXPORTACAO, CFOP_VENDA_DE_IMOBILIZADO, CODIGO_DA_NATUREZA_BC, CST_CREDITO,
-    CST_CREDITO_BASICO, CST_RECEITA_BRUTA, PATTERN,
+    CFOP_DE_EXPORTACAO, CFOP_VENDA_DE_IMOBILIZADO, CODIGO_DA_NATUREZA_BC, CSTS_NAO_TRIBUTADOS,
+    CST_CREDITO, CST_CREDITO_BASICO, CST_OUTRAS_OPERACOES, CST_RECEITA_BRUTA, PATTERN,
 };
 
 use polars::prelude::*;
-
-const CST_OUTRAS_OPERACOES: [u16; 1] = [49];
-const CSTS_NAO_TRIBUTADOS: [u16; 6] = [4, 6, 7, 8, 9, 49];
 
 /// Filtrar ReceitaBrutaTotal não Nula
 ///
@@ -101,10 +98,12 @@ fn operacoes_v3(range: impl Iterator<Item = u32>) -> Expr {
     col(top).is_not_null().and(col(top).is_in(lit(series)))
 }
 
-/// CST de Receita Bruta Cumulativa e Receita Bruta Não Cumulativa:
+/// CST de Receita Bruta (Saídas):
 ///
-/// Intervalo de CST: valores entre 1 a 9.
-pub fn cst_01_a_09() -> Expr {
+/// CST de Receita Bruta Cumulativa e Receita Bruta Não Cumulativa.
+///
+/// Intervalo de CST: valores entre 1 a 49.
+pub fn cst_de_receita_bruta() -> Expr {
     csts(CST_RECEITA_BRUTA)
 }
 
@@ -362,7 +361,7 @@ entre outras.
 */
 pub fn saida_de_receita_bruta() -> Expr {
     operacoes_de_saida() // 2: Saída
-        .and(cst_01_a_09())
+        .and(cst_de_receita_bruta())
         .and(venda_de_imobilizado().not())
         .and(aliquota_de_receita_financeira().not())
         .and(descricao_de_outras_receitas().not())

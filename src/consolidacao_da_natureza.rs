@@ -2,8 +2,8 @@ use polars::{datatypes::DataType, prelude::*};
 use std::{error::Error, ops::Neg};
 
 use crate::{
-    cfop_de_exportacao, coluna, cst_01_a_09, cst_49, cst_50_a_66, csts, csts_nao_tributados,
-    desprezar_pequenos_valores, entrada_de_credito, get_cnpj_base,
+    cfop_de_exportacao, coluna, cst_49, cst_50_a_66, cst_de_receita_bruta, csts,
+    csts_nao_tributados, desprezar_pequenos_valores, entrada_de_credito, get_cnpj_base,
     operacoes_de_ajustes_ou_descontos, operacoes_de_saida, receita_bruta_cumulativa,
     receita_bruta_nao_cumulativa, receita_nao_nula, round_float64_columns, saida_de_receita_bruta,
     Side::Left,
@@ -339,7 +339,7 @@ fn replicar_linha_de_soma_da_receita(lazyframe: LazyFrame) -> Result<LazyFrame, 
     let lazyframe: LazyFrame = lazyframe.with_columns([when(cst_50_a_66())
         .then(
             cols(selected_columns)
-                .filter(cst_01_a_09())
+                .filter(cst_de_receita_bruta())
                 .sum() // soma de valores para cst entre 01 a 09
                 .over(discrimination_window),
         )
