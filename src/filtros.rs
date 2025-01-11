@@ -102,7 +102,7 @@ fn operacoes_v3(range: impl Iterator<Item = u32>) -> Expr {
 ///
 /// CST de Receita Bruta Cumulativa e Receita Bruta Não Cumulativa.
 ///
-/// Intervalo de CST: valores entre 1 a 49.
+/// Intervalo de CST: valores entre 1 a 9 e 49.
 pub fn cst_de_receita_bruta() -> Expr {
     csts(CST_RECEITA_BRUTA)
 }
