@@ -544,7 +544,7 @@ fn analisar_debitos_omitidos(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn 
     let debitos_omitidos_ncm_2309: LazyFrame = lazyframe
         .filter(operacoes_de_saida())
         .filter(csts_nao_tributados())
-        .filter(cfop_de_exportacao().not())
+        .filter(cfop_de_exportacao().not()) // excluir operações de exportação
         .filter(ncm_2309)
         .group_by([
             col("CNPJ Base"),
