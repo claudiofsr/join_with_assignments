@@ -33,6 +33,7 @@ claudiofsr_lib = "0.14"
 colored = "3.0"
 confy = "0.6"
 csv = "1.3"
+execution-time = "0.1"
 hashbrown = { version = "0.15", features = ["raw-entry"] }
 pathfinding = "4.14"
 rayon = "1.10"
@@ -52,11 +53,10 @@ features = [
 ]
 
 [dependencies.polars]
-version = "0.45.1"
+version = "0.46.0"
 # git = "https://github.com/pola-rs/polars.git"
 # rev = "8a6bf4b"
-# https://github.com/pola-rs/polars/releases/tag/rs-0.44.0
-# https://github.com/pola-rs/polars/releases/tag/rs-0.45.0.1
+# https://github.com/pola-rs/polars/releases/tag/rs-0.46.0
 # git clone https://github.com/pola-rs/polars.git
 # path = "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/polars-0.40.0"
 features = [
@@ -82,8 +82,11 @@ features = [
     "strings",      # Extra string utilities for Utf8Chunked
 ]
 
+[dependencies.polars-arrow ]
+version = "0.46.0"
+
 [dependencies.rust_xlsxwriter]
-version = "0.81.0"
+version = "0.82.0"
 # https://github.com/jmcnamara/rust_xlsxwriter/blob/main/CHANGELOG.md
 # git = "https://github.com/jmcnamara/rust_xlsxwriter.git"
 # path = "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/rust_xlsxwriter-0.80.0b"

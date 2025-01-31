@@ -21,6 +21,7 @@ pub fn obter_consolidacao_nat(
         to_supertypes: true,
         diagonal: false,
         from_partitioned_ds: false,
+        maintain_order: true,
     };
 
     let lazyframe: LazyFrame = dataframe.clone().lazy();

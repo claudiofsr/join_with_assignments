@@ -2,18 +2,16 @@
 //
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //
-// Copyright 2023-2024, John McNamara, jmcnamara@cpan.org
-//
-// git clone https://github.com/jmcnamara/polars_excel_writer.git
+// Copyright 2022-2025, John McNamara, jmcnamara@cpan.org
 
 use std::io::{Seek, Write};
 use std::path::Path;
 
-use polars::export::arrow::temporal_conversions::{
+use polars::prelude::*;
+use polars_arrow::temporal_conversions::{
     date32_to_date, time64ns_to_time, timestamp_ms_to_datetime, timestamp_ns_to_datetime,
     timestamp_us_to_datetime,
 };
-use polars::prelude::*;
 use rust_xlsxwriter::{Format, Table, Workbook, Worksheet};
 pub struct PolarsXlsxWriter {
     pub(crate) workbook: Workbook,
@@ -114,8 +112,23 @@ impl PolarsXlsxWriter {
         self
     }
 
-    pub fn set_null_value(&mut self, null_value: impl Into<String>) -> &mut PolarsXlsxWriter {
-        self.options.null_string = Some(null_value.into());
+    pub fn set_null_value(&mut self, value: impl Into<String>) -> &mut PolarsXlsxWriter {
+        self.options.null_value = Some(value.into());
+        self
+    }
+
+    pub fn set_nan_value(&mut self, value: impl Into<String>) -> &mut PolarsXlsxWriter {
+        self.options.nan_value = Some(value.into());
+        self
+    }
+
+    pub fn set_infinity_value(&mut self, value: impl Into<String>) -> &mut PolarsXlsxWriter {
+        self.options.infinity_value = Some(value.into());
+        self
+    }
+
+    pub fn set_neg_infinity_value(&mut self, value: impl Into<String>) -> &mut PolarsXlsxWriter {
+        self.options.neg_infinity_value = Some(value.into());
         self
     }
 
@@ -143,6 +156,13 @@ impl PolarsXlsxWriter {
 
     pub fn set_freeze_panes_top_cell(&mut self, row: u32, col: u16) -> &mut PolarsXlsxWriter {
         self.options.top_cell = (row, col);
+
+        self
+    }
+
+    pub fn set_autofilter(&mut self, enable: bool) -> &mut PolarsXlsxWriter {
+        let table = self.options.table.clone().set_autofilter(enable);
+        self.options.table = table;
 
         self
     }
@@ -213,6 +233,17 @@ impl PolarsXlsxWriter {
     ) -> Result<(), PolarsError> {
         let header_offset = u32::from(options.table.has_header_row());
 
+        // Set NaN and Infinity values, if required.
+        if let Some(nan_value) = &options.nan_value {
+            worksheet.set_nan_value(nan_value);
+        }
+        if let Some(infinity_value) = &options.infinity_value {
+            worksheet.set_infinity_value(infinity_value);
+        }
+        if let Some(neg_infinity_value) = &options.neg_infinity_value {
+            worksheet.set_neg_infinity_value(neg_infinity_value);
+        }
+
         // Iterate through the dataframe column by column.
         for (col_num, column) in df.get_columns().iter().enumerate() {
             let col_num = col_offset + col_num as u16;
@@ -222,17 +253,8 @@ impl PolarsXlsxWriter {
                 worksheet.write(row_offset, col_num, column.name().as_str())?;
             }
 
-            //println!("column: {column}");
-
-            let series = match column.as_series() {
-                Some(s) => s,
-                None => continue,
-            };
-
-            // let series = column.as_materialized_series();
-
             // Write the row data for each column/type.
-            for (row_num, data) in series.iter().enumerate() {
+            for (row_num, data) in column.as_materialized_series().iter().enumerate() {
                 let row_num = header_offset + row_offset + row_num as u32;
 
                 // Map the Polars Series AnyValue types to Excel/rust_xlsxwriter
@@ -292,7 +314,7 @@ impl PolarsXlsxWriter {
                         worksheet.write_boolean(row_num, col_num, value)?;
                     }
                     AnyValue::Null => {
-                        if let Some(null_string) = &options.null_string {
+                        if let Some(null_string) = &options.null_value {
                             worksheet.write_string(row_num, col_num, null_string)?;
                         }
                     }
@@ -389,7 +411,10 @@ pub(crate) struct WriterOptions {
     pub(crate) time_format: Format,
     pub(crate) float_format: Format,
     pub(crate) datetime_format: Format,
-    pub(crate) null_string: Option<String>,
+    pub(crate) null_value: Option<String>,
+    pub(crate) nan_value: Option<String>,
+    pub(crate) infinity_value: Option<String>,
+    pub(crate) neg_infinity_value: Option<String>,
     pub(crate) table: Table,
     pub(crate) zoom: u16,
     pub(crate) screen_gridlines: bool,
@@ -410,7 +435,10 @@ impl WriterOptions {
             time_format: "hh:mm:ss;@".into(),
             date_format: "yyyy\\-mm\\-dd;@".into(),
             datetime_format: "yyyy\\-mm\\-dd\\ hh:mm:ss".into(),
-            null_string: None,
+            null_value: None,
+            nan_value: None,
+            infinity_value: None,
+            neg_infinity_value: None,
             float_format: Format::default(),
             table: Table::new(),
             zoom: 100,

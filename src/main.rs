@@ -1,8 +1,9 @@
 use chrono::{DateTime, Local};
 use claudiofsr_lib::clear_terminal_screen;
+use execution_time::ExecutionTime;
 use join_with_assignments::*;
 use polars::prelude::*;
-use std::{error::Error, time::Instant};
+use std::error::Error;
 
 /*
 Example of use:
@@ -70,7 +71,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     show_sysinfo();
 
     let args: Arguments = Arguments::build()?;
-    let time = Instant::now();
+    let timer = ExecutionTime::start();
 
     let df_itens_de_docs_fiscais: DataFrame = get_dataframe_after_assignments(&args)?;
 
@@ -118,7 +119,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let dt_local_now: DateTime<Local> = Local::now();
     println!("Location date: {}", dt_local_now.format("%d/%m/%Y"));
-    println!("Total Execution Time: {:?}\n", time.elapsed());
+    println!("Total Execution Time: {}\n", timer.get_elapsed_time());
 
     Ok(())
 }
