@@ -1,0 +1,11 @@
+/target
+/Dados*
+df_*
+*.csv
+*.txt
+*.xlsx
+*.parquet
+*.py
+*.sh
+nfe*
+efd*
