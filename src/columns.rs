@@ -356,7 +356,7 @@ impl Column {
             Column {side, nick: "cfop", name: "Código CFOP : NF Item (Todos)", dtype: DataType::Int64},
             Column {side, nick: "descricao_cfop", name: "Descrição CFOP : NF Item (Todos)", dtype: DataType::String},
             Column {side, nick: "descricao_mercadoria", name: "Descrição da Mercadoria/Serviço : NF Item (Todos)", dtype: DataType::String},
-            Column {side, nick: "ncm", name: "Código NCM : NF Item (Todos)", dtype: DataType::Int64},
+            Column {side, nick: "ncm", name: "Código NCM : NF Item (Todos)", dtype: DataType::String},
             Column {side, nick: "descricao_ncm", name: "Descrição NCM : NF Item (Todos)", dtype: DataType::String},
             Column {side, nick: "cst_descricao_pis", name: "CST PIS Descrição : NF Item (Todos)", dtype: DataType::String},
             Column {side, nick: "cst_descricao_cof", name: "CST COFINS Descrição : NF Item (Todos)", dtype: DataType::String},

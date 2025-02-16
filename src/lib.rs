@@ -57,6 +57,7 @@ use std::{
     collections::{HashMap, HashSet},
     env,
     error::Error,
+    fmt::Write,
     fs::File,
     num::ParseFloatError,
     path::PathBuf,
@@ -586,6 +587,9 @@ pub fn write_csv(df: &DataFrame, basename: &str, delimiter: char) -> PolarsResul
 ///
 /// Substituir código por sua descrição nas colunas selecionadas.
 fn format_dataframe(df: &DataFrame) -> PolarsResult<DataFrame> {
+    // Column names:
+    let natureza: &str = coluna(Left, "natureza");
+
     let df_formated: DataFrame = df
         .clone()
         .lazy()
@@ -601,7 +605,7 @@ fn format_dataframe(df: &DataFrame) -> PolarsResult<DataFrame> {
             descricao_do_tipo_de_credito,
             GetOutput::from_type(DataType::String),
         ))
-        .with_column(col("Natureza da Base de Cálculo dos Créditos").apply(
+        .with_column(col(natureza).apply(
             descricao_da_natureza_da_bc_dos_creditos,
             GetOutput::from_type(DataType::String),
         ))
@@ -825,6 +829,18 @@ fn get_opt_from_str(opt_str: Option<&str>, col: &PColumn, decimals: u32) -> Opti
     opt_float64
 }
 
+/// NCM format: "12345678" --> "1234.56.78"
+pub fn formatar_ncm(col: PColumn) -> PolarsResult<Option<PColumn>> {
+    let new_col: PColumn = col
+        .str()?
+        .into_iter()
+        .map(|option_str| option_str.map(extract_ncm))
+        .collect::<StringChunked>()
+        .into_column();
+
+    Ok(Some(new_col))
+}
+
 pub fn formatar_chave_eletronica(col: PColumn) -> PolarsResult<Option<PColumn>> {
     match col.dtype() {
         DataType::String => format_digits(col),
@@ -892,6 +908,7 @@ $     the end of text (or end-of-line with multi-line mode)
 
 */
 pub fn extract_cnpjs(input: &str) -> Vec<String> {
+    // Define a static Regex to avoid recompiling the regex on every call.
     static FIND_CNPJS: Lazy<Regex> = Lazy::new(|| {
         Regex::new(
             r"(?x)
@@ -905,16 +922,70 @@ pub fn extract_cnpjs(input: &str) -> Vec<String> {
             \w{4}     # check 4 alphanumeric
             -?
             \d{2}     # check 2 digits
-            (?:\z|\W) # end of text or not digit ; or (?:$|\W)
+            (?:\z|\W) # end of text or not word ; or (?:$|\W)
         ",
         )
         .unwrap()
     });
 
+    /*
     FIND_CNPJS
         .captures_iter(input)
         .map(|caps| caps.extract())
         .map(|(_full, [a, b, c])| [a, ".", b, ".", c].concat())
+        .collect()
+    */
+
+    FIND_CNPJS
+        .captures_iter(input)
+        .filter_map(|caps| {
+            let part1 = caps.get(1)?.as_str();
+            let part2 = caps.get(2)?.as_str();
+            let part3 = caps.get(3)?.as_str();
+
+            let mut cnpj = String::new();
+            write!(&mut cnpj, "{}.{}.{}", part1, part2, part3).ok()?;
+            Some(cnpj)
+        })
+        .collect()
+}
+
+/**
+Extrair código NCM formatado.
+
+Exemplo:
+
+* "12345678" --> "1234.56.78"
+```
+*/
+pub fn extract_ncm(input: &str) -> String {
+    // Define a static Regex to avoid recompiling the regex on every call.
+    static FIND_NCM: Lazy<Regex> = Lazy::new(|| {
+        Regex::new(
+            r"(?x)
+            (?:\A|\D) # beginning of text or not digit; Ensures the match is not preceded by a digit.
+            (\d{4})   # capture 4 digits (first part of NCM)
+            \.?       # optional dot
+            (\d{2})   # capture 2 digits (second part of NCM)
+            \.?       # optional dot
+            (\d{2})   # capture 2 digits (third part of NCM)
+            (?:\z|\D) # end of text or not digit; Ensures the match is not followed by a digit.
+        ",
+        )
+        .unwrap()
+    });
+
+    FIND_NCM
+        .captures_iter(input)
+        .filter_map(|caps| {
+            let part1 = caps.get(1)?.as_str();
+            let part2 = caps.get(2)?.as_str();
+            let part3 = caps.get(3)?.as_str();
+
+            let mut ncm = String::new();
+            write!(&mut ncm, "{}.{}.{}", part1, part2, part3).ok()?;
+            Some(ncm)
+        })
         .collect()
 }
 
@@ -997,6 +1068,22 @@ mod test_functions {
         assert_eq!(Some(PColumn::new("".into(), &valid)), col);
 
         Ok(())
+    }
+
+    #[test]
+    /// `cargo test -- --show-output  test_extract_ncm`
+    fn test_extract_ncm() {
+        let text1 = "1234.56.78";
+        let text2 = "0912345"; //This won't match
+        let text3 = "NCM 0912.3456";
+        let text4 = "Invalid: 123.45.67"; //This won't match
+                                          //let text5 = "Multiple: 1234.56.78 and 9012.34.56";
+
+        assert_eq!(extract_ncm(text1), "1234.56.78");
+        assert_eq!(extract_ncm(text2), "");
+        assert_eq!(extract_ncm(text3), "0912.34.56");
+        assert_eq!(extract_ncm(text4), "");
+        //assert_eq!(extract_ncm(text5), "1234.56.78"); // Only the *first* NCM is extracted.
     }
 
     #[test]

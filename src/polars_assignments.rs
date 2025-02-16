@@ -5,7 +5,7 @@ use polars::{datatypes::DataType, prelude::*};
 
 use crate::{
     args::Arguments,
-    coluna, formatar_chave_eletronica, get_lazyframe_from_csv, get_opt_vectuples,
+    coluna, formatar_chave_eletronica, formatar_ncm, get_lazyframe_from_csv, get_opt_vectuples,
     get_option_assignments, round_column, DataFrameExtension,
     Side::{Left, Middle, Right},
     VecTuples,
@@ -60,6 +60,7 @@ fn format_fazyframe_a(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>>
 
     let count_lines = coluna(Left, "count_lines");
     let chave = coluna(Left, "chave");
+    let ncm = coluna(Left, "ncm");
     //let valor_item = coluna(Left, "valor_item");
 
     /*
@@ -83,6 +84,7 @@ fn format_fazyframe_a(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>>
             formatar_chave_eletronica,
             GetOutput::from_type(DataType::String),
         ))
+        .with_column(col(ncm).apply(formatar_ncm, GetOutput::from_type(DataType::String)))
         .with_columns([cols(columns_with_float64).apply(
             |series| round_column(series, 2),
             GetOutput::from_type(DataType::Float64),
@@ -103,6 +105,7 @@ fn format_fazyframe_b(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>>
 
     let count_lines = coluna(Right, "count_lines");
     let chave = coluna(Right, "chave");
+    let ncm = coluna(Right, "ncm");
     //let valor_item = coluna(Right, "valor_item");
 
     /*
@@ -126,6 +129,7 @@ fn format_fazyframe_b(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>>
             formatar_chave_eletronica,
             GetOutput::from_type(DataType::String),
         ))
+        .with_column(col(ncm).apply(formatar_ncm, GetOutput::from_type(DataType::String)))
         .with_columns([
             cols(columns_with_float64).apply(
                 |series| round_column(series, 2),
