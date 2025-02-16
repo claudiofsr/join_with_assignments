@@ -68,7 +68,7 @@ pub fn obter_consolidacao_nat(
 /// Em seguida, aplicar filtros.
 fn selecionar_colunas_apos_filtros(
     lazyframe: LazyFrame,
-    auditar: bool,
+    _auditar: bool,
 ) -> Result<LazyFrame, Box<dyn Error>> {
     //let pa_ano: i32 = 2015;
     //let pa_trimestres = Series::from_iter([1, 2, 3, 4]);
@@ -154,7 +154,7 @@ fn selecionar_colunas_apos_filtros(
                 .alias(val),
         )
         */
-        //*
+        /*
         // Correção de CST: 50 -> 51
         .with_column(
             when(col(cst).eq(50).and(auditar))
@@ -171,7 +171,7 @@ fn selecionar_colunas_apos_filtros(
                 .cast(DataType::Int64)
                 .alias("Código do Tipo de Crédito"),
         )
-        //*/
+        */
         .with_column(
             col("CNPJ dos Estabelecimentos do Contribuinte")
                 .apply(get_cnpj_base, GetOutput::from_type(DataType::String))
