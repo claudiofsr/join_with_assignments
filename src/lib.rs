@@ -969,7 +969,7 @@ pub fn extract_ncm(input: &str) -> String {
         Regex::new(
             r"(?x)
             (?:\A|\D) # beginning of text or not digit; Ensures the match is not preceded by a digit.
-            (\d{4})   # capture 4 digits (first part of NCM)
+            (\d{3,4}) # capture 3 or 4 digits (first part of NCM)
             \.?       # optional dot
             (\d{2})   # capture 2 digits (second part of NCM)
             \.?       # optional dot
@@ -988,7 +988,11 @@ pub fn extract_ncm(input: &str) -> String {
             let part3 = caps.get(3)?.as_str();
 
             let mut ncm = String::new();
-            write!(&mut ncm, "{}.{}.{}", part1, part2, part3).ok()?;
+            if part1.len() == 3 {
+                write!(&mut ncm, "0{}.{}.{}", part1, part2, part3).ok()?;
+            } else {
+                write!(&mut ncm, "{}.{}.{}", part1, part2, part3).ok()?;
+            }
             Some(ncm)
         })
         .next() // Take only the first match.
@@ -1080,13 +1084,13 @@ mod test_functions {
     /// `cargo test -- --show-output test_extract_ncm`
     fn test_extract_ncm() {
         let text1 = "1234.56.78";
-        let text2 = "0912345"; // return the original input
+        let text2 = "6912345"; // return the original input
         let text3 = "NCM 0912.3456";
-        let text4 = "Invalid: 123.45.67"; // return the original input
+        let text4 = "Invalid: 23.45.67"; // return the original input
         let text5 = "Multiple: 1234.5678 and 9012.34.56";
 
         assert_eq!(extract_ncm(text1), "1234.56.78");
-        assert_eq!(extract_ncm(text2), text2);
+        assert_eq!(extract_ncm(text2), "0691.23.45");
         assert_eq!(extract_ncm(text3), "0912.34.56");
         assert_eq!(extract_ncm(text4), text4);
         assert_eq!(extract_ncm(text5), "1234.56.78"); // Only the *first* NCM is extracted.
