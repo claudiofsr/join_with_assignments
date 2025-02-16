@@ -950,14 +950,19 @@ pub fn extract_cnpjs(input: &str) -> Vec<String> {
         .collect()
 }
 
-/**
-Extrair código NCM formatado.
-
-Exemplo:
-
-* "12345678" --> "1234.56.78"
-```
-*/
+/// Extracts the first NCM (Nomenclatura Comum do Mercosul) code found in a given string.
+/// If no valid NCM is found, returns the original input string.
+///
+/// The function searches for an NCM code using a regular expression and returns it
+/// as a string. If no NCM code is found, it returns the original input string.
+///
+/// ### Arguments
+///
+/// * `input` - The string to search for the NCM code.
+///
+/// ### Returns
+///
+/// A string containing the extracted NCM code, or the original input string if no NCM is found.
 pub fn extract_ncm(input: &str) -> String {
     // Define a static Regex to avoid recompiling the regex on every call.
     static FIND_NCM: Lazy<Regex> = Lazy::new(|| {
@@ -986,7 +991,8 @@ pub fn extract_ncm(input: &str) -> String {
             write!(&mut ncm, "{}.{}.{}", part1, part2, part3).ok()?;
             Some(ncm)
         })
-        .collect()
+        .next() // Take only the first match.
+        .unwrap_or_else(|| input.to_string()) // Return the original input if no match is found.
 }
 
 pub fn quit() {
@@ -1071,19 +1077,19 @@ mod test_functions {
     }
 
     #[test]
-    /// `cargo test -- --show-output  test_extract_ncm`
+    /// `cargo test -- --show-output test_extract_ncm`
     fn test_extract_ncm() {
         let text1 = "1234.56.78";
-        let text2 = "0912345"; //This won't match
+        let text2 = "0912345"; // return the original input
         let text3 = "NCM 0912.3456";
-        let text4 = "Invalid: 123.45.67"; //This won't match
-                                          //let text5 = "Multiple: 1234.56.78 and 9012.34.56";
+        let text4 = "Invalid: 123.45.67"; // return the original input
+        let text5 = "Multiple: 1234.5678 and 9012.34.56";
 
         assert_eq!(extract_ncm(text1), "1234.56.78");
-        assert_eq!(extract_ncm(text2), "");
+        assert_eq!(extract_ncm(text2), text2);
         assert_eq!(extract_ncm(text3), "0912.34.56");
-        assert_eq!(extract_ncm(text4), "");
-        //assert_eq!(extract_ncm(text5), "1234.56.78"); // Only the *first* NCM is extracted.
+        assert_eq!(extract_ncm(text4), text4);
+        assert_eq!(extract_ncm(text5), "1234.56.78"); // Only the *first* NCM is extracted.
     }
 
     #[test]
