@@ -1084,16 +1084,18 @@ mod test_functions {
     /// `cargo test -- --show-output test_extract_ncm`
     fn test_extract_ncm() {
         let text1 = "1234.56.78";
-        let text2 = "6912345"; // return the original input
+        let text2 = "1234567"; // return the original input
         let text3 = "NCM 0912.3456";
         let text4 = "Invalid: 23.45.67"; // return the original input
         let text5 = "Multiple: 1234.5678 and 9012.34.56";
+        let text6 = "<N/D>";
 
         assert_eq!(extract_ncm(text1), "1234.56.78");
-        assert_eq!(extract_ncm(text2), "0691.23.45");
+        assert_eq!(extract_ncm(text2), "0123.45.67");
         assert_eq!(extract_ncm(text3), "0912.34.56");
         assert_eq!(extract_ncm(text4), text4);
         assert_eq!(extract_ncm(text5), "1234.56.78"); // Only the *first* NCM is extracted.
+        assert_eq!(extract_ncm(text6), text6);
     }
 
     #[test]
