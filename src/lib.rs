@@ -925,7 +925,7 @@ pub fn extract_cnpjs(input: &str) -> Vec<String> {
             (?:\z|\W) # end of text or not word ; or (?:$|\W)
         ",
         )
-        .unwrap()
+        .expect("fn extract_cnpjs()\nFailed to compile regex") // Panic if regex compilation fails.
     });
 
     /*
@@ -977,23 +977,28 @@ pub fn extract_ncm(input: &str) -> String {
             (?:\z|\D) # end of text or not digit; Ensures the match is not followed by a digit.
         ",
         )
-        .unwrap()
+        .expect("fn extract_ncm()\nFailed to compile regex") // Panic if regex compilation fails.
     });
 
     FIND_NCM
         .captures_iter(input)
         .filter_map(|caps| {
+            // Extract the captured groups.
+            // Using ? for early return if any capture fails.
             let part1 = caps.get(1)?.as_str();
             let part2 = caps.get(2)?.as_str();
             let part3 = caps.get(3)?.as_str();
 
+            // Construct the NCM string.
             let mut ncm = String::new();
             if part1.len() == 3 {
+                // Add a leading zero if the first part has 3 digits.
                 write!(&mut ncm, "0{}.{}.{}", part1, part2, part3).ok()?;
             } else {
+                // Otherwise, use the first part as is.
                 write!(&mut ncm, "{}.{}.{}", part1, part2, part3).ok()?;
             }
-            Some(ncm)
+            Some(ncm) // Return the constructed NCM.
         })
         .next() // Take only the first match.
         .unwrap_or_else(|| input.to_string()) // Return the original input if no match is found.
