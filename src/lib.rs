@@ -939,13 +939,16 @@ pub fn extract_cnpjs(input: &str) -> Vec<String> {
     FIND_CNPJS
         .captures_iter(input)
         .filter_map(|caps| {
+            // Extract the captured groups.
+            // Using ? for early return if any capture fails.
             let part1 = caps.get(1)?.as_str();
             let part2 = caps.get(2)?.as_str();
             let part3 = caps.get(3)?.as_str();
 
+            // Construct the CNPJ string.
             let mut cnpj = String::new();
             write!(&mut cnpj, "{}.{}.{}", part1, part2, part3).ok()?;
-            Some(cnpj)
+            Some(cnpj) // Return the constructed CNPJ.
         })
         .collect()
 }
