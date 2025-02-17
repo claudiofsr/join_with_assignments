@@ -182,6 +182,8 @@ fn base_legal(codigo_ncm: u64, descricao: &str) -> Option<&'static str> {
         29000000..=29999999 => decreto_6426_art01(descricao),
 
         ncm @ 7000000..=8999999 | ncm @ 4070000..=4079999 => lei_10865_art28_inciso03(ncm),
+        5110000..=5119999 => lei_10865_art28_inciso05(),
+        87130000..=87139999 => lei_10865_art28_inciso14(),
 
         _ => None,
     }
@@ -481,6 +483,14 @@ fn lei_10865_art28_inciso03(ncm: u64) -> Option<&'static str> {
     } else {
         Some("Alíquota Zero - Lei 10.865/2004, Art. 28, Inciso III (Produtos hortícolas classificados no Capítulo 7).")
     }
+}
+
+fn lei_10865_art28_inciso05() -> Option<&'static str> {
+    Some("Alíquota Zero - Lei 10.865/2004, Art. 28, Inciso V (Semens e Embriões da posição 05.11 da NCM).")
+}
+
+fn lei_10865_art28_inciso14() -> Option<&'static str> {
+    Some("Alíquota Zero - Lei 10.865/2004, Art. 28, Inciso XIV (Produtos classificados na posição 87.13 da NCM).")
 }
 
 /*
