@@ -80,12 +80,12 @@ fn format_fazyframe_a(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>>
 
     let lz = lazyframe // Formatar colunas
         .with_column(col(count_lines).cast(DataType::UInt64))
-        .with_column(col(chave).apply(
+        .with_column(col(chave).map(
             formatar_chave_eletronica,
             GetOutput::from_type(DataType::String),
         ))
-        .with_column(col(ncm).apply(formatar_ncm, GetOutput::from_type(DataType::String)))
-        .with_columns([cols(columns_with_float64).apply(
+        .with_column(col(ncm).map(formatar_ncm, GetOutput::from_type(DataType::String)))
+        .with_columns([cols(columns_with_float64).map(
             |series| round_column(series, 2),
             GetOutput::from_type(DataType::Float64),
         )]);
@@ -125,17 +125,17 @@ fn format_fazyframe_b(lazyframe: LazyFrame) -> Result<LazyFrame, Box<dyn Error>>
 
     let lz = lazyframe // Formatar colunas
         .with_column(col(count_lines).cast(DataType::UInt64))
-        .with_column(col(chave).apply(
+        .with_column(col(chave).map(
             formatar_chave_eletronica,
             GetOutput::from_type(DataType::String),
         ))
-        .with_column(col(ncm).apply(formatar_ncm, GetOutput::from_type(DataType::String)))
+        .with_column(col(ncm).map(formatar_ncm, GetOutput::from_type(DataType::String)))
         .with_columns([
-            cols(columns_with_float64).apply(
+            cols(columns_with_float64).map(
                 |series| round_column(series, 2),
                 GetOutput::from_type(DataType::Float64),
             ), //all()
-               //.apply(|series| round_float64_columns(series, 2), GetOutput::same_type())
+               //.map(|series| round_float64_columns(series, 2), GetOutput::same_type())
         ]);
 
     // Lazy operations don’t execute until we call .collect()?.
@@ -658,7 +658,7 @@ mod test_assignments {
 
         let lazyframe: LazyFrame = dataframe01.lazy().with_columns([
             //cols(selected)
-            all().apply(
+            all().map(
                 |series| round_float64_columns(series, 2),
                 GetOutput::same_type(),
             ),
