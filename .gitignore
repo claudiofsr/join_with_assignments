@@ -2,6 +2,8 @@
 /Dados*
 df_*
 *.csv
+*.json
+*.ndjson
 *.txt
 *.xlsx
 *.parquet
