@@ -39,7 +39,7 @@ pathfinding = "4.14"
 rayon = "1.10"
 regex = "1.11"
 serde = { version = "1.0", features = [ "derive" ] }
-sysinfo = "0.33"
+sysinfo = "0.34"
 tabled = { version = "0.18", features = ["ansi"] }
 toml = "0.8"
 
@@ -80,13 +80,14 @@ features = [
     "round_series", # Round underlying float types of Series
     "serde-lazy",   # Support for serde serialization and deserialization.
     "strings",      # Extra string utilities for Utf8Chunked
+    "temporal"      # Automatically try to parse dates/datetimes and time.
 ]
 
 [dependencies.polars-arrow ]
 version = "0.46.0"
 
 [dependencies.rust_xlsxwriter]
-version = "0.84.0"
+version = "0.85.0"
 # https://github.com/jmcnamara/rust_xlsxwriter/blob/main/CHANGELOG.md
 # git = "https://github.com/jmcnamara/rust_xlsxwriter.git"
 # path = "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/rust_xlsxwriter-0.80.0b"

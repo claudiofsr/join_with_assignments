@@ -68,12 +68,14 @@ pub fn obter_consolidacao_nat(
 /// Em seguida, aplicar filtros.
 fn selecionar_colunas_apos_filtros(
     lazyframe: LazyFrame,
-    _auditar: bool,
+    auditar: bool,
 ) -> Result<LazyFrame, Box<dyn Error>> {
     //let pa_ano: i32 = 2015;
     //let pa_trimestres = Series::from_iter([1, 2, 3, 4]);
 
+    let cod: &str = coluna(Left, "cod_cred"); // "Código do Tipo de Crédito"
     let cst: &str = coluna(Left, "cst"); // "Código de Situação Tributária (CST)"
+    let nat: &str = coluna(Left, "natureza"); // "Natureza da Base de Cálculo dos Créditos"
     let reg: &str = coluna(Left, "registro"); // "Registro"
     let top: &str = coluna(Left, "tipo_operacao"); // "Tipo de Operação"
     let val: &str = coluna(Left, "valor_item"); // "Valor Total do Item"
@@ -83,6 +85,13 @@ fn selecionar_colunas_apos_filtros(
     // 5: Desconto da Contribuição Apurada no Próprio Período;
     // 6: Desconto Efetuado em Período Posterior; 7: Detalhamento.
     let operacoes_desejadas: Expr = col(top).is_not_null().and(col(top).neq(lit(7)));
+
+    // Natureza: '01 - Aquisição de Bens para Revenda' and CST neq 50
+    let bens_para_revenda: Expr = col(nat)
+        .is_not_null()
+        .and(col(cst).is_not_null())
+        .and(col(nat).eq(1))
+        .and(col(cst).neq(50));
 
     //let series = Series::new(reg.into(), ["C170"]);
     //let registros_selecionados = col(reg).is_in(lit(series));
@@ -96,7 +105,7 @@ fn selecionar_colunas_apos_filtros(
         col("Trimestre do Período de Apuração"),
         col("Mês do Período de Apuração"),
         col(top),
-        col("Código do Tipo de Crédito"),
+        col(cod),
         col("Tipo de Crédito"),
         col(cst),
         col(reg),
@@ -104,7 +113,7 @@ fn selecionar_colunas_apos_filtros(
         col("Código NCM"),
         col("Alíquota de PIS/PASEP (em percentual)"),
         col("Alíquota de COFINS (em percentual)"),
-        col("Natureza da Base de Cálculo dos Créditos"),
+        col(nat),
         col("Valor da Base de Cálculo das Contribuições"),
         col(val),
         col("RecBrutaNCumulativa"),
@@ -143,6 +152,28 @@ fn selecionar_colunas_apos_filtros(
                 .cast(DataType::Boolean)
                 .alias("RecBrutaTotal"),
         )
+        // Se Natureza: '01 - Aquisição de Bens para Revenda' and CST neq 50
+        // Correção de CST: XX -> 50
+        .with_column(
+            when(bens_para_revenda.clone().and(auditar))
+                .then(lit(50))
+                .otherwise(col(cst))
+                .cast(DataType::Int64)
+                .alias(cst),
+        )
+        // Correção de 'Código do Tipo de Crédito': XXX -> 101
+        .with_column(
+            when(
+                bens_para_revenda
+                    .and(col(cod).is_not_null())
+                    .and(col(cod).neq(101))
+                    .and(auditar),
+            )
+            .then(lit(101))
+            .otherwise(col(cod))
+            .cast(DataType::Int64)
+            .alias(cod),
+        )
         /*
         // Correção: CST 9 && Registro C170 --> "valor_item" = 0.0
         .with_column(
@@ -165,11 +196,11 @@ fn selecionar_colunas_apos_filtros(
         )
         // Correção de 'Código do Tipo de Crédito': 101 -> 201
         .with_column(
-            when(col("Código do Tipo de Crédito").eq(101).and(auditar))
+            when(col(cod).eq(101).and(auditar))
                 .then(lit(201))
-                .otherwise(col("Código do Tipo de Crédito"))
+                .otherwise(col(cod))
                 .cast(DataType::Int64)
-                .alias("Código do Tipo de Crédito"),
+                .alias(cod),
         )
         */
         .with_column(

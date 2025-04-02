@@ -501,7 +501,7 @@ fn read_csv_lazy(
 ) -> PolarsResult<LazyFrame> {
     // Set values that will be interpreted as missing/null.
     let null_values: Vec<PlSmallStr> = vec![
-        //"", // foo;"";bar --> foo;;bar
+        "", // foo;"";bar --> foo;;bar
         " ",
         "<N/D>",
         "*DIVERSOS*",

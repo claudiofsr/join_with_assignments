@@ -31,7 +31,7 @@ static DESCRICAO_DO_TIPO_DE_CREDITO: Lazy<HashMap<i64, &'static str>> = Lazy::ne
         (4, "Estoque de Abertura"),
         (5, "Aquisição Embalagens para Revenda"),
         (6, "Presumido da Agroindústria"),
-        (7, "Outros Créditos Presumidos"),
+        (7, "Demais Créditos Presumidos"),
         (8, "Importação"),
         (9, "Atividade Imobiliária"),
         (99, "Outros"),
@@ -155,7 +155,7 @@ static NATUREZA_DA_BASE_DE_CALCULO_DOS_CREDITOS: Lazy<HashMap<i64, &'static str>
             ),
             (
                 107,
-                "Base de Cálculo dos Créditos - Outros Créditos Presumidos (Soma)",
+                "Base de Cálculo dos Créditos - Demais Créditos Presumidos (Soma)",
             ),
             (108, "Base de Cálculo dos Créditos - Importação (Soma)"),
             (
