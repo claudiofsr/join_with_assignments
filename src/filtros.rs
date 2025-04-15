@@ -66,34 +66,11 @@ pub fn operacoes_de_ajustes_ou_descontos() -> Expr {
 /// Operações de Descontos: `[5, 6]`
 ///
 /// E demais opções.
-pub fn operacoes<const N: usize>(range: [u32; N]) -> Expr {
+fn operacoes(range: impl IntoIterator<Item = u32>) -> Expr {
     let top: &str = coluna(Left, "tipo_operacao");
 
     // 1: Entrada, 2: Saída, 3 e 4: Ajustes, 5 e 6: Descontos, 7: Detalhamento
     let series: Series = range.into_iter().collect();
-
-    col(top).is_not_null().and(col(top).is_in(lit(series)))
-}
-
-#[allow(dead_code)]
-fn operacoes_v2<T>(range: T) -> Expr
-where
-    T: Iterator<Item = u32>,
-{
-    let top: &str = coluna(Left, "tipo_operacao");
-
-    // 1: Entrada, 2: Saída, 3 e 4: Ajustes, 5 e 6: Descontos, 7: Detalhamento
-    let series: Series = range.collect();
-
-    col(top).is_not_null().and(col(top).is_in(lit(series)))
-}
-
-#[allow(dead_code)]
-fn operacoes_v3(range: impl Iterator<Item = u32>) -> Expr {
-    let top: &str = coluna(Left, "tipo_operacao");
-
-    // 1: Entrada, 2: Saída, 3 e 4: Ajustes, 5 e 6: Descontos, 7: Detalhamento
-    let series: Series = range.collect();
 
     col(top).is_not_null().and(col(top).is_in(lit(series)))
 }
@@ -391,7 +368,8 @@ pub fn apply_filter(data_frame: DataFrame, args: &Arguments) -> Result<DataFrame
     if args.operacoes_de_creditos == Some(true) {
         data_frame
             .lazy()
-            .filter(entrada_de_credito().or(operacoes_de_entrada_ou_saida().not()))
+            //.filter(entrada_de_credito().or(operacoes_de_entrada_ou_saida().not()))
+            //.filter(cst_50_a_66())
             .collect()
     } else {
         Ok(data_frame)
