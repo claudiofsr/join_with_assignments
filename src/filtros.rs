@@ -364,8 +364,7 @@ pub fn apply_filter(data_frame: DataFrame, args: &Arguments) -> Result<DataFrame
     if args.operacoes_de_creditos == Some(true) {
         data_frame
             .lazy()
-            //.filter(entrada_de_credito().or(operacoes_de_entrada_ou_saida().not()))
-            .filter(cst_50_a_66())
+            .filter(entrada_de_credito().or(operacoes_de_entrada_ou_saida().not()))
             .collect()
     } else {
         Ok(data_frame)
