@@ -362,7 +362,7 @@ pub fn receita_bruta_cumulativa() -> Expr {
 // Retain only credit entries (50 <= CST <= 66)
 pub fn apply_filter(data_frame: DataFrame, args: &Arguments) -> Result<DataFrame, PolarsError> {
     // 1: Entrada, 2: Saída, 3 e 4: Ajustes, 5 e 6: Descontos, 7: Detalhamento
-    let _top: &str = coluna(Left, "tipo_operacao");
+    // let top: &str = coluna(Left, "tipo_operacao");
 
     if args.operacoes_de_creditos == Some(true) {
         data_frame
