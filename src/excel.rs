@@ -441,10 +441,6 @@ pub enum Frame {
 /// Eliminate columns that contain only null values.
 ///
 /// frame can be LazyFrame or DataFrame
-///
-/// <https://github.com/pola-rs/polars/issues/1613>
-///
-/// <https://stackoverflow.com/questions/76338261/polars-and-the-lazy-api-how-to-drop-columns-that-contain-only-null-values>
 pub fn remove_null_columns(frame: Frame) -> PolarsResult<DataFrame> {
     let df: DataFrame = match frame {
         Frame::Lazy(lz) => lz.collect()?,
@@ -455,17 +451,21 @@ pub fn remove_null_columns(frame: Frame) -> PolarsResult<DataFrame> {
     let pa_mes: &str = coluna(Left, "pa_mes"); // "Mês do Período de Apuração"
     let glosar: &str = coluna(Middle, "glosar"); // "Glosar Base de Cálculo de PIS/PASEP e COFINS"
 
-    let df_clean: DataFrame = df
-        .iter()
+    // 1. Get the names of columns that have at least one non-null value.
+    let columns_to_keep: Vec<&str> = df
+        .iter() // Iterate over the Series (columns)
         .filter(|series| {
             series.is_not_null().any()
                 || series.name().contains(pa_mes)
                 || series.name().contains(glosar)
-        })
-        .cloned()
-        .collect();
+        }) // Keep series with any non-null value
+        .map(|series| series.name().as_str()) // Get the series name as &str
+        .collect(); // Collect the names into a Vec<&str>
 
-    Ok(df_clean)
+    // 2. Select only those columns from the original DataFrame.
+    // The select operation is highly optimized and often avoids deep data copies.
+    // `select` can take an iterator or slice of items convertible to PlSmallStr, including &str.
+    df.select(columns_to_keep)
 }
 
 #[cfg(test)]
