@@ -31,6 +31,7 @@ Example of use:
     cargo run -- -1 'Dados - Fa/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Fa/nfe_float64.csv' -c true -p true -r true -s 202104 -f 202112 -o true
     cargo run -- -1 'Dados - Nd/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Nd/nfe_float64.csv' -c true -p true -r true -s 202107 -f 202112
     cargo run -- -1 'Dados - Pg/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Pg/nfe_float64.csv' -c true -p true -r true -s 201907 -f 202206
+    cargo run -- -1 'Dados - Se/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Se/nfe_float64.csv' -c true -p true -r true -s 202301 -f 202412 -o true
     cargo run -- -1 'Dados - Tc/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Tc/nfe_float64.csv' -c true -p true -r true -s 201604 -f 201812
 
     cargo run -- -1 'Dados - Le01/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Le01/nfe_float64.csv' -c true -p true -r true -s 202204 -f 202306
@@ -46,6 +47,7 @@ Example of use:
     join_with_assignments -1 'Dados - Fa/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Fa/nfe_float64.csv' -c true -p true -r true -s 202104 -f 202112 -o true
     join_with_assignments -1 'Dados - Nd/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Nd/nfe_float64.csv' -c true -p true -r true -s 202107 -f 202112
     join_with_assignments -1 'Dados - Pg/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Pg/nfe_float64.csv' -c true -p true -r true -s 201907 -f 202206
+    join_with_assignments -1 'Dados - Se/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Se/nfe_float64.csv' -c true -p true -r true -s 202301 -f 202412 -o true
     join_with_assignments -1 'Dados - Tc/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Tc/nfe_float64.csv' -c true -p true -r true -s 201604 -f 201812
 
     join_with_assignments -1 'Dados - Le01/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Le01/nfe_float64.csv' -c true -p true -r true -s 202204 -f 202306
