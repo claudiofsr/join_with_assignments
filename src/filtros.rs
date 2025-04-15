@@ -310,11 +310,11 @@ pub fn entrada_de_credito() -> Expr {
     let aliquota_de_cof: &str = coluna(Left, "aliq_cof"); // "Alíquota de COFINS (em percentual)"
 
     operacoes_de_entrada() // 1: Entrada
-        .and(cst_50_a_66())
-        .and(codigo_nat_01_a_18())
         .and(col(tipo_de_credito).is_not_null())
         .and(col(aliquota_de_pis).is_not_null())
         .and(col(aliquota_de_cof).is_not_null())
+        .and(cst_50_a_66())
+        .and(codigo_nat_01_a_18())
 }
 
 /**
@@ -391,9 +391,7 @@ pub fn apply_filter(data_frame: DataFrame, args: &Arguments) -> Result<DataFrame
     if args.operacoes_de_creditos == Some(true) {
         data_frame
             .lazy()
-            .filter(not(
-                operacoes_de_entrada_ou_saida().and(entrada_de_credito().not())
-            ))
+            .filter(entrada_de_credito().or(operacoes_de_entrada_ou_saida().not()))
             .collect()
     } else {
         Ok(data_frame)
