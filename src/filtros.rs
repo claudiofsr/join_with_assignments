@@ -360,62 +360,19 @@ pub fn receita_bruta_cumulativa() -> Expr {
 }
 
 // Retain only credit entries (50 <= CST <= 66)
-pub fn apply_filter(mut data_frame: DataFrame, args: &Arguments) -> Result<DataFrame, PolarsError> {
+pub fn apply_filter(data_frame: DataFrame, args: &Arguments) -> Result<DataFrame, PolarsError> {
     // Opções da coluna "tipo_operacao":
     // 1: Entrada, 2: Saída, 3 e 4: Ajustes, 5 e 6: Descontos, 7: Detalhamento.
     // let tipo_operacao: &str = coluna(Left, "tipo_operacao");
 
     if args.operacoes_de_creditos == Some(true) {
-        // Use the Lazy API
-        let mut df = data_frame
+        data_frame
             .lazy()
             //.filter(csts([63u32]))
-            //.filter(col(tipo_operacao).is_not_null().and(col(tipo_operacao).neq(lit(2))))
             .filter(operacoes_de_saida().not())
             //.filter(entrada_de_credito().or(operacoes_de_entrada_ou_saida().not()))
-            .collect()?;
-
-        // --- Execute and Rechunk ---
-        df.rechunk_mut();
-
-        // Rechunk consolidates each column into a single memory chunk
-        Ok(df)
+            .collect()
     } else {
-        // No filtering applied, but the *input* data_frame might already be chunked.
-        // If the downstream consumer (Excel writer) *always* needs rechunked data,
-        // it's safest to rechunk here too for consistency.
-        data_frame.rechunk_mut();
-
-        Ok(data_frame)
-        // If you are *certain* the unfiltered DataFrame doesn't need rechunking
-        // for the downstream consumer, you could use: Ok(data_frame)
-        // But rechunking here makes the function's output guarantee consistent.
-    }
-}
-
-pub fn apply_filter_v2(data_frame: DataFrame, args: &Arguments) -> Result<DataFrame, PolarsError> {
-    let tipo_operacao: &str = coluna(Left, "tipo_operacao");
-
-    // Use matches! for slightly more concise check, equivalent to original
-    if matches!(args.operacoes_de_creditos, Some(true)) {
-        // --- Eager API Steps ---
-        // 1. Access the target column series
-        let series = data_frame.column(tipo_operacao)?.as_materialized_series();
-
-        // 2. Create the first mask (is_not_null)
-        let mask_not_null = series.is_not_null();
-
-        // 3. Create the second mask (not_equal to 2)
-        //    Handle potential comparison error (e.g., if column is not numeric)
-        let mask_neq_2 = series.not_equal(2)?; // Use appropriate literal type if needed (e.g., 2_i32)
-
-        // 4. Combine masks using bitwise AND (&)
-        let combined_mask = mask_not_null & mask_neq_2; // Element-wise logical AND
-
-        // 5. Apply the combined filter *once*
-        data_frame.filter(&combined_mask) // Pass the combined mask
-    } else {
-        // No filtering needed
         Ok(data_frame)
     }
 }

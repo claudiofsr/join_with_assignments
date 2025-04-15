@@ -93,7 +93,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let df_itens_de_docs_fiscais_result = apply_filter(joined, &args)?;
 
-    let dataframes: Vec<DataFrame> = [
+    let mut dataframes: Vec<DataFrame> = [
         df_itens_de_docs_fiscais_result,
         df_consolidacao_natureza_da_bcalc,
         df_consolidacao_natureza_da_bcalc_result,
@@ -113,6 +113,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         "df_consolidacao_natureza_da_bcalc",
         "df_consolidacao_natureza_da_bcalc_result",
     ];
+
+    // Necessário antes de usar PolarsXlsxWriter::new()
+    rechunk_dataframes_inplace(&mut dataframes);
 
     let iterator = dataframes.iter().zip(basenames.iter());
 
