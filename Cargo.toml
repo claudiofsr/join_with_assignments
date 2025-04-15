@@ -80,7 +80,7 @@ features = [
     "round_series", # Round underlying float types of Series
     "serde-lazy",   # Support for serde serialization and deserialization.
     "strings",      # Extra string utilities for Utf8Chunked
-    "temporal"      # Automatically try to parse dates/datetimes and time.
+    "temporal",     # Automatically try to parse dates/datetimes and time.
 ]
 
 [dependencies.polars-arrow ]

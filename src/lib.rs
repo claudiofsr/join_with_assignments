@@ -545,6 +545,7 @@ fn read_csv_lazy(
                 //.with_null_values(None)
                 .with_missing_is_null(true)
                 //.with_infer_schema_length(Some(200))
+                .with_rechunk(true)
                 .with_schema(Some(Arc::new(schema)))
                 .finish();
 
