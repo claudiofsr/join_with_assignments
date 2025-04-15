@@ -120,6 +120,10 @@ pub struct Arguments {
     #[arg(short('c'), long, required = false)]
     pub print_csv: Option<bool>,
 
+    /// Print Excel files
+    #[arg(short('e'), long, required = false)]
+    pub print_excel: Option<bool>,
+
     /// Print PARQUET files
     #[arg(short('p'), long, required = false)]
     pub print_parquet: Option<bool>,
@@ -147,6 +151,7 @@ impl default::Default for Arguments {
             date_final: None,
             operacoes_de_creditos: Some(false),
             print_csv: Some(false),
+            print_excel: Some(true),
             print_parquet: Some(false),
             remove_null_columns: Some(true),
             verbose: Some(true),
@@ -231,6 +236,7 @@ mod tests {
             date_final: None,
             operacoes_de_creditos: Some(false),
             print_csv: Some(false),
+            print_excel: Some(true),
             print_parquet: Some(false),
             remove_null_columns: Some(true),
             verbose: Some(true),
@@ -247,6 +253,7 @@ mod tests {
             delimiter_output: Some(';'),
             operacoes_de_creditos: Some(false),
             print_csv: Some(false),
+            print_excel: Some(true),
             print_parquet: Some(false),
             remove_null_columns: Some(true),
             verbose: Some(true),

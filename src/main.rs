@@ -87,18 +87,28 @@ fn main() -> Result<(), Box<dyn Error>> {
     let df_consolidacao_natureza_da_bcalc_result: DataFrame =
         obter_consolidacao_nat(&df_itens_de_docs_fiscais_result, true)?;
 
-    let df_itens_de_docs_fiscais = apply_filter(df_itens_de_docs_fiscais, &args)?;
-    let df_itens_de_docs_fiscais_result = apply_filter(df_itens_de_docs_fiscais_result, &args)?;
+    // Add column from one dataframe to another.
+    let joined: DataFrame =
+        add_column_from_df_to_another(&df_itens_de_docs_fiscais, &df_itens_de_docs_fiscais_result)?;
 
-    let dataframes: [DataFrame; 4] = [
-        df_itens_de_docs_fiscais,
+    let df_itens_de_docs_fiscais_result = apply_filter(joined, &args)?;
+
+    let dataframes: Vec<DataFrame> = [
         df_itens_de_docs_fiscais_result,
         df_consolidacao_natureza_da_bcalc,
         df_consolidacao_natureza_da_bcalc_result,
-    ];
+    ]
+    .into_iter()
+    .filter_map(|df| {
+        if let Some(true) = args.remove_null_columns {
+            remove_null_columns(Frame::Data(df)).ok()
+        } else {
+            Some(df)
+        }
+    })
+    .collect();
 
-    let basenames: [&str; 4] = [
-        "df_itens_de_docs_fiscais",
+    let basenames: [&str; 3] = [
         "df_itens_de_docs_fiscais_result",
         "df_consolidacao_natureza_da_bcalc",
         "df_consolidacao_natureza_da_bcalc_result",
@@ -119,7 +129,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    write_xlsx(&args, &dataframes)?;
+    if args.print_excel == Some(true) {
+        write_xlsx(&dataframes)?;
+    }
 
     let dt_local_now: DateTime<Local> = Local::now();
     println!("Location date: {}", dt_local_now.format("%d/%m/%Y"));

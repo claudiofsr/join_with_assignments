@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    coluna, format_dataframe, Arguments, DataFrameExtension, PolarsXlsxWriter,
+    coluna, format_dataframe, DataFrameExtension, PolarsXlsxWriter,
     Side::{
         Left,
         Middle,
@@ -28,44 +28,22 @@ const ADJUSTMENT: f64 = 1.1;
 /// <https://crates.io/crates/polars_excel_writer>
 ///
 /// <https://github.com/jmcnamara/polars_excel_writer/issues/4>
-pub fn write_xlsx(args: &Arguments, dfs: &[DataFrame]) -> PolarsResult<()> {
+pub fn write_xlsx(dfs: &[DataFrame]) -> PolarsResult<()> {
     let output = "EFD Contribuicoes x Documentos Fiscais.xlsx";
     println!("Write DataFrames to {output:?}\n");
-
-    let dataframes: Vec<DataFrame> = dfs
-        .iter()
-        .filter_map(|df| {
-            if let Some(true) = args.remove_null_columns {
-                remove_null_columns(Frame::Data(df.clone())).ok()
-            } else {
-                Some(df.clone())
-            }
-        })
-        .collect();
-
-    let df_itens_de_docs_fiscais = &dataframes[0];
-    let df_itens_de_docs_fiscais_result = &dataframes[1];
-    let df_consolidacao_natureza_da_bcalc = &dataframes[2];
-    let df_consolidacao_natureza_da_bcalc_result = &dataframes[3];
-
-    // Add column from one dataframe to another.
-    let joined: DataFrame =
-        add_column_from_df_to_another(df_itens_de_docs_fiscais, df_itens_de_docs_fiscais_result)?;
 
     // Workbook with worksheets
     let mut workbook = Workbook::new();
 
     for (df, sheet_name) in [
-        (&joined, "Itens de Docs Fiscais"),
-        (df_consolidacao_natureza_da_bcalc, "EFD (original)"),
-        (
-            df_consolidacao_natureza_da_bcalc_result,
-            "EFD (após auditoria)",
-        ),
+        (&dfs[0], "Itens de Docs Fiscais"),
+        (&dfs[1], "EFD (original)"),
+        (&dfs[2], "EFD (após auditoria)"),
     ] {
         let number_of_rows = df.height();
         let number_of_sheet = number_of_rows.div_ceil(MAX_NUMBER_OF_ROWS);
 
+        //println!("sheet_name: {sheet_name}");
         //println!("number_of_rows: {number_of_rows}");
         //println!("number_of_sheet: {number_of_sheet}\n");
 
@@ -101,7 +79,7 @@ pub fn write_xlsx(args: &Arguments, dfs: &[DataFrame]) -> PolarsResult<()> {
 }
 
 /// Select a column from df_source and copy it to df_result
-fn add_column_from_df_to_another(
+pub fn add_column_from_df_to_another(
     df_source: &DataFrame,
     df_result: &DataFrame,
 ) -> Result<DataFrame, PolarsError> {
