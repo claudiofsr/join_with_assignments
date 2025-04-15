@@ -110,9 +110,8 @@ pub fn cst_50_a_56() -> Expr {
 /// Códigos de Situação Tributária (CST)
 ///
 /// Intervalo de CST válidos: valores entre 1 a 99.
-pub fn csts<const N: usize, T>(range: [T; N]) -> Expr
+pub fn csts<T>(range: impl IntoIterator<Item = T>) -> Expr
 where
-    T: Copy,
     u32: From<T>,
 {
     let cst: &str = coluna(Left, "cst");
@@ -146,14 +145,11 @@ Get series from array
     );
 ```
 */
-pub fn get_series<const N: usize, T>(range: [T; N]) -> Series
+pub fn get_series<T>(range: impl IntoIterator<Item = T>) -> Series
 where
-    T: Copy,
     u32: From<T>,
 {
-    let series: Series = range.into_iter().map(|type_t| u32::from(type_t)).collect();
-
-    series
+    range.into_iter().map(u32::from).collect()
 }
 
 /// Código da Natureza da Base de Cálculo dos Créditos:
@@ -369,7 +365,7 @@ pub fn apply_filter(data_frame: DataFrame, args: &Arguments) -> Result<DataFrame
         data_frame
             .lazy()
             //.filter(entrada_de_credito().or(operacoes_de_entrada_ou_saida().not()))
-            //.filter(cst_50_a_66())
+            .filter(cst_50_a_66())
             .collect()
     } else {
         Ok(data_frame)
