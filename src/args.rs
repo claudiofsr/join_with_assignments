@@ -121,7 +121,7 @@ pub struct Arguments {
     pub print_csv: Option<bool>,
 
     /// Print Excel files
-    #[arg(short('e'), long, required = false)]
+    #[arg(short('e'), long, required = false, default_value = "true")]
     pub print_excel: Option<bool>,
 
     /// Print PARQUET files
