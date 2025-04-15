@@ -2,14 +2,11 @@
 //
 // SPDX-License-Identifier: MIT OR Apache-2.0
 //
-// Copyright 2023-2024, John McNamara, jmcnamara@cpan.org
-//
-// git clone https://github.com/jmcnamara/polars_excel_writer.git
-
-use std::io::{Seek, Write};
+// Copyright 2022-2025, John McNamara, jmcnamara@cpan.org
 
 use polars::prelude::*;
 use rust_xlsxwriter::Format;
+use std::io::{Seek, Write};
 
 use crate::PolarsXlsxWriter;
 

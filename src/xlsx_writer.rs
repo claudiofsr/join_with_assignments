@@ -13,6 +13,7 @@ use polars_arrow::temporal_conversions::{
     timestamp_us_to_datetime,
 };
 use rust_xlsxwriter::{Format, Table, Workbook, Worksheet};
+
 pub struct PolarsXlsxWriter {
     pub(crate) workbook: Workbook,
     pub(crate) options: WriterOptions,
