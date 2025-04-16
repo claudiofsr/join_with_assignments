@@ -1021,7 +1021,7 @@ Resultado: O DataFrame retornado por .rechunk() tem a garantia estrutural necess
 
 Quando usar: Use quando você precisar garantir que as colunas do DataFrame final sejam contíguas na memória,
 geralmente para interoperabilidade com outras bibliotecas ou APIs que tenham essa exigência
-(como parece ser o caso do seu PolarsXlsxWriter).
+(como parece ser o caso de PolarsXlsxWriter).
 
 */
 
