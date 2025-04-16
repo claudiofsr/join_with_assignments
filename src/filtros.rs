@@ -365,7 +365,7 @@ pub fn apply_filter(data_frame: DataFrame, args: &Arguments) -> Result<DataFrame
     // 1: Entrada, 2: Saída, 3 e 4: Ajustes, 5 e 6: Descontos, 7: Detalhamento.
     // let tipo_operacao: &str = coluna(Left, "tipo_operacao");
 
-    if args.operacoes_de_creditos == Some(true) {
+    if let Some(true) = args.operacoes_de_creditos {
         data_frame
             .lazy()
             //.filter(csts([63u32]))
