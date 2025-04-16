@@ -147,7 +147,7 @@ pub fn integrate_and_sort_column(
             valor_bc_auditado.into(), // new_name
         )?
         .with_column(column_to_add)?
-        .sort_by_columns(Some("write_xlsx sort_by_columns:"))?;
+        .sort_by_columns(Some("sort_by_columns:"))?;
 
     Ok(df_final)
 }
