@@ -665,11 +665,32 @@ pub fn write_csv(df: &DataFrame, basename: &str, delimiter: char) -> PolarsResul
 /// Format CSV file
 ///
 /// Substituir código por sua descrição nas colunas selecionadas.
-fn format_dataframe(df: &DataFrame) -> PolarsResult<DataFrame> {
+fn format_dataframe(data_frame: &DataFrame) -> PolarsResult<DataFrame> {
     // Column names:
     let natureza: &str = coluna(Left, "natureza");
+    let origem: &str = coluna(Left, "origem");
+    let chave_efd: &str = coluna(Left, "chave");
+    let chave_nfe: &str = coluna(Right, "chave");
 
-    let df_formated: DataFrame = df
+    // Get the names of columns currently present in the DataFrame for quick lookup.
+    let current_columns: HashSet<PlSmallStr> =
+        data_frame.get_column_names_owned().into_iter().collect();
+
+    let columns_chaves: Vec<&str> = vec![chave_efd, chave_nfe];
+    let columns_origem: Vec<&str> = vec![origem];
+
+    let columns_to_transform1: Vec<&str> = columns_chaves
+        .into_iter()
+        .filter(|&col| current_columns.contains(col))
+        .collect();
+
+    // Verificar a existência da coluna "Indicador de Origem" antes aplicar alterações.
+    let columns_to_transform2: Vec<&str> = columns_origem
+        .into_iter()
+        .filter(|&col| current_columns.contains(col))
+        .collect();
+
+    data_frame
         .clone()
         .lazy()
         .with_column(
@@ -688,31 +709,16 @@ fn format_dataframe(df: &DataFrame) -> PolarsResult<DataFrame> {
             descricao_da_natureza_da_bc_dos_creditos,
             GetOutput::from_type(DataType::String),
         ))
-        .collect()?;
-
-    // Verificar a existência da coluna "Indicador de Origem" antes aplicar alterações.
-    let col_names: Vec<&PlSmallStr> = df_formated.get_column_names();
-
-    if find_name(&col_names, "Indicador de Origem") {
-        let df = df_formated
-            .clone()
-            .lazy()
-            .with_column(
-                col("Indicador de Origem")
-                    .apply(descricao_da_origem, GetOutput::from_type(DataType::String)),
-            )
-            .collect()?;
-        return Ok(df);
-    }
-
-    Ok(df_formated)
-}
-
-/// Searching a &str into Vec<&str>
-///
-/// <https://stackoverflow.com/questions/57633089/searching-a-string-into-vecstring-in-rust>
-pub fn find_name(names: &[&PlSmallStr], name: &str) -> bool {
-    names.iter().any(|&x| x == name)
+        .with_columns([
+            // Apply cast only to the intersection of target and existing columns
+            cols(columns_to_transform1).cast(DataType::String),
+        ])
+        .with_columns([
+            // Apply cast only to the intersection of target and existing columns
+            cols(columns_to_transform2)
+                .apply(descricao_da_origem, GetOutput::from_type(DataType::String)),
+        ])
+        .collect()
 }
 
 /// Write Dataframe to Parquet file
