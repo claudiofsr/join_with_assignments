@@ -668,17 +668,22 @@ pub fn write_csv(df: &DataFrame, basename: &str, delimiter: char) -> PolarsResul
 fn format_dataframe(data_frame: &DataFrame) -> PolarsResult<DataFrame> {
     // Column names:
     let natureza: &str = coluna(Left, "natureza");
+    let pa_mes: &str = coluna(Left, "pa_mes");
+    let tipo_operacao: &str = coluna(Left, "tipo_operacao");
+    let tipo_cred: &str = coluna(Left, "tipo_cred");
     let origem: &str = coluna(Left, "origem");
     let chave_efd: &str = coluna(Left, "chave");
     let chave_nfe: &str = coluna(Right, "chave");
 
-    // Get the names of columns currently present in the DataFrame for quick lookup.
+    // 1. Get the names of columns currently present in the DataFrame for quick lookup.
     let current_columns: HashSet<PlSmallStr> =
         data_frame.get_column_names_owned().into_iter().collect();
 
     let columns_chaves: Vec<&str> = vec![chave_efd, chave_nfe];
     let columns_origem: Vec<&str> = vec![origem];
 
+    // 2. Filter the target list to include only columns that *actually exist*
+    //    in the current DataFrame.
     let columns_to_transform1: Vec<&str> = columns_chaves
         .into_iter()
         .filter(|&col| current_columns.contains(col))
@@ -693,15 +698,12 @@ fn format_dataframe(data_frame: &DataFrame) -> PolarsResult<DataFrame> {
     data_frame
         .clone()
         .lazy()
-        .with_column(
-            col("Mês do Período de Apuração")
-                .apply(descricao_do_mes, GetOutput::from_type(DataType::String)),
-        )
-        .with_column(col("Tipo de Operação").apply(
+        .with_column(col(pa_mes).apply(descricao_do_mes, GetOutput::from_type(DataType::String)))
+        .with_column(col(tipo_operacao).apply(
             descricao_do_tipo_de_operacao,
             GetOutput::from_type(DataType::String),
         ))
-        .with_column(col("Tipo de Crédito").apply(
+        .with_column(col(tipo_cred).apply(
             descricao_do_tipo_de_credito,
             GetOutput::from_type(DataType::String),
         ))
