@@ -672,25 +672,17 @@ fn format_dataframe(data_frame: &DataFrame) -> PolarsResult<DataFrame> {
     let tipo_operacao: &str = coluna(Left, "tipo_operacao");
     let tipo_cred: &str = coluna(Left, "tipo_cred");
     let origem: &str = coluna(Left, "origem");
-    let chave_efd: &str = coluna(Left, "chave");
-    let chave_nfe: &str = coluna(Right, "chave");
 
     // 1. Get the names of columns currently present in the DataFrame for quick lookup.
     let current_columns: HashSet<PlSmallStr> =
         data_frame.get_column_names_owned().into_iter().collect();
 
-    let columns_chaves: Vec<&str> = vec![chave_efd, chave_nfe];
     let columns_origem: Vec<&str> = vec![origem];
 
     // 2. Filter the target list to include only columns that *actually exist*
     //    in the current DataFrame.
-    let columns_to_transform1: Vec<&str> = columns_chaves
-        .into_iter()
-        .filter(|&col| current_columns.contains(col))
-        .collect();
-
     // Verificar a existência da coluna "Indicador de Origem" antes aplicar alterações.
-    let columns_to_transform2: Vec<&str> = columns_origem
+    let columns_to_transform: Vec<&str> = columns_origem
         .into_iter()
         .filter(|&col| current_columns.contains(col))
         .collect();
@@ -713,11 +705,7 @@ fn format_dataframe(data_frame: &DataFrame) -> PolarsResult<DataFrame> {
         ))
         .with_columns([
             // Apply cast only to the intersection of target and existing columns
-            cols(columns_to_transform1).cast(DataType::String),
-        ])
-        .with_columns([
-            // Apply cast only to the intersection of target and existing columns
-            cols(columns_to_transform2)
+            cols(columns_to_transform)
                 .apply(descricao_da_origem, GetOutput::from_type(DataType::String)),
         ])
         .collect()
