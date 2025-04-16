@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    coluna, format_dataframe, DataFrameExtension, PolarsXlsxWriter,
+    coluna, format_dataframe, Arguments, DataFrameExtension, PolarsXlsxWriter,
     Side::{
         Left,
         Middle,
@@ -444,6 +444,17 @@ pub fn remove_null_columns(frame: Frame) -> PolarsResult<DataFrame> {
     // The select operation is highly optimized and often avoids deep data copies.
     // `select` can take an iterator or slice of items convertible to PlSmallStr, including &str.
     df.select(columns_to_keep)
+}
+
+pub fn remover_colunas_vazias(
+    data_frame: DataFrame,
+    args: &Arguments,
+) -> Result<DataFrame, PolarsError> {
+    if let Some(true) = args.remove_null_columns {
+        remove_null_columns(Frame::Data(data_frame))
+    } else {
+        Ok(data_frame)
+    }
 }
 
 #[cfg(test)]

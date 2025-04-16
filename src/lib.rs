@@ -1008,17 +1008,6 @@ pub fn extract_ncm(input: &str) -> String {
         .unwrap_or_else(|| input.to_string()) // Return the original input if no match is found.
 }
 
-pub fn remover_colunas_vazias(
-    data_frame: DataFrame,
-    args: &Arguments,
-) -> Result<DataFrame, PolarsError> {
-    if let Some(true) = args.remove_null_columns {
-        remove_null_columns(Frame::Data(data_frame))
-    } else {
-        Ok(data_frame)
-    }
-}
-
 pub fn quit() {
     std::process::exit(0);
 }
