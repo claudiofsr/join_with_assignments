@@ -89,7 +89,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Add column from one dataframe to another.
     let df_joined: DataFrame =
-        add_column_from_df_to_another(&df_itens_de_docs_fiscais, &df_itens_de_docs_fiscais_result)?;
+        integrate_and_sort_column(df_itens_de_docs_fiscais, df_itens_de_docs_fiscais_result)?;
 
     let df_filtered = apply_filter(df_joined, &args)?;
 

@@ -29,7 +29,7 @@ pub use self::{
     analise_do_periodo_de_apuracao::adicionar_coluna_periodo_de_apuracao_inicial_e_final,
     args::*,
     columns::{
-        coluna, Column,
+        coluna, MyColumn,
         Side::{self, Left, Middle, Right},
     },
     consolidacao_da_natureza::obter_consolidacao_nat,
@@ -50,7 +50,7 @@ pub use self::{
 };
 
 use claudiofsr_lib::RoundFloat;
-use polars::{datatypes::DataType, prelude::Column as PColumn, prelude::*};
+use polars::prelude::*;
 use regex::Regex;
 use std::{
     any,
@@ -68,57 +68,125 @@ use sysinfo::System;
 
 pub type VecTuples = Vec<(String, u64, u64)>;
 
+/// Trait providing DataFrame extension methods.
 pub trait DataFrameExtension {
-    /// Using the select method is the recommended way to sort columns in polars.
+    /// Reorders the DataFrame columns according to a predefined canonical order.
     ///
-    /// Some messages can be added.
+    /// Columns present in the DataFrame but not in the canonical order are omitted.
+    /// Columns present in the canonical order but not in the DataFrame are ignored.
+    /// The canonical order is typically defined externally (e.g., `MyColumn::get_columns()`).
     ///
-    /// <https://doc.rust-lang.org/std/collections>
-    fn sort_by_columns(&self, msg: Option<&str>) -> Result<Self, PolarsError>
+    /// This method uses `DataFrame::select` for efficient column reordering.
+    fn sort_by_columns(&self, opt_msg: Option<&str>) -> PolarsResult<Self>
     where
         Self: std::marker::Sized;
 }
 
 impl DataFrameExtension for DataFrame {
-    fn sort_by_columns(&self, opt_msg: Option<&str>) -> Result<DataFrame, PolarsError> {
-        // Vec versus HashSet lookup performance.
-        // HashSet contains() is O(1).
-        // Vec is like an array, searching for the correct String is an O(n) operation.
-        // HashMap/HashSet is a hash table, searching for the String is an O(1) operation.
-        // https://gist.github.com/daboross/976978d8200caf86e02acb6805961195#file-lib-rs
-        let df_columns: HashSet<&str> = self
-            .get_column_names()
-            .into_iter()
-            .map(|s| s.as_str())
-            .collect();
+    /// Reorders the DataFrame columns according to the order defined by `MyColumn::get_columns()`.
+    fn sort_by_columns(&self, opt_msg: Option<&str>) -> PolarsResult<Self> {
+        // Get the names of columns currently present in the DataFrame for quick lookup.
+        let current_columns: HashSet<PlSmallStr> =
+            self.get_column_names_owned().into_iter().collect();
 
         if let Some(msg) = opt_msg {
             println!("{msg}")
         }
-        let df_sorted: DataFrame = self.select(
-            Column::get_columns()
-                .iter()
-                //.filter(|col| self.column(col.name).is_ok())
-                .filter(|col| df_columns.contains(&col.name))
-                .enumerate()
-                .map(|(index, col)| {
-                    // Print column names and their respective types
-                    if opt_msg.is_some() {
-                        println!(
-                            "column {:02}: (\"{}\", DataType::{}),",
-                            index + 1,
-                            col.name,
-                            col.dtype
-                        );
-                    }
-                    col.name
-                }),
-        )?;
-        if opt_msg.is_some() {
-            println!()
-        }
 
-        Ok(df_sorted)
+        // Filter the canonical column list to include only those present in the DataFrame.
+        // Then extract just the names in the desired order.
+        let columns_to_select: Vec<&str> = MyColumn::get_columns()
+            .iter()
+            // Keep only columns from the canonical list that actually exist in the DataFrame
+            .filter(|col| current_columns.contains(col.name))
+            //.filter(|col| self.column(col.name).is_ok())
+            .enumerate()
+            .map(|(index, col)| {
+                // Print column names and their respective types
+                if opt_msg.is_some() {
+                    println!(
+                        "column {:02}: (\"{}\", DataType::{}),",
+                        index + 1,
+                        col.name,
+                        col.dtype
+                    );
+                }
+                col.name
+            })
+            .collect();
+
+        // Perform the select operation with the ordered list of existing columns.
+        // Using df.select ensures only specified columns are kept and they are in the specified order.
+        self.select(columns_to_select)
+    }
+}
+
+pub enum Frame {
+    Lazy(LazyFrame),
+    Data(DataFrame),
+}
+
+/// Integrates a specific column from a source DataFrame into a result DataFrame,
+/// renames an existing column in the result DataFrame, and sorts the final columns.
+pub fn integrate_and_sort_column(
+    df_source: DataFrame,
+    mut df_result: DataFrame,
+) -> PolarsResult<DataFrame> {
+    // Column names:
+    let valor_bc: &str = coluna(Left, "valor_bc");
+    let valor_bc_auditado: &str = coluna(Left, "valor_bc_auditado");
+
+    // 1. Select the column from the source DataFrame first.
+    //    Cloning the Series is generally efficient due to Arc pointers.
+    let column_to_add = df_source.column(valor_bc)?.clone();
+
+    // 2. Chain operations on df_result: Rename, add column, sort
+    let df_final: DataFrame = df_result
+        .rename(
+            valor_bc,                 // original_name
+            valor_bc_auditado.into(), // new_name
+        )?
+        .with_column(column_to_add)?
+        .sort_by_columns(Some("write_xlsx sort_by_columns:"))?;
+
+    Ok(df_final)
+}
+
+/// Eliminate columns that contain only null values.
+///
+/// frame can be LazyFrame or DataFrame
+pub fn remove_null_columns(frame: Frame) -> PolarsResult<DataFrame> {
+    let df: DataFrame = match frame {
+        Frame::Lazy(lz) => lz.collect()?,
+        Frame::Data(df) => df,
+    };
+
+    // Keep the names of these columns:
+    let pa_mes: &str = coluna(Left, "pa_mes"); // "Mês do Período de Apuração"
+    let glosar: &str = coluna(Middle, "glosar"); // "Glosar Base de Cálculo de PIS/PASEP e COFINS"
+
+    // 1. Get the names of columns that have at least one non-null value.
+    let columns_to_keep: Vec<&str> = df
+        .iter() // Iterate over the Series (columns)
+        .filter(|series| {
+            series.is_not_null().any()
+                || series.name().contains(pa_mes)
+                || series.name().contains(glosar)
+        }) // Keep series with any non-null value
+        .map(|series| series.name().as_str()) // Get the series name as &str
+        .collect(); // Collect the names into a Vec<&str>
+
+    // 2. Select only those columns from the original DataFrame.
+    // The select operation is highly optimized and often avoids deep data copies.
+    // `select` can take an iterator or slice of items convertible to PlSmallStr, including &str.
+    df.select(columns_to_keep)
+}
+
+pub fn remover_colunas_vazias(data_frame: DataFrame, args: &Arguments) -> PolarsResult<DataFrame> {
+    if let Some(true) = args.remove_null_columns {
+        remove_null_columns(Frame::Data(data_frame))
+    } else {
+        Ok(data_frame)
     }
 }
 
@@ -516,7 +584,7 @@ fn read_csv_lazy(
             let mut schema: Schema = Schema::default();
 
             // HashMap<name, dtype> used to make Schema
-            let cols_dtype: HashMap<&str, DataType> = Column::get_cols_dtype(side);
+            let cols_dtype: HashMap<&str, DataType> = MyColumn::get_cols_dtype(side);
 
             // headers, nomes das colunas, primeira linha do arquivo CSV.
             if let Ok(headers) = get_csv_headers(path, separator as u8) {
@@ -661,7 +729,7 @@ pub fn write_pqt(df: &DataFrame, basename: &str) -> PolarsResult<()> {
 /// #### Exemplo fictício:
 ///
 /// Se CNPJ: `12.345.678/0009-23`, então CNPJ Base: `12.345.678`.
-pub fn get_cnpj_base(col: PColumn) -> PolarsResult<Option<PColumn>> {
+pub fn get_cnpj_base(col: Column) -> PolarsResult<Option<Column>> {
     match col.dtype() {
         DataType::String => cnpj_base(col),
         _ => {
@@ -681,8 +749,8 @@ pub fn get_cnpj_base(col: PColumn) -> PolarsResult<Option<PColumn>> {
 /// `12.345.678/0009-23` -> `12.345.678`
 ///
 /// `<N/D> [Info do CT-e: 12.345.678/0009-23] [Info do CT-e: <N/D>] [Info do CT-e: 12.345.678/0009-23]` -> `12.345.678`
-fn cnpj_base(col: PColumn) -> PolarsResult<Option<PColumn>> {
-    let new_col: PColumn = col
+fn cnpj_base(col: Column) -> PolarsResult<Option<Column>> {
+    let new_col: Column = col
         .str()?
         .into_iter()
         .map(|option_str: Option<&str>| {
@@ -708,8 +776,8 @@ fn cnpj_base(col: PColumn) -> PolarsResult<Option<PColumn>> {
     Ok(Some(new_col))
 }
 
-pub fn desprezar_pequenos_valores(col: PColumn, delta: f64) -> PolarsResult<Option<PColumn>> {
-    let new_col: PColumn = col
+pub fn desprezar_pequenos_valores(col: Column, delta: f64) -> PolarsResult<Option<Column>> {
+    let new_col: Column = col
         .f64()?
         .into_iter()
         .map(|opt_f64: Option<f64>| match opt_f64 {
@@ -754,7 +822,7 @@ fn leading_zeros(series: Series, fill: usize) -> PolarsResult<Option<Series>> {
 /// Filtra colunas do tipo float64.
 ///
 /// Posteriormente, arredonda os valores da coluna
-pub fn round_float64_columns(col: PColumn, decimals: u32) -> PolarsResult<Option<PColumn>> {
+pub fn round_float64_columns(col: Column, decimals: u32) -> PolarsResult<Option<Column>> {
     let series = match col.as_series() {
         Some(s) => s,
         None => return Ok(Some(col)),
@@ -766,7 +834,7 @@ pub fn round_float64_columns(col: PColumn, decimals: u32) -> PolarsResult<Option
     }
 }
 
-pub fn round_column(col: PColumn, decimals: u32) -> PolarsResult<Option<PColumn>> {
+pub fn round_column(col: Column, decimals: u32) -> PolarsResult<Option<Column>> {
     match col.dtype() {
         // DataType::Float64 => Ok(Some(series.round(decimals)?)), <-- Bug panicking::panic_fmt
         DataType::Float64 => round_column_f64(col, decimals),
@@ -782,8 +850,8 @@ pub fn round_column(col: PColumn, decimals: u32) -> PolarsResult<Option<PColumn>
     }
 }
 
-fn round_column_f64(col: PColumn, decimals: u32) -> PolarsResult<Option<PColumn>> {
-    let new_col: PColumn = col
+fn round_column_f64(col: Column, decimals: u32) -> PolarsResult<Option<Column>> {
+    let new_col: Column = col
         .f64()?
         .into_iter()
         .map(|opt_f64: Option<f64>| opt_f64.map(|float64| float64.round_float(decimals)))
@@ -793,8 +861,8 @@ fn round_column_f64(col: PColumn, decimals: u32) -> PolarsResult<Option<PColumn>
     Ok(Some(new_col))
 }
 
-fn round_column_str(col: PColumn, decimals: u32) -> PolarsResult<Option<PColumn>> {
-    let new_col: PColumn = col
+fn round_column_str(col: Column, decimals: u32) -> PolarsResult<Option<Column>> {
+    let new_col: Column = col
         .str()?
         .into_iter()
         .map(|opt_str: Option<&str>| get_opt_from_str(opt_str, &col, decimals))
@@ -804,7 +872,7 @@ fn round_column_str(col: PColumn, decimals: u32) -> PolarsResult<Option<PColumn>
     Ok(Some(new_col))
 }
 
-fn get_opt_from_str(opt_str: Option<&str>, col: &PColumn, decimals: u32) -> Option<f64> {
+fn get_opt_from_str(opt_str: Option<&str>, col: &Column, decimals: u32) -> Option<f64> {
     let opt_float64: Option<f64> = match opt_str {
         Some(str) => {
             let result: Result<f64, ParseFloatError> =
@@ -831,8 +899,8 @@ fn get_opt_from_str(opt_str: Option<&str>, col: &PColumn, decimals: u32) -> Opti
 }
 
 /// NCM format: "12345678" --> "1234.56.78"
-pub fn formatar_ncm(col: PColumn) -> PolarsResult<Option<PColumn>> {
-    let new_col: PColumn = col
+pub fn formatar_ncm(col: Column) -> PolarsResult<Option<Column>> {
+    let new_col: Column = col
         .str()?
         .into_iter()
         .map(|option_str| option_str.map(extract_ncm))
@@ -842,7 +910,7 @@ pub fn formatar_ncm(col: PColumn) -> PolarsResult<Option<PColumn>> {
     Ok(Some(new_col))
 }
 
-pub fn formatar_chave_eletronica(col: PColumn) -> PolarsResult<Option<PColumn>> {
+pub fn formatar_chave_eletronica(col: Column) -> PolarsResult<Option<Column>> {
     match col.dtype() {
         DataType::String => format_digits(col),
         _ => {
@@ -856,8 +924,8 @@ pub fn formatar_chave_eletronica(col: PColumn) -> PolarsResult<Option<PColumn>> 
 }
 
 // https://docs.rs/polars/latest/polars/prelude/string/struct.StringNameSpace.html#
-fn format_digits(col: PColumn) -> PolarsResult<Option<PColumn>> {
-    let new_col: PColumn = col
+fn format_digits(col: Column) -> PolarsResult<Option<Column>> {
+    let new_col: Column = col
         .str()?
         .into_iter()
         .map(retain_only_digits)
@@ -1084,7 +1152,7 @@ mod test_functions {
 
         println!("column: {col:?}\n");
 
-        assert_eq!(Some(PColumn::new("".into(), &valid)), col);
+        assert_eq!(Some(Column::new("".into(), &valid)), col);
 
         Ok(())
     }
@@ -1202,14 +1270,14 @@ mod test_functions {
             column_multiple_values.list()?.into_iter().collect();
 
         // É necessário formatar o número de casas decimais
-        let col_formatted: Vec<Option<PColumn>> = vec_opt_lines_efd
+        let col_formatted: Vec<Option<Column>> = vec_opt_lines_efd
             .into_iter()
             .flat_map(|opt_series| {
                 opt_series.and_then(|series| round_column(series.into(), 1).ok())
             })
             .collect();
 
-        let vec_col: Vec<PColumn> = col_formatted.into_iter().flatten().collect();
+        let vec_col: Vec<Column> = col_formatted.into_iter().flatten().collect();
 
         let vec_lines: Result<Vec<Vec<f64>>, Box<dyn Error>> = vec_col
             .iter()
@@ -1304,6 +1372,42 @@ mod test_functions {
         let valid = vec![vec![0, 1, 2, 3, 4], vec![0, 1, 2, 4, 3]];
 
         assert_eq!(valid, results);
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests_remove_null_columns {
+    use super::*;
+    use std::error::Error;
+
+    #[test]
+    /// `cargo test -- --show-output teste_remove_null_columns`
+    fn teste_remove_null_columns() -> Result<(), Box<dyn Error>> {
+        let dataframe: DataFrame = df!(
+            "integers"  => &[1, 2, 3, 4],
+            "options A" => [None::<u32>, None, None, None],
+            "float64"   => [23.654, 0.319, 10.0049, -3.41501],
+            "options B" => [None::<u32>, None, None, None],
+            "options C" => [Some(28), Some(300), None, Some(2)],
+            "options D" => [None::<u32>, None, None, None],
+        )?;
+
+        println!("dataframe: {dataframe}\n");
+
+        let df_clean: DataFrame = remove_null_columns(Frame::Data(dataframe))?;
+
+        println!("df_clean: {df_clean}\n");
+
+        assert_eq!(
+            df_clean,
+            df!(
+                "integers"  => &[1, 2, 3, 4],
+                "float64"   => [23.654, 0.319, 10.0049, -3.41501],
+                "options C" => [Some(28), Some(300), None, Some(2)],
+            )?
+        );
 
         Ok(())
     }

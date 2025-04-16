@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
 use crate::{
-    coluna, format_dataframe, Arguments, DataFrameExtension, PolarsXlsxWriter,
+    coluna, format_dataframe, PolarsXlsxWriter,
     Side::{
         Left,
-        Middle,
+        //Middle,
         //Right,
     },
 };
@@ -76,30 +76,6 @@ pub fn write_xlsx(dfs: &[DataFrame]) -> PolarsResult<()> {
     workbook.save(output)?;
 
     Ok(())
-}
-
-/// Select a column from df_source and copy it to df_result
-pub fn add_column_from_df_to_another(
-    df_source: &DataFrame,
-    df_result: &DataFrame,
-) -> Result<DataFrame, PolarsError> {
-    // Column names:
-    let valor_bc: &str = coluna(Left, "valor_bc");
-    let valor_bc_auditado: &str = coluna(Left, "valor_bc_auditado");
-
-    let joined: DataFrame = df_result
-        .clone()
-        .rename(
-            valor_bc,                 // original_name
-            valor_bc_auditado.into(), // new_name
-        )?
-        .with_column(
-            // Select a column and copy it to another df
-            df_source.column(valor_bc)?.clone(),
-        )?
-        .sort_by_columns(Some("write_xlsx sort_by_columns:"))?;
-
-    Ok(joined)
 }
 
 /// Write Dataframe to xlsx Excel file
@@ -407,84 +383,5 @@ fn truncate_string(s: &str, max_chars: usize) -> &str {
     match s.char_indices().nth(max_chars) {
         Some((idx, _)) => &s[..idx],
         None => s,
-    }
-}
-
-pub enum Frame {
-    Lazy(LazyFrame),
-    Data(DataFrame),
-}
-
-/// Eliminate columns that contain only null values.
-///
-/// frame can be LazyFrame or DataFrame
-pub fn remove_null_columns(frame: Frame) -> PolarsResult<DataFrame> {
-    let df: DataFrame = match frame {
-        Frame::Lazy(lz) => lz.collect()?,
-        Frame::Data(df) => df,
-    };
-
-    // Keep the names of these columns:
-    let pa_mes: &str = coluna(Left, "pa_mes"); // "Mês do Período de Apuração"
-    let glosar: &str = coluna(Middle, "glosar"); // "Glosar Base de Cálculo de PIS/PASEP e COFINS"
-
-    // 1. Get the names of columns that have at least one non-null value.
-    let columns_to_keep: Vec<&str> = df
-        .iter() // Iterate over the Series (columns)
-        .filter(|series| {
-            series.is_not_null().any()
-                || series.name().contains(pa_mes)
-                || series.name().contains(glosar)
-        }) // Keep series with any non-null value
-        .map(|series| series.name().as_str()) // Get the series name as &str
-        .collect(); // Collect the names into a Vec<&str>
-
-    // 2. Select only those columns from the original DataFrame.
-    // The select operation is highly optimized and often avoids deep data copies.
-    // `select` can take an iterator or slice of items convertible to PlSmallStr, including &str.
-    df.select(columns_to_keep)
-}
-
-pub fn remover_colunas_vazias(data_frame: DataFrame, args: &Arguments) -> PolarsResult<DataFrame> {
-    if let Some(true) = args.remove_null_columns {
-        remove_null_columns(Frame::Data(data_frame))
-    } else {
-        Ok(data_frame)
-    }
-}
-
-#[cfg(test)]
-mod test_functions {
-    use super::*;
-    use std::error::Error;
-
-    #[test]
-    /// `cargo test -- --show-output teste_remove_null_columns`
-    fn teste_remove_null_columns() -> Result<(), Box<dyn Error>> {
-        let dataframe: DataFrame = df!(
-            "integers"  => &[1, 2, 3, 4],
-            "options A" => [None::<u32>, None, None, None],
-            "float64"   => [23.654, 0.319, 10.0049, -3.41501],
-            "options B" => [None::<u32>, None, None, None],
-            "options C" => [Some(28), Some(300), None, Some(2)],
-            "options D" => [None::<u32>, None, None, None],
-        )?;
-
-        println!("dataframe: {dataframe}\n");
-
-        let df_clean: DataFrame = remove_null_columns(Frame::Data(dataframe))?;
-
-        println!("df_clean: {df_clean}\n");
-
-        assert_eq!(
-            df_clean,
-            df!(
-                "integers"  => &[1, 2, 3, 4],
-                "float64"   => [23.654, 0.319, 10.0049, -3.41501],
-                "options C" => [Some(28), Some(300), None, Some(2)],
-            )?
-        );
-
-        Ok(())
     }
 }
