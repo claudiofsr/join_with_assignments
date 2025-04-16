@@ -93,7 +93,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let df_filtered = apply_filter(df_joined, &args)?;
 
-    let df_itens_de_docs_fiscais_result = remover_colunas_vazias(df_filtered, &args)?;
+    let df_itens_de_docs_fiscais_result = conditionally_remove_null_columns(df_filtered, &args)?;
 
     let dataframes: Vec<DataFrame> = [
         df_itens_de_docs_fiscais_result,

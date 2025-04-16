@@ -96,7 +96,7 @@ impl DataFrameExtension for DataFrame {
         // Filter the canonical column list to include only those present in the DataFrame.
         // Then extract just the names in the desired order.
         let columns_to_select: Vec<&str> = MyColumn::get_columns()
-            .iter()
+            .into_iter()
             // Keep only columns from the canonical list that actually exist in the DataFrame
             .filter(|col| current_columns.contains(col.name))
             //.filter(|col| self.column(col.name).is_ok())
@@ -152,10 +152,9 @@ pub fn integrate_and_sort_column(
     Ok(df_final)
 }
 
-/// Eliminate columns that contain only null values.
-///
-/// frame can be LazyFrame or DataFrame
+/// Removes columns that consist entirely of null values from a DataFrame or LazyFrame.
 pub fn remove_null_columns(frame: Frame) -> PolarsResult<DataFrame> {
+    // Collect if lazy, or use the DataFrame directly.
     let df: DataFrame = match frame {
         Frame::Lazy(lz) => lz.collect()?,
         Frame::Data(df) => df,
@@ -165,25 +164,36 @@ pub fn remove_null_columns(frame: Frame) -> PolarsResult<DataFrame> {
     let pa_mes: &str = coluna(Left, "pa_mes"); // "Mês do Período de Apuração"
     let glosar: &str = coluna(Middle, "glosar"); // "Glosar Base de Cálculo de PIS/PASEP e COFINS"
 
-    // 1. Get the names of columns that have at least one non-null value.
-    let columns_to_keep: Vec<&str> = df
-        .iter() // Iterate over the Series (columns)
-        .filter(|series| {
-            series.is_not_null().any()
-                || series.name().contains(pa_mes)
-                || series.name().contains(glosar)
-        }) // Keep series with any non-null value
-        .map(|series| series.name().as_str()) // Get the series name as &str
-        .collect(); // Collect the names into a Vec<&str>
+    let mandatory_columns = [pa_mes, glosar];
 
-    // 2. Select only those columns from the original DataFrame.
-    // The select operation is highly optimized and often avoids deep data copies.
-    // `select` can take an iterator or slice of items convertible to PlSmallStr, including &str.
+    // Use a HashSet for efficient lookup of mandatory columns.
+    let mandatory_set: HashSet<&str> = mandatory_columns.into_iter().collect();
+
+    // Determine which columns to keep.
+    let columns_to_keep: Vec<&str> = df
+        .get_columns()
+        .iter()
+        .filter_map(|col| {
+            let name = col.name().as_str();
+            // Condition: Keep if it's mandatory OR if it contains any non-null value.
+            if mandatory_set.contains(name) || col.is_not_null().any() {
+                Some(name) // Keep this column name
+            } else {
+                None // Filter out this column (it's fully null and not mandatory)
+            }
+        })
+        .collect(); // Collect the names of columns to keep
+
+    // Select only the desired columns. This is efficient.
     df.select(columns_to_keep)
 }
 
-pub fn remover_colunas_vazias(data_frame: DataFrame, args: &Arguments) -> PolarsResult<DataFrame> {
-    if let Some(true) = args.remove_null_columns {
+/// Conditionally removes fully null columns based on program arguments.
+pub fn conditionally_remove_null_columns(
+    data_frame: DataFrame,
+    args: &Arguments,
+) -> PolarsResult<DataFrame> {
+    if args.remove_null_columns == Some(true) {
         remove_null_columns(Frame::Data(data_frame))
     } else {
         Ok(data_frame)
