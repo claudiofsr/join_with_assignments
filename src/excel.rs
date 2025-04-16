@@ -446,10 +446,7 @@ pub fn remove_null_columns(frame: Frame) -> PolarsResult<DataFrame> {
     df.select(columns_to_keep)
 }
 
-pub fn remover_colunas_vazias(
-    data_frame: DataFrame,
-    args: &Arguments,
-) -> Result<DataFrame, PolarsError> {
+pub fn remover_colunas_vazias(data_frame: DataFrame, args: &Arguments) -> PolarsResult<DataFrame> {
     if let Some(true) = args.remove_null_columns {
         remove_null_columns(Frame::Data(data_frame))
     } else {
