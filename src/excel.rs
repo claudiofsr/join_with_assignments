@@ -121,7 +121,6 @@ pub fn make_worksheet(df: &DataFrame, sheet_name: &str) -> PolarsResult<Workshee
         .set_num_format("dd/mm/yyyy");
 
     dbg!(&df_to_excel);
-    dbg!(&fmt_date);
 
     // Write the dataframe to the worksheet using `PolarsXlsxWriter`.
     PolarsXlsxWriter::new()
