@@ -1008,45 +1008,15 @@ pub fn extract_ncm(input: &str) -> String {
         .unwrap_or_else(|| input.to_string()) // Return the original input if no match is found.
 }
 
-/*
-.rechunk():
-
-Propósito: É uma operação explícita realizada depois que a computação lazy (collect()) é concluída.
-
-Ação: Garante que cada coluna (Series) no DataFrame resultante tenha exatamente um chunk (bloco de memória contíguo).
-Ele faz isso copiando os dados, se necessário, para um novo buffer único.
-
-Resultado: O DataFrame retornado por .rechunk() tem a garantia estrutural necessária para que métodos como .iter()
-(que esperam um único chunk) funcionem corretamente.
-
-Quando usar: Use quando você precisar garantir que as colunas do DataFrame final sejam contíguas na memória,
-geralmente para interoperabilidade com outras bibliotecas ou APIs que tenham essa exigência
-(como parece ser o caso de PolarsXlsxWriter).
-
-*/
-
-/// Rechunka (consolida chunks) cada DataFrame dentro de um vetor, modificando-os no lugar.
-///
-/// Esta função itera sobre um vetor mutável de DataFrames e chama `rechunk_mut()`
-/// em cada um. `rechunk_mut()` consolida os chunks de cada Series dentro do
-/// DataFrame em um único chunk contíguo, modificando o DataFrame diretamente.
-/// Isso pode ser útil para garantir a contiguidade da memória antes de operações
-/// que se beneficiam dela ou antes de passar os dados para APIs que a exigem.
-///
-/// # Arguments
-///
-/// * `dataframes`: Uma referência mutável para um vetor contendo os DataFrames
-///   a serem rechunkados. O vetor em si não é alterado (nenhum item é adicionado
-///   ou removido), mas os DataFrames *dentro* dele serão modificados.
-///
-pub fn rechunk_dataframes_inplace(dataframes: &mut [DataFrame]) {
-    // Itera sobre referências mutáveis para cada DataFrame no vetor
-    for df in dataframes.iter_mut() {
-        // Chama rechunk_mut() que modifica o DataFrame no lugar.
-        // rechunk_mut() não retorna nada (implicitamente retorna ()).
-        df.rechunk_mut();
+pub fn remover_colunas_vazias(
+    data_frame: DataFrame,
+    args: &Arguments,
+) -> Result<DataFrame, PolarsError> {
+    if let Some(true) = args.remove_null_columns {
+        remove_null_columns(Frame::Data(data_frame))
+    } else {
+        Ok(data_frame)
     }
-    // A função não precisa retornar nada, pois modificou o vetor de entrada.
 }
 
 pub fn quit() {

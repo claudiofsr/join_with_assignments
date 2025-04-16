@@ -88,23 +88,23 @@ fn main() -> Result<(), Box<dyn Error>> {
         obter_consolidacao_nat(&df_itens_de_docs_fiscais_result, true)?;
 
     // Add column from one dataframe to another.
-    let joined: DataFrame =
+    let df_joined: DataFrame =
         add_column_from_df_to_another(&df_itens_de_docs_fiscais, &df_itens_de_docs_fiscais_result)?;
 
-    let df_itens_de_docs_fiscais_result = apply_filter(joined, &args)?;
+    let df_filtered = apply_filter(df_joined, &args)?;
 
-    let mut dataframes: Vec<DataFrame> = [
+    let df_itens_de_docs_fiscais_result = remover_colunas_vazias(df_filtered, &args)?;
+
+    let dataframes: Vec<DataFrame> = [
         df_itens_de_docs_fiscais_result,
         df_consolidacao_natureza_da_bcalc,
         df_consolidacao_natureza_da_bcalc_result,
     ]
     .into_iter()
-    .filter_map(|df| {
-        if let Some(true) = args.remove_null_columns {
-            remove_null_columns(Frame::Data(df)).ok()
-        } else {
-            Some(df)
-        }
+    .map(|mut df| {
+        // Necessário antes de usar PolarsXlsxWriter::new()
+        df.rechunk_mut();
+        df
     })
     .collect();
 
@@ -113,9 +113,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         "df_consolidacao_natureza_da_bcalc",
         "df_consolidacao_natureza_da_bcalc_result",
     ];
-
-    // Necessário antes de usar PolarsXlsxWriter::new()
-    rechunk_dataframes_inplace(&mut dataframes);
 
     let iterator = dataframes.iter().zip(basenames.iter());
 
