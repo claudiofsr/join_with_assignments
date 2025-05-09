@@ -643,7 +643,7 @@ fn read_csv_lazy(
                     .with_has_header(true) // Indicate the CSV file has a header row
                     .with_ignore_errors(true) // Continue reading even if parsing errors occur
                     //.with_null_values(Some(NullValues::AllColumns(null_values))) // Apply the predefined null values list
-                    .with_null_values(None) // Apply fn replace_values_with_null()
+                    .with_null_values(None) // Apply fn build_null_expression()
                     .with_missing_is_null(true) // Treat missing fields as null
                     // Infer schema length 0 reads only headers. Polars gets column names.
                     .with_infer_schema_length(Some(0))
