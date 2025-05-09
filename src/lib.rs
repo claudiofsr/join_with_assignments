@@ -456,12 +456,16 @@ pub fn get_lazyframe_from_csv(
         }
     }
 
+    let replacement_expr: Expr = build_null_expression(true)?;
+
     // Format date
-    let mut lazyframe: LazyFrame = read_csv_lazy(file_path, delimiter, side)?.with_column(
-        col("^(Período|Data|Dia).*$") // regex
-            .str()
-            .to_date(options),
-    );
+    let mut lazyframe: LazyFrame = read_csv_lazy(file_path, delimiter, side)?
+        .with_columns([replacement_expr])
+        .with_column(
+            col("^(Período|Data|Dia).*$") // regex
+                .str()
+                .to_date(options),
+        );
 
     println!("{}\n", lazyframe.clone().collect()?);
 
@@ -484,6 +488,60 @@ pub fn get_lazyframe_from_csv(
     // println!("teste dataframe: {:#?}", lazyframe.clone().collect()?);
 
     Ok(lazyframe)
+}
+
+/// Define values to be interpreted as null across all columns.
+pub static NULL_VALUES: [&str; 3] = [
+    " ",           // Represents empty strings --> null
+    "<N/D>",      // Specific placeholder string 1
+    "*DIVERSOS*", // Specific placeholder string 2
+];
+
+/// Builds a Polars Expression to replace specified string values (after trimming)
+/// with NULL within selected columns of a DataFrame.
+///
+/// Values are replaced if they match any string in the hardcoded list
+/// `null_value_list: Vec<&str>` after trimming leading/trailing whitespace.
+///
+pub fn build_null_expression(apply_to_all_columns: bool) -> PolarsResult<Expr> {
+    // Create a Polars Series containing the *strings* to be treated as null markers.
+    let series = Series::new("null_vals".into(), NULL_VALUES);
+    let literal_series: Expr = series.to_list_expr()?;
+
+    // --- Define Replacement Logic based on the flag ---
+    let replacement_expr: Expr = if apply_to_all_columns {
+        // Universal Mode: Apply to ALL columns via casting and trimming string representation
+        let condition = all() // Select current column value
+            .cast(DataType::String) // Cast to String
+            .str()
+            .strip_chars(lit(NULL)) // Trim whitespace from string representation
+            .is_in(literal_series, true); // Check if trimmed string is in the list
+
+        when(condition) // WHEN the trimmed string representation matches...
+            .then(lit(NULL)) // THEN replace original value with NULL
+            .otherwise(all()) // OTHERWISE keep the original value
+            .name()
+            .keep() // Keep original column name
+    } else {
+        // String-Only Mode: Apply only to String columns, trim original string
+        let string_cols_selector = dtype_col(&DataType::String);
+
+        let condition = string_cols_selector // Select only string columns
+            .clone() // Clone needed for use in `otherwise`
+            .str()
+            .strip_chars(lit(NULL)) // Trim whitespace from the original string value
+            .is_in(literal_series, true); // Check if trimmed string is in the list
+
+        when(condition) // WHEN the trimmed string matches...
+            // THEN replace with NULL (cast needed for type consistency within String col expr)
+            .then(lit(NULL).cast(DataType::String))
+            // OTHERWISE keep the original string value
+            .otherwise(string_cols_selector)
+            .name()
+            .keep() // Keep original column name
+    };
+
+    Ok(replacement_expr)
 }
 
 /// If valid, print the variables (file_path, delimiter, side).
@@ -569,49 +627,11 @@ fn read_csv_lazy(
     delimiter: Option<char>,    // Optional delimiter character
     side: Side,                 // Custom parameter (e.g., determines schema)
 ) -> PolarsResult<LazyFrame> {
-    // Define values to be interpreted as null across all columns.
-    let null_values: Vec<PlSmallStr> = vec![
-        //"",         // Represents empty strings
-        " ",          // Represents space strings
-        "<N/D>",      // Specific placeholder string 1
-        "*DIVERSOS*", // Specific placeholder string 2
-    ]
-    .into_iter()
-    .map(|s| s.into()) // Convert each string slice to PlSmallStr
-    .collect(); // Collect into a vector
-
     match (&file_path, delimiter) {
         (Some(path), Some(separator)) => {
             // Get the expected column names and their data types BEFORE the closure.
             // Use Arc to efficiently share the map ownership with the 'move' closure.
             let cols_dtype: HashMap<&str, DataType> = MyColumn::get_cols_dtype(side);
-
-            /*
-            // 1. Define the CSV parsing options.
-            let csv_parse_options = CsvParseOptions::default()
-                .with_encoding(CsvEncoding::LossyUtf8) // Handle potentially non-strict UTF8
-                .with_missing_is_null(true) // Treat empty fields as nulls
-                .with_try_parse_dates(false) // Disable automatic date parsing during initial read
-                .with_quote_char(Some(b'"')) // Set the quote character (default)
-                .with_null_values(Some(NullValues::AllColumns(null_values.clone()))) // Apply the predefined null values list
-                .with_separator(separator as u8); // Set the chosen delimiter
-
-            // 2. Define the main CSV reading options.
-            let data_frame = CsvReadOptions::default()
-                .with_parse_options(csv_parse_options) // Apply the parsing sub-options
-                .with_has_header(true) // File has a header row
-                .with_ignore_errors(true) // Allow skipping rows/fields that fail to parse
-                .with_rechunk(true) // Optional rechunking step
-                .with_infer_schema_length(Some(0)) // Number of rows to use for schema inference (0 means header only)
-                .with_n_rows(Some(0)) // Limits the number of rows to read.
-                .try_into_reader_with_file_path(Some(path.to_path_buf()))?
-                .finish()?;
-
-            println!("data_frame: {}", data_frame);
-            println!("schema: {:?}", data_frame.schema());
-
-            // let data_frame = csv_parse_options.finish();
-            */
 
             // Create a LazyCsvReader to process the file lazily.
             let result_lazyframe: PolarsResult<LazyFrame> =
@@ -622,10 +642,10 @@ fn read_csv_lazy(
                     .with_quote_char(Some(b'"')) // Set the quote character (default)
                     .with_has_header(true) // Indicate the CSV file has a header row
                     .with_ignore_errors(true) // Continue reading even if parsing errors occur
-                    .with_null_values(Some(NullValues::AllColumns(null_values))) // Apply the predefined null values list
+                    //.with_null_values(Some(NullValues::AllColumns(null_values))) // Apply the predefined null values list
+                    .with_null_values(None) // Apply fn replace_values_with_null()
                     .with_missing_is_null(true) // Treat missing fields as null
                     // Infer schema length 0 reads only headers. Polars gets column names.
-                    // It will likely default them to String.
                     .with_infer_schema_length(Some(0))
                     // Modify the schema using the separate helper function.
                     // The closure's role is now just to bridge from the Polars API signature
@@ -1544,5 +1564,86 @@ mod tests_read_csv {
         let dir = tempdir().unwrap();
         let file_path = create_csv(dir.path(), "dummy.csv", "a,b\n1,2").unwrap();
         let _ = read_csv_lazy(Some(file_path), None, Side::Left).unwrap();
+    }
+}
+
+/// Run tests with:
+/// cargo test -- --show-output tests_replace_values_with_null
+#[cfg(test)]
+mod tests_replace_values_with_null {
+    use super::*;
+    use polars::functions::concat_df_horizontal;
+
+    #[test]
+    fn test_remove_leading_and_trailing_chars() -> MyResult<()> {
+        configure_the_environment();
+
+        let df_input = df! {
+            "foo" => &["", " ", "hello ", " <N/D> ", " *DIVERSOS* \n ", " world", " \n\r *DIVERSOS* \n ", "<N/D>"],
+        }?;
+
+        println!("df_input: {}", df_input);
+
+        // Create a Polars Series containing the *strings* to be treated as null markers.
+        let series = Series::new("null_vals".into(), NULL_VALUES);
+        let literal_series: Expr = series.to_list_expr()?;
+
+        let condition = all() // Select current column value
+            .cast(DataType::String) // Cast to String
+            .str()
+            .strip_chars(lit(NULL)) // Trim whitespace from string representation
+            .is_in(literal_series, true); // Check if trimmed string is in the list
+        println!("condition: {}", condition);
+
+        let replacement_expr: Expr = build_null_expression(true)?;
+        println!("replacement_expr: {}", replacement_expr);
+
+        let mut df_temp = df_input
+            .clone()
+            .lazy()
+            .with_columns([condition.alias("other name"), replacement_expr]) // Apply the selected expression
+            .collect()?;
+        df_temp.set_column_names(["foo_stripped", "is_in condition"])?;
+
+        // Concat DataFrames horizontally.
+        // let df_output = df_input.hstack(df_temp.get_columns())?;
+        let df_output = concat_df_horizontal(&[df_input, df_temp], true)?;
+
+        println!("df_output: {}", df_output);
+
+        let vec_from_series: Vec<&str> = df_output["foo_stripped"]
+            .str()?
+            .iter() // Iterator over Option<&str>
+            .map(|opt_str| opt_str.unwrap_or("null"))
+            .collect();
+
+        println!("vec_from_series: {:?}", vec_from_series);
+
+        let vec_from_series: Vec<Option<&str>> = df_output
+            .column("foo_stripped")?
+            .str()?
+            .iter() // Iterator over Option<&str>
+            .collect();
+
+        println!("vec_from_series: {:?}", vec_from_series);
+
+        let df_expected = df! {
+            "foo" => &["", " ", "hello ", " <N/D> ", " *DIVERSOS* \n ", " world", " \n\r *DIVERSOS* \n ", "<N/D>"],
+            "foo_stripped" => &[None, None, Some("hello "), None, None, Some(" world"), None, None],
+            "is_in condition" => &[true, true, false, true, true, false, true, true],
+        }?;
+
+        assert_eq!(
+            df_output, df_expected,
+            "DataFrame mismatch after schema modify and null handling"
+        );
+
+        assert_eq!(
+            df_output.schema(),
+            df_expected.schema(),
+            "DataFrame mismatch schema"
+        );
+
+        Ok(())
     }
 }

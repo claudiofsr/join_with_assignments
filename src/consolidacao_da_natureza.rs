@@ -223,9 +223,11 @@ fn transferir_valores(column_number: i64, receita: &str) -> Expr {
     // De acordo com 4.3.6 – Tabela Código de Tipo de Crédito
     // when(col("Código do Tipo de Crédito").is_in(lit(range)))
     when(
-        col(codigo_do_credito)
-            .floor_div(lit(100))
-            .eq(lit(column_number)),
+        col(codigo_do_credito).is_not_null().and(
+            col(codigo_do_credito)
+                .floor_div(lit(100))
+                .eq(lit(column_number)),
+        ),
     )
     .then(col("Valor Total do Item"))
     .otherwise(lit(NULL))

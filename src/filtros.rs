@@ -265,19 +265,23 @@ a depender das atividades que constituam objeto da empresa.
 pub fn descricao_de_outras_receitas() -> Expr {
     let pattern: Expr = lit(PATTERN);
 
+    let item_desc: &str = coluna(Left, "item_desc"); // "Descrição do Item"
+    let contabil: &str = coluna(Left, "contabil"); // "Escrituração Contábil: Nome da Conta"
+    let informacao: &str = coluna(Left, "informacao"); // "Informação Complementar do Documento Fiscal"
+
     // Check if this column of strings contains a Regex.
     // fn contains(self, pat: Expr, strict: bool)
     // see polars-plan-0.33.2/src/dsl/string.rs
 
-    let descricao_do_item: Expr = col(coluna(Left, "item_desc"))
-        .str()
-        .contains(pattern.clone(), false); // "Descrição do Item"
-    let escritur_contabil: Expr = col(coluna(Left, "contabil"))
-        .str()
-        .contains(pattern.clone(), false); // "Escrituração Contábil: Nome da Conta"
-    let info_complementar: Expr = col(coluna(Left, "informacao"))
-        .str()
-        .contains(pattern, false); // "Informação Complementar do Documento Fiscal"
+    let descricao_do_item: Expr = col(item_desc)
+        .is_not_null()
+        .and(col(item_desc).str().contains(pattern.clone(), false));
+    let escritur_contabil: Expr = col(contabil)
+        .is_not_null()
+        .and(col(contabil).str().contains(pattern.clone(), false));
+    let info_complementar: Expr = col(informacao)
+        .is_not_null()
+        .and(col(informacao).str().contains(pattern, false));
 
     descricao_do_item
         .or(escritur_contabil)
