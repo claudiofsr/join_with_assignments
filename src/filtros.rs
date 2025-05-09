@@ -36,7 +36,9 @@ pub fn operacoes_de_credito() -> PolarsResult<Expr> {
 ///
 /// Evitar divisão por Zero
 pub fn receita_nao_nula() -> Expr {
-    col("ReceitaBrutaTotal").neq(lit(0))
+    col("ReceitaBrutaTotal")
+        .is_not_null()
+        .and(col("ReceitaBrutaTotal").neq(lit(0)))
 }
 
 /// Entre as opções da coluna "tipo_operacao":

@@ -492,7 +492,7 @@ pub fn get_lazyframe_from_csv(
 
 /// Define values to be interpreted as null across all columns.
 pub static NULL_VALUES: [&str; 3] = [
-    " ",           // Represents empty strings --> null
+    "",           // Represents empty strings --> null
     "<N/D>",      // Specific placeholder string 1
     "*DIVERSOS*", // Specific placeholder string 2
 ];
