@@ -124,7 +124,7 @@ impl DataFrameExtension for DataFrame {
 }
 
 pub enum Frame {
-    Lazy(LazyFrame),
+    Lazy(Box<LazyFrame>),
     Data(DataFrame),
 }
 

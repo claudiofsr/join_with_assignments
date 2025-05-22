@@ -3,7 +3,7 @@ name = "join_with_assignments"
 authors = ["Claudio F S Rodrigues <claudiofsrodrigues@gmail.com>"]
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.86"
+rust-version = "1.87"
 homepage = "https://github.com/claudiofsr/join_with_assignments"
 repository = "https://github.com/claudiofsr/join_with_assignments"
 description = """
@@ -31,7 +31,7 @@ cc = { version = "1.2", features = ["parallel"] }
 chrono = { version = "0.4", features = [ "serde" ] }
 claudiofsr_lib = "0.14"
 colored = "3.0"
-confy = "0.6"
+confy = "1.0"
 execution-time = "0.3"
 pathfinding = "4.14"
 rayon = "1.10"
@@ -51,12 +51,12 @@ features = [
 ]
 
 [dependencies.polars]
-version = "0.47.1"
+version = "0.48.1"
 # git = "https://github.com/pola-rs/polars.git"
 # rev = "8a6bf4b"
-# https://github.com/pola-rs/polars/releases/tag/rs-0.47.1
+# https://github.com/pola-rs/polars/releases/tag/rs-0.48.1
 # git clone https://github.com/pola-rs/polars.git
-# path = "/home/claudio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/polars-0.47.1"
+# path = "/home/claudio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/polars-0.48.1"
 features = [
     "abs",        # Convert all values to their absolute/positive value.
     "concat_str", # Concat string data in linear time
@@ -85,14 +85,14 @@ features = [
 ]
 
 [dependencies.polars-arrow ]
-version = "0.47.1"
+version = "0.48.1"
 
 [dependencies.rust_xlsxwriter]
-# version = "0.86.1"
+# version = "0.87.0"
 # https://github.com/jmcnamara/rust_xlsxwriter/blob/main/CHANGELOG.md
 # git = "https://github.com/jmcnamara/rust_xlsxwriter.git"
 # Cargo.toml, update polars version
-path = "/home/claudio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rust_xlsxwriter-0.86.1b"
+path = "/home/claudio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rust_xlsxwriter-0.87.0b"
 
 features = [
     # "constant_memory",
@@ -104,7 +104,7 @@ features = [
 
 [dev-dependencies]
 # Dependencies ONLY needed for testing
-tempfile = "3.19"
+tempfile = "3.20"
 
 [lints.rust]
 unsafe_code = "forbid"
