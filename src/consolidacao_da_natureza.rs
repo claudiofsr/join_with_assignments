@@ -63,7 +63,7 @@ pub fn obter_consolidacao_nat(dataframe: &DataFrame, auditar: bool) -> MyResult<
 /// Reter apenas as colunas de interesse.
 ///
 /// Em seguida, aplicar filtros.
-fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame, auditar: bool) -> MyResult<LazyFrame> {
+fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame, _auditar: bool) -> MyResult<LazyFrame> {
     //let pa_ano: i32 = 2015;
     //let pa_trimestres = Series::from_iter([1, 2, 3, 4]);
 
@@ -82,7 +82,7 @@ fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame, auditar: bool) -> MyRes
     let operacoes_desejadas: Expr = col(top).is_not_null().and(col(top).neq(lit(7)));
 
     // Natureza: '01 - Aquisição de Bens para Revenda' and CST neq 50
-    let bens_para_revenda: Expr = col(nat)
+    let _bens_para_revenda: Expr = col(nat)
         .is_not_null()
         .and(col(cst).is_not_null())
         .and(col(nat).eq(1))
@@ -147,6 +147,7 @@ fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame, auditar: bool) -> MyRes
                 .cast(DataType::Boolean)
                 .alias("RecBrutaTotal"),
         )
+        /*
         // Se Natureza: '01 - Aquisição de Bens para Revenda' and CST neq 50
         // Correção de CST: XX -> 50
         .with_column(
@@ -169,6 +170,7 @@ fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame, auditar: bool) -> MyRes
             .cast(DataType::Int64)
             .alias(cod),
         )
+        */
         /*
         // Correção: CST 9 && Registro C170 --> "valor_item" = 0.0
         .with_column(
@@ -180,7 +182,7 @@ fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame, auditar: bool) -> MyRes
                 .alias(val),
         )
         */
-        //*
+        /*
         // Crédito 'Presumido da Agroindústria'
         // Correção de CST: XX -> 61
         .with_column(
@@ -203,7 +205,7 @@ fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame, auditar: bool) -> MyRes
                 .cast(DataType::Int64)
                 .alias(cod),
         )
-        //*/
+        */
         .with_column(
             col("CNPJ dos Estabelecimentos do Contribuinte")
                 .apply(get_cnpj_base, GetOutput::from_type(DataType::String))
