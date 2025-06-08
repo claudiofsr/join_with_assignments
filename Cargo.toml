@@ -38,7 +38,7 @@ rayon = "1.10"
 regex = "1.11"
 serde = { version = "1.0", features = [ "derive" ] }
 sysinfo = "0.35"
-tabled = { version = "0.19", features = ["ansi"] }
+tabled = { version = "0.20", features = ["ansi"] }
 toml = "0.8"
 
 [dependencies.clap]
@@ -88,11 +88,11 @@ features = [
 version = "0.48.1"
 
 [dependencies.rust_xlsxwriter]
-# version = "0.87"
+version = "0.88.0"
 # https://github.com/jmcnamara/rust_xlsxwriter/blob/main/CHANGELOG.md
 # git = "https://github.com/jmcnamara/rust_xlsxwriter.git"
 # Cargo.toml, update polars version
-path = "/home/claudio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rust_xlsxwriter-0.87.0b"
+# path = "/home/claudio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rust_xlsxwriter-0.87.0b"
 
 features = [
     # "constant_memory",
