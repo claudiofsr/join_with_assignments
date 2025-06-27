@@ -64,7 +64,7 @@ pub fn write_xlsx(dfs: &[DataFrame]) -> PolarsResult<()> {
 
             let mut new_name = sheet_name.to_string();
             if count >= 2 {
-                new_name = format!("{} {}", sheet_name, count);
+                new_name = format!("{sheet_name} {count}");
             }
 
             let worksheet = make_worksheet(&data, &new_name)?;

@@ -293,8 +293,9 @@ fn analisar_situacao03(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
                 .alias(columns[3]), // Coluna Temporária
         );
 
-    let situacao_03: Expr = col(columns[1]).is_not_null();
-    //.or(col(columns[3]).is_not_null());
+    let situacao_03: Expr = col(columns[1])
+        .is_not_null()
+        .or(col(columns[3]).is_not_null());
 
     println!("situacao_03: {situacao_03:?}\n");
 
@@ -305,7 +306,7 @@ fn analisar_situacao03(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
         lit("De acordo com o inciso II do § 2º do art. 3º das Leis 10.637/2002 e 10.833/2003, não dará direito"),
         lit("a crédito o valor da aquisição de bens ou serviços não sujeitos ao pagamento da contribuição."),
         col(columns[1]),
-        //col(columns[3]),
+        col(columns[3]),
         lit("&"),
     ], " ", true);
 

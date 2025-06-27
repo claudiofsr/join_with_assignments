@@ -241,10 +241,7 @@ pub fn show_sysinfo() {
     let sys_used_memory: u64 = sys.used_memory() / (1024 * 1024);
     let sys_total_memory: u64 = sys.total_memory() / (1024 * 1024);
 
-    println!(
-        "Memory used/total: {:>8}/{} Mbytes",
-        sys_used_memory, sys_total_memory
-    );
+    println!("Memory used/total: {sys_used_memory:>8}/{sys_total_memory} Mbytes");
 
     // Number of CPUs:
     println!("Number of CPUs: {:>9}\n", sys.cpus().len());
@@ -603,10 +600,7 @@ fn apply_custom_schema_rules(
             }
             None => {
                 // If not in map, keep it as String and warn the user.
-                eprintln!(
-                    "Insert DataType for column '{}' in Column {:?}!",
-                    col_name, side
-                );
+                eprintln!("Insert DataType for column '{col_name}' in Column {side:?}!");
                 modified_fields.push(Field::new(col_name.into(), DataType::String));
                 // Ensure String
             }
@@ -658,18 +652,15 @@ fn read_csv_lazy(
 
             // Print error if creating the LazyFrame failed during finish().
             if result_lazyframe.is_err() {
-                eprintln!(
-                    "\nError: Failed to finish lazy reader setup for file {:#?}",
-                    path
-                );
+                eprintln!("\nError: Failed to finish lazy reader setup for file {path:#?}");
             }
 
             result_lazyframe // Return the LazyFrame result
         }
         // Handle cases where file path or delimiter is missing.
         _ => {
-            eprintln!("File path: {:#?}", file_path); // Debug output
-            eprintln!("Delimiter: {:#?}", delimiter); // Debug output
+            eprintln!("File path: {file_path:#?}"); // Debug output
+            eprintln!("Delimiter: {delimiter:#?}"); // Debug output
             panic!("File path or delimiter error!"); // Panic as essential configuration is missing.
         }
     }
@@ -1057,7 +1048,7 @@ pub fn extract_cnpjs(input: &str) -> Vec<String> {
 
             // Construct the CNPJ string.
             let mut cnpj = String::new();
-            write!(&mut cnpj, "{}.{}.{}", part1, part2, part3).ok()?;
+            write!(&mut cnpj, "{part1}.{part2}.{part3}").ok()?;
             Some(cnpj) // Return the constructed CNPJ.
         })
         .collect()
@@ -1106,10 +1097,10 @@ pub fn extract_ncm(input: &str) -> String {
             let mut ncm = String::new();
             if part1.len() == 3 {
                 // Add a leading zero if the first part has 3 digits.
-                write!(&mut ncm, "0{}.{}.{}", part1, part2, part3).ok()?;
+                write!(&mut ncm, "0{part1}.{part2}.{part3}").ok()?;
             } else {
                 // Otherwise, use the first part as is.
-                write!(&mut ncm, "{}.{}.{}", part1, part2, part3).ok()?;
+                write!(&mut ncm, "{part1}.{part2}.{part3}").ok()?;
             }
             Some(ncm) // Return the constructed NCM.
         })
