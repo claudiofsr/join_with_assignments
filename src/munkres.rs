@@ -1,5 +1,5 @@
 use colored::*;
-use pathfinding::prelude::{kuhn_munkres_min, Matrix};
+use pathfinding::prelude::{Matrix, kuhn_munkres_min};
 use rayon::prelude::*;
 use std::{
     cmp::{self, Ordering},
@@ -321,10 +321,12 @@ fn print_matrix(
             rows.push(header)
         }
 
-        let mut row = vec![array1
-            .get(i)
-            .map(|x| x.to_string().green().to_string())
-            .unwrap_or_default()];
+        let mut row = vec![
+            array1
+                .get(i)
+                .map(|x| x.to_string().green().to_string())
+                .unwrap_or_default(),
+        ];
 
         for (j, integer) in line.iter().enumerate() {
             if filter && (j >= col_number) {
@@ -419,7 +421,10 @@ fn display_bipartite_matching(
         let vec_1: i64 = array1[row].round() as i64;
         let vec_2: i64 = array2[col].round() as i64;
 
-        println!("(array1[{row:widx$}], array2[{col:widx$}], abs_diff): ({:>width$}, {:>width$}, {delta:>width$})", array1[row], array2[col]);
+        println!(
+            "(array1[{row:widx$}], array2[{col:widx$}], abs_diff): ({:>width$}, {:>width$}, {delta:>width$})",
+            array1[row], array2[col]
+        );
         bipartite.push((vec_1, vec_2, delta));
     }
     println!();

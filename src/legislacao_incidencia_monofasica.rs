@@ -1,7 +1,7 @@
 use polars::{prelude::*, series::Series};
 use rayon::prelude::*;
 
-use crate::{operacoes_de_entrada_ou_saida, MyResult};
+use crate::{MyResult, operacoes_de_entrada_ou_saida};
 
 /// Analisar legislação vigente das Contribuições conforme código NCM e descrição dos itens.
 ///

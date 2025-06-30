@@ -3,7 +3,7 @@ use rayon::prelude::*;
 use regex::Regex;
 use std::sync::LazyLock as Lazy;
 
-use crate::{operacoes_de_entrada_ou_saida, MyResult};
+use crate::{MyResult, operacoes_de_entrada_ou_saida};
 
 /// Analisar legislação vigente das Contribuições conforme código NCM e descrição dos itens.
 ///
@@ -145,7 +145,9 @@ fn condicoes_ncm_04(descricao: &str, _ncm: u64) -> Option<&'static str> {
         // DECRETO Nº 8.533, DE 30 DE SETEMBRO DE 2015
         // Crédito Presumido: aquisição de leite in natura utilizado como insumo - Programa Mais Leite Saudável.
         // Crédito Presumido: aquisição sem pagamento das Constribuições que gera direito a crédito.
-        Some("Crédito Presumido - Decreto 8.533/2015, Art. 4º, Inciso I (Leite In Natura Utilizado como Insumo - Programa Mais Leite Saudável).")
+        Some(
+            "Crédito Presumido - Decreto 8.533/2015, Art. 4º, Inciso I (Leite In Natura Utilizado como Insumo - Programa Mais Leite Saudável).",
+        )
     } else {
         None
     }

@@ -1,10 +1,10 @@
 use crate::{
+    Arguments, DataFrameExtension, MyResult,
+    Side::{Left, Middle, Right},
     adicionar_coluna_de_aliquota_zero, adicionar_coluna_de_credito_presumido,
     adicionar_coluna_de_incidencia_monofasica,
     adicionar_coluna_periodo_de_apuracao_inicial_e_final, coluna, cst_50_a_56, equal,
-    get_cnpj_base, operacoes_de_credito, round_column, unequal, Arguments, DataFrameExtension,
-    MyResult,
-    Side::{Left, Middle, Right},
+    get_cnpj_base, operacoes_de_credito, round_column, unequal,
 };
 use polars::prelude::*;
 
@@ -180,13 +180,19 @@ fn analisar_situacao01(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
 
     println!("situacao_01: {situacao_01:?}\n");
 
-    let mensagem: Expr = concat_str([
-        col(glosar),
-        lit("Situação 01:"),
-        lit("NF-e/CT-e Cancelada (Cláusula 12ª do Ajuste Sinief 07/2005 e Cláusula 14ª"),
-        lit("do Ajuste Sinief 09/2007 do CONFAZ e Art. 327 do RIPI - Decreto nº 7.212 de 2010)."),
-        lit("&"),
-    ], " ", true);
+    let mensagem: Expr = concat_str(
+        [
+            col(glosar),
+            lit("Situação 01:"),
+            lit("NF-e/CT-e Cancelada (Cláusula 12ª do Ajuste Sinief 07/2005 e Cláusula 14ª"),
+            lit(
+                "do Ajuste Sinief 09/2007 do CONFAZ e Art. 327 do RIPI - Decreto nº 7.212 de 2010).",
+            ),
+            lit("&"),
+        ],
+        " ",
+        true,
+    );
 
     let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_01, mensagem, lit(0))?;
 
@@ -299,16 +305,24 @@ fn analisar_situacao03(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
 
     println!("situacao_03: {situacao_03:?}\n");
 
-    let mensagem: Expr = concat_str([
-        col(glosar),
-        lit("Situação 03:"),
-        lit("Aquisição de bens ou serviços não sujeitos ao pagamento da contribuição."),
-        lit("De acordo com o inciso II do § 2º do art. 3º das Leis 10.637/2002 e 10.833/2003, não dará direito"),
-        lit("a crédito o valor da aquisição de bens ou serviços não sujeitos ao pagamento da contribuição."),
-        col(columns[1]),
-        col(columns[3]),
-        lit("&"),
-    ], " ", true);
+    let mensagem: Expr = concat_str(
+        [
+            col(glosar),
+            lit("Situação 03:"),
+            lit("Aquisição de bens ou serviços não sujeitos ao pagamento da contribuição."),
+            lit(
+                "De acordo com o inciso II do § 2º do art. 3º das Leis 10.637/2002 e 10.833/2003, não dará direito",
+            ),
+            lit(
+                "a crédito o valor da aquisição de bens ou serviços não sujeitos ao pagamento da contribuição.",
+            ),
+            col(columns[1]),
+            col(columns[3]),
+            lit("&"),
+        ],
+        " ",
+        true,
+    );
 
     let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_03, mensagem, lit(0))?;
 
@@ -366,22 +380,43 @@ fn analisar_situacao04(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
 
     println!("situacao_04: {situacao_04:?}\n");
 
-    let mensagem: Expr = concat_str([
-        col(glosar),
-        lit("Situação 04:"),
-        lit("Valor do frete adicionado ao valor do insumo acarretando acréscimo indevido na Base de Cálculo das Contribuições,"),
-        lit("tal que o fornecedor do insumo quem efetuou o pagamento do frete, remetente tomador."),
-        lit("Ver colunas: [CTe - Remetente das mercadorias transportadas: CNPJ/CPF de Conhecimento] e"),
-        lit("[Descrição CTe - Indicador do 'papel' do tomador do serviço de Conhecimento] e"),
-        lit("[CNPJ Base do Remetente] e [CNPJ Base do Destinatário] e [Valor Total de Documentos Vinculados]."),
-        lit("Valor da Base de Cálculo = "),
-        col(valor_bc).apply(|col| round_column(col, 2), GetOutput::from_type(DataType::Float64)),
-        lit("-"),
-        col(valor_cte_vinculado).apply(|col| round_column(col, 2), GetOutput::from_type(DataType::Float64)),
-        lit("="),
-        valor_justo.clone().apply(|col| round_column(col, 2), GetOutput::from_type(DataType::Float64)),
-        lit("&"),
-    ], " ", true);
+    let mensagem: Expr = concat_str(
+        [
+            col(glosar),
+            lit("Situação 04:"),
+            lit(
+                "Valor do frete adicionado ao valor do insumo acarretando acréscimo indevido na Base de Cálculo das Contribuições,",
+            ),
+            lit(
+                "tal que o fornecedor do insumo quem efetuou o pagamento do frete, remetente tomador.",
+            ),
+            lit(
+                "Ver colunas: [CTe - Remetente das mercadorias transportadas: CNPJ/CPF de Conhecimento] e",
+            ),
+            lit("[Descrição CTe - Indicador do 'papel' do tomador do serviço de Conhecimento] e"),
+            lit(
+                "[CNPJ Base do Remetente] e [CNPJ Base do Destinatário] e [Valor Total de Documentos Vinculados].",
+            ),
+            lit("Valor da Base de Cálculo = "),
+            col(valor_bc).apply(
+                |col| round_column(col, 2),
+                GetOutput::from_type(DataType::Float64),
+            ),
+            lit("-"),
+            col(valor_cte_vinculado).apply(
+                |col| round_column(col, 2),
+                GetOutput::from_type(DataType::Float64),
+            ),
+            lit("="),
+            valor_justo.clone().apply(
+                |col| round_column(col, 2),
+                GetOutput::from_type(DataType::Float64),
+            ),
+            lit("&"),
+        ],
+        " ",
+        true,
+    );
 
     let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_04, mensagem, valor_justo)?;
 
@@ -393,7 +428,7 @@ fn analisar_situacao05(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     let glosar: &str = coluna(Middle, "glosar");
     let valor_bc: &str = coluna(Left, "valor_bc"); // "Valor da Base de Cálculo das Contribuições"
     let valor_da_nota_proporcional_nfe: &str = coluna(Right, "valor_item"); // "Valor da Nota Proporcional : NF Item (Todos) SOMA";
-                                                                            // let valor_da_base_calculo_icms_nfe: &str = coluna(Right, "valor_bc_icms"); // "ICMS: Base de Cálculo : NF Item (Todos) SOMA"
+    // let valor_da_base_calculo_icms_nfe: &str = coluna(Right, "valor_bc_icms"); // "ICMS: Base de Cálculo : NF Item (Todos) SOMA"
 
     let valores_iguais_nota_prop: Expr = equal(valor_bc, valor_da_nota_proporcional_nfe);
     //let valores_iguais_base_icms: Expr = col(valor_da_bcal_da_efd).eq(col(valor_da_base_calculo_icms_nfe));
@@ -407,16 +442,28 @@ fn analisar_situacao05(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
 
     println!("situacao_05: {situacao_05:?}\n");
 
-    let mensagem: Expr = concat_str([
-        col(glosar),
-        lit("Situação 05:"),
-        lit("Excluir valor do ICMS destacado em Nota Fiscal da Base de Cálculo das Contribuições."),
-        lit("O valor da Base de Cálculo foi alterado de"),
-        col(valor_bc).apply(|col| round_column(col, 2), GetOutput::from_type(DataType::Float64)),
-        lit("para"),
-        delta.clone().apply(|col| round_column(col, 2), GetOutput::from_type(DataType::Float64)),
-        lit("&"),
-    ], " ", true);
+    let mensagem: Expr = concat_str(
+        [
+            col(glosar),
+            lit("Situação 05:"),
+            lit(
+                "Excluir valor do ICMS destacado em Nota Fiscal da Base de Cálculo das Contribuições.",
+            ),
+            lit("O valor da Base de Cálculo foi alterado de"),
+            col(valor_bc).apply(
+                |col| round_column(col, 2),
+                GetOutput::from_type(DataType::Float64),
+            ),
+            lit("para"),
+            delta.clone().apply(
+                |col| round_column(col, 2),
+                GetOutput::from_type(DataType::Float64),
+            ),
+            lit("&"),
+        ],
+        " ",
+        true,
+    );
 
     let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_05, mensagem, delta)?;
 
@@ -530,14 +577,20 @@ fn analisar_situacao07(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
 
     println!("situacao_07: {situacao_07:?}\n");
 
-    let mensagem: Expr = concat_str([
-        col(glosar),
-        lit("Situação 07:"),
-        lit("Fretes sobre Compras cujos insumos NÃO estão sujeitos ao pagamento das Contribuições de PIS/PASEP e COFINS."),
-        col(columns[3]),
-        col(columns[5]),
-        lit("&"),
-    ], " ", true);
+    let mensagem: Expr = concat_str(
+        [
+            col(glosar),
+            lit("Situação 07:"),
+            lit(
+                "Fretes sobre Compras cujos insumos NÃO estão sujeitos ao pagamento das Contribuições de PIS/PASEP e COFINS.",
+            ),
+            col(columns[3]),
+            col(columns[5]),
+            lit("&"),
+        ],
+        " ",
+        true,
+    );
 
     let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_07, mensagem, lit(0))?;
 
@@ -568,15 +621,21 @@ fn analisar_situacao08(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
 
     println!("situacao_08: {situacao_08:?}\n");
 
-    let mensagem: Expr = concat_str([
-        col(glosar),
-        lit("Situação 08:"),
-        lit("Frete sobre Vendas, operação de Transferência."),
-        lit("Conforme Parecer Normativo Cosit nº 5/2018 e § 2º do art. 176 da IN RFB nº 2121 de 2022:"),
-        lit("Não são considerados insumos os serviços de transporte de produtos"),
-        lit("acabados realizados em ou entre estabelecimentos da pessoa jurídica."),
-        lit("&"),
-    ], " ", true);
+    let mensagem: Expr = concat_str(
+        [
+            col(glosar),
+            lit("Situação 08:"),
+            lit("Frete sobre Vendas, operação de Transferência."),
+            lit(
+                "Conforme Parecer Normativo Cosit nº 5/2018 e § 2º do art. 176 da IN RFB nº 2121 de 2022:",
+            ),
+            lit("Não são considerados insumos os serviços de transporte de produtos"),
+            lit("acabados realizados em ou entre estabelecimentos da pessoa jurídica."),
+            lit("&"),
+        ],
+        " ",
+        true,
+    );
 
     let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_08, mensagem, lit(0))?;
 
@@ -598,14 +657,22 @@ fn analisar_situacao09(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
 
     println!("situacao_09: {situacao_09:?}\n");
 
-    let mensagem: Expr = concat_str([
-        col(glosar),
-        lit("Situação 09:"),
-        lit("Serviço de Propaganda e Marketing."),
-        lit("Os gastos com Serviço de Propaganda e Marketing não são insumos geradores de crédito das Contribuições"),
-        lit("segundo os critérios da Essencialidade ou da Relevância (Ver Parecer Normativo nº 5 de 2018)."),
-        lit("&"),
-    ], " ", true);
+    let mensagem: Expr = concat_str(
+        [
+            col(glosar),
+            lit("Situação 09:"),
+            lit("Serviço de Propaganda e Marketing."),
+            lit(
+                "Os gastos com Serviço de Propaganda e Marketing não são insumos geradores de crédito das Contribuições",
+            ),
+            lit(
+                "segundo os critérios da Essencialidade ou da Relevância (Ver Parecer Normativo nº 5 de 2018).",
+            ),
+            lit("&"),
+        ],
+        " ",
+        true,
+    );
 
     let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_09, mensagem, lit(0))?;
 
@@ -663,15 +730,25 @@ fn analisar_situacao11(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
 
     println!("situacao_11: {situacao_11:?}\n");
 
-    let mensagem: Expr = concat_str([
-        col(glosar),
-        lit("Situação 11:"),
-        lit("Atividades da Mão de Obra."),
-        lit("Conforme Parecer Normativo SRFB n° 5 de 2018, linhas 55 e 168, não são considerados insumos os itens destinados"),
-        lit("a viabilizar a atividade da mão de obra empregada pela pessoa jurídica em qualquer de suas áreas, inclusive em"),
-        lit("seu processo de produção de bens ou de prestação de serviços, tais como alimentação, vestimenta e transporte."),
-        lit("&"),
-    ], " ", true);
+    let mensagem: Expr = concat_str(
+        [
+            col(glosar),
+            lit("Situação 11:"),
+            lit("Atividades da Mão de Obra."),
+            lit(
+                "Conforme Parecer Normativo SRFB n° 5 de 2018, linhas 55 e 168, não são considerados insumos os itens destinados",
+            ),
+            lit(
+                "a viabilizar a atividade da mão de obra empregada pela pessoa jurídica em qualquer de suas áreas, inclusive em",
+            ),
+            lit(
+                "seu processo de produção de bens ou de prestação de serviços, tais como alimentação, vestimenta e transporte.",
+            ),
+            lit("&"),
+        ],
+        " ",
+        true,
+    );
 
     let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_11, mensagem, lit(0))?;
 
@@ -701,12 +778,18 @@ fn analisar_situacao12(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
 
     println!("situacao_12: {situacao_12:?}\n");
 
-    let mensagem: Expr = concat_str([
-        col(glosar),
-        lit("Situação 12:"),
-        lit("Documento Fiscal inexistente conforme www.nfe.fazenda.gov.br ou www.cte.fazenda.gov.br"),
-        lit("&"),
-    ], " ", true);
+    let mensagem: Expr = concat_str(
+        [
+            col(glosar),
+            lit("Situação 12:"),
+            lit(
+                "Documento Fiscal inexistente conforme www.nfe.fazenda.gov.br ou www.cte.fazenda.gov.br",
+            ),
+            lit("&"),
+        ],
+        " ",
+        true,
+    );
 
     let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_12, mensagem, lit(0))?;
 
@@ -1005,16 +1088,24 @@ mod tests_glosar_base_de_calculo {
 
         println!("situacao_03: {situacao_03:?}");
 
-        let mensagem: Expr = concat_str([
-            col(glosar),
-            lit("Situação 03:"),
-            lit("Aquisição de bens ou serviços não sujeitos ao pagamento da contribuição."),
-            lit("De acordo com o inciso II do § 2º do art. 3º das Leis 10.637/2002 e 10.833/2003, não dará direito"),
-            lit("a crédito o valor da aquisição de bens ou serviços não sujeitos ao pagamento da contribuição."),
-            col(columns[1]),
-            col(columns[3]),
-            lit("&"),
-        ], " ", true);
+        let mensagem: Expr = concat_str(
+            [
+                col(glosar),
+                lit("Situação 03:"),
+                lit("Aquisição de bens ou serviços não sujeitos ao pagamento da contribuição."),
+                lit(
+                    "De acordo com o inciso II do § 2º do art. 3º das Leis 10.637/2002 e 10.833/2003, não dará direito",
+                ),
+                lit(
+                    "a crédito o valor da aquisição de bens ou serviços não sujeitos ao pagamento da contribuição.",
+                ),
+                col(columns[1]),
+                col(columns[3]),
+                lit("&"),
+            ],
+            " ",
+            true,
+        );
 
         let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_03, mensagem, lit(0))?;
 

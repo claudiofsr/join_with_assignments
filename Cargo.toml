@@ -2,8 +2,8 @@
 name = "join_with_assignments"
 authors = ["Claudio F S Rodrigues <claudiofsrodrigues@gmail.com>"]
 version = "0.1.0"
-edition = "2021"
-rust-version = "1.87"
+edition = "2024"
+rust-version = "1.88"
 homepage = "https://github.com/claudiofsr/join_with_assignments"
 repository = "https://github.com/claudiofsr/join_with_assignments"
 description = """
@@ -105,9 +105,6 @@ features = [
 [dev-dependencies]
 # Dependencies ONLY needed for testing
 tempfile = "3.20"
-
-[lints.rust]
-unsafe_code = "forbid"
 
 # Package release:
 # Cross-compile a Rust application from Linux to Windows

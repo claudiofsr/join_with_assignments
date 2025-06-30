@@ -29,8 +29,9 @@ pub use self::{
     analise_do_periodo_de_apuracao::adicionar_coluna_periodo_de_apuracao_inicial_e_final,
     args::*,
     columns::{
-        coluna, MyColumn,
+        MyColumn,
         Side::{self, Left, Middle, Right},
+        coluna,
     },
     consolidacao_da_natureza::obter_consolidacao_nat,
     descricoes::{
@@ -43,7 +44,7 @@ pub use self::{
     legislacao_aliquota_zero::adicionar_coluna_de_aliquota_zero,
     legislacao_credito_presumido::adicionar_coluna_de_credito_presumido,
     legislacao_incidencia_monofasica::adicionar_coluna_de_incidencia_monofasica,
-    munkres::{munkres_assignments, try_convert, FloatIterExt},
+    munkres::{FloatIterExt, munkres_assignments, try_convert},
     polars_assignments::get_dataframe_after_assignments,
     write::ExcelWriter,
     xlsx_writer::PolarsXlsxWriter,
@@ -206,10 +207,12 @@ pub fn conditionally_remove_null_columns(
 pub fn configure_the_environment() {
     // https://stackoverflow.com/questions/70830241/rust-polars-how-to-show-all-columns/75675569#75675569
     // https://pola-rs.github.io/polars/polars/index.html#config-with-env-vars
-    env::set_var("POLARS_FMT_TABLE_ROUNDED_CORNERS", "1"); // apply rounded corners to UTF8-styled tables.
-    env::set_var("POLARS_FMT_MAX_COLS", "10"); // maximum number of columns shown when formatting DataFrames.
-    env::set_var("POLARS_FMT_MAX_ROWS", "10"); // maximum number of rows shown when formatting DataFrames.
-    env::set_var("POLARS_FMT_STR_LEN", "52"); // maximum number of characters printed per string value.
+    unsafe {
+        env::set_var("POLARS_FMT_TABLE_ROUNDED_CORNERS", "1"); // apply rounded corners to UTF8-styled tables.
+        env::set_var("POLARS_FMT_MAX_COLS", "10"); // maximum number of columns shown when formatting DataFrames.
+        env::set_var("POLARS_FMT_MAX_ROWS", "10"); // maximum number of rows shown when formatting DataFrames.
+        env::set_var("POLARS_FMT_STR_LEN", "52"); // maximum number of characters printed per string value.
+    }
 }
 
 // https://pola-rs.github.io/polars/sysinfo/index.html
@@ -449,7 +452,7 @@ pub fn get_lazyframe_from_csv(
         Side::Middle => {
             return Err(PolarsError::InvalidOperation(
                 "The middle side is not valid!".into(),
-            ))
+            ));
         }
     }
 
@@ -1333,13 +1336,15 @@ mod tests_functions {
 
         let first_list = vec![2.0, 3.3, 1.0];
 
-        assert!(first_list
-            .into_iter()
-            .zip(vec_lines?[0].clone())
-            .all(|(a, b)| {
-                println!("a: {a:>3} ; b: {b:>3}");
-                a == b
-            }));
+        assert!(
+            first_list
+                .into_iter()
+                .zip(vec_lines?[0].clone())
+                .all(|(a, b)| {
+                    println!("a: {a:>3} ; b: {b:>3}");
+                    a == b
+                })
+        );
 
         Ok(())
     }
@@ -1471,8 +1476,7 @@ mod tests_read_csv {
     fn test_read_csv_lazy_schema_modify() -> MyResult<()> {
         configure_the_environment();
         let dir = tempdir()?;
-        let csv_content =
-            "Linhas,Registro,Valor Total do Item,unknown_csv_col,extra_col_defined_in_map\n\
+        let csv_content = "Linhas,Registro,Valor Total do Item,unknown_csv_col,extra_col_defined_in_map\n\
              10,hello,1.1,u1,true\n\
              <N/D>, world ,2.2,u2,false\n\
              30,test,*DIVERSOS*,u3,"; // Note: empty field for extra_col

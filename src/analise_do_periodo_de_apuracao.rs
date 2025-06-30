@@ -6,7 +6,7 @@ use chrono::{
     NaiveDate,
 };
 
-use crate::{coluna, operacoes_de_entrada_ou_saida, Arguments, MyResult, Side::Left};
+use crate::{Arguments, MyResult, Side::Left, coluna, operacoes_de_entrada_ou_saida};
 
 /// Colunas temporárias: `Período de Apuração Inicial` e `Período de Apuração Final`.
 ///

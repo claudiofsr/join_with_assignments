@@ -1,12 +1,13 @@
 use std::collections::HashMap;
 
 use crate::{
-    coluna, format_dataframe, PolarsXlsxWriter,
+    PolarsXlsxWriter,
     Side::{
         Left,
         //Middle,
         //Right,
     },
+    coluna, format_dataframe,
 };
 
 use polars::prelude::*;

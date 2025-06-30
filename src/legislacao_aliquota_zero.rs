@@ -3,7 +3,7 @@ use rayon::prelude::*;
 use regex::Regex;
 use std::sync::LazyLock as Lazy;
 
-use crate::{operacoes_de_entrada_ou_saida, MyResult};
+use crate::{MyResult, operacoes_de_entrada_ou_saida};
 
 /// Analisar legislação vigente das Contribuições conforme código NCM e descrição dos itens.
 ///
@@ -213,7 +213,9 @@ fn lei_10925_art01_inciso03(descricao: &str) -> Option<&'static str> {
     static RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)Semente|Muda").unwrap());
 
     if RE.is_match(descricao) {
-        Some("Alíquota Zero - Lei 10.925/2004, Art. 1º, Inciso III (Sementes e Mudas destinadas à semeadura e plantio).")
+        Some(
+            "Alíquota Zero - Lei 10.925/2004, Art. 1º, Inciso III (Sementes e Mudas destinadas à semeadura e plantio).",
+        )
     } else {
         None
     }
@@ -249,7 +251,9 @@ fn lei_10925_art01_inciso05() -> Option<&'static str> {
 fn lei_10925_art01_inciso06() -> Option<&'static str> {
     // VI - inoculantes agrícolas produzidos a partir de bactérias fixadoras de nitrogênio,
     // classificados no código 3002.90.99 da TIPI;
-    Some("Alíquota Zero - Lei 10.925/2004, Art. 1º, Inciso VI (Inoculantes Agrícolas, biofertilizantes).")
+    Some(
+        "Alíquota Zero - Lei 10.925/2004, Art. 1º, Inciso VI (Inoculantes Agrícolas, biofertilizantes).",
+    )
 }
 
 fn lei_10925_art01_inciso07() -> Option<&'static str> {
@@ -295,7 +299,9 @@ fn condicoes_ncm_04(descricao: &str, ncm: u64) -> Option<&'static str> {
         // XI - leite fluido pasteurizado ou industrializado, na forma de ultrapasteurizado, leite em pó, integral, semidesnatado ou desnatado,
         // leite fermentado, bebidas e compostos lácteos e fórmulas infantis, assim definidas conforme previsão legal específica, destinados ao
         // consumo humano ou utilizados na industrialização de produtos que se destinam ao consumo humano;
-        Some("Alíquota Zero - Lei 10.925/2004, Art. 1º, Inciso XI (Leite Fluido, em Pó e Fermentado[inclui Iogurte] e Bebidas Lácteas).")
+        Some(
+            "Alíquota Zero - Lei 10.925/2004, Art. 1º, Inciso XI (Leite Fluido, em Pó e Fermentado[inclui Iogurte] e Bebidas Lácteas).",
+        )
     } else if ncm == 4041000 && SORO_FLUIDO.is_match(descricao) && !SORO_EM_PO.is_match(descricao) {
         // XIII - soro de leite fluido a ser empregado na industrialização de produtos destinados ao consumo humano.
         Some("Alíquota Zero - Lei 10.925/2004, Art. 1º, Inciso XIII (Soro de Leite Fluido).")
@@ -309,7 +315,9 @@ fn lei_10925_art01_inciso11b(descricao: &str) -> Option<&'static str> {
         Lazy::new(|| Regex::new(r"(?i)Beb.*Lac|Achocolatado|Achocolat").unwrap());
 
     if RE.is_match(descricao) {
-        Some("Alíquota Zero - Lei 10.925/2004, Art. 1º, Inciso XI (Bebidas Lácteas e Achocolatados).")
+        Some(
+            "Alíquota Zero - Lei 10.925/2004, Art. 1º, Inciso XI (Bebidas Lácteas e Achocolatados).",
+        )
     } else {
         None
     }
@@ -400,7 +408,9 @@ fn lei_10925_art01_inciso22() -> Option<&'static str> {
 fn lei_10925_art01_inciso23() -> Option<&'static str> {
     // XXIII - óleo de soja classificado na posição 15.07 da Tipi e outros
     // óleos vegetais classificados nas posições 15.08 a 15.14 da Tipi;
-    Some("Alíquota Zero - Lei 10.925/2004, Art. 1º, Inciso XXIII (Óleo de Soja e Outros Óleos Vegetais).")
+    Some(
+        "Alíquota Zero - Lei 10.925/2004, Art. 1º, Inciso XXIII (Óleo de Soja e Outros Óleos Vegetais).",
+    )
 }
 
 fn lei_10925_art01_inciso24() -> Option<&'static str> {
@@ -420,7 +430,9 @@ fn lei_10925_art01_inciso26() -> Option<&'static str> {
 
 fn lei_10925_art01_inciso27() -> Option<&'static str> {
     // XXVII - produtos para higiene bucal ou dentária classificados na posição 33.06 da Tipi;
-    Some("Alíquota Zero - Lei 10.925/2004, Art. 1º, Inciso XXVII (Produtos para Higiene Bucal ou Dentária).")
+    Some(
+        "Alíquota Zero - Lei 10.925/2004, Art. 1º, Inciso XXVII (Produtos para Higiene Bucal ou Dentária).",
+    )
 }
 
 fn lei_10925_art01_inciso28() -> Option<&'static str> {
@@ -459,7 +471,9 @@ fn decreto_6426_art01(descricao: &str) -> Option<&'static str> {
         Lazy::new(|| Regex::new(r"(?i)Sucralox|LACTATO DE CALCIO|Lactulose").unwrap());
 
     if RE.is_match(descricao) {
-        Some("Alíquota Zero - Decreto 6.426/2008, Art. 1º, Inciso I e Inciso II (Produtos Químicos relacionados nos Anexos I e II).")
+        Some(
+            "Alíquota Zero - Decreto 6.426/2008, Art. 1º, Inciso I e Inciso II (Produtos Químicos relacionados nos Anexos I e II).",
+        )
     } else {
         None
     }
@@ -475,20 +489,30 @@ III - produtos hortícolas e frutas, classificados nos Capítulos 7 e 8, e ovos,
 */
 fn lei_10865_art28_inciso03(ncm: u64) -> Option<&'static str> {
     if (8000000..=8999999).contains(&ncm) {
-        Some("Alíquota Zero - Lei 10.865/2004, Art. 28, Inciso III (Frutas classificadas no Capítulo 8).")
+        Some(
+            "Alíquota Zero - Lei 10.865/2004, Art. 28, Inciso III (Frutas classificadas no Capítulo 8).",
+        )
     } else if (4070000..=4079999).contains(&ncm) {
-        Some("Alíquota Zero - Lei 10.865/2004, Art. 28, Inciso III (Ovos classificados na posição 04.07).")
+        Some(
+            "Alíquota Zero - Lei 10.865/2004, Art. 28, Inciso III (Ovos classificados na posição 04.07).",
+        )
     } else {
-        Some("Alíquota Zero - Lei 10.865/2004, Art. 28, Inciso III (Produtos hortícolas classificados no Capítulo 7).")
+        Some(
+            "Alíquota Zero - Lei 10.865/2004, Art. 28, Inciso III (Produtos hortícolas classificados no Capítulo 7).",
+        )
     }
 }
 
 fn lei_10865_art28_inciso05() -> Option<&'static str> {
-    Some("Alíquota Zero - Lei 10.865/2004, Art. 28, Inciso V (Semens e Embriões da posição 05.11 da NCM).")
+    Some(
+        "Alíquota Zero - Lei 10.865/2004, Art. 28, Inciso V (Semens e Embriões da posição 05.11 da NCM).",
+    )
 }
 
 fn lei_10865_art28_inciso14() -> Option<&'static str> {
-    Some("Alíquota Zero - Lei 10.865/2004, Art. 28, Inciso XIV (Produtos classificados na posição 87.13 da NCM).")
+    Some(
+        "Alíquota Zero - Lei 10.865/2004, Art. 28, Inciso XIV (Produtos classificados na posição 87.13 da NCM).",
+    )
 }
 
 /*
@@ -663,11 +687,15 @@ mod tests {
             vec_opt_str,
             [
                 None,
-                Some("NCM 25.00.1234 : Alíquota Zero - Lei 10.925/2004, Art. 1º, Inciso IV (Corretivo de Solo)."),
+                Some(
+                    "NCM 25.00.1234 : Alíquota Zero - Lei 10.925/2004, Art. 1º, Inciso IV (Corretivo de Solo)."
+                ),
                 None,
                 None,
                 None,
-                Some("NCM 19020000 : Alíquota Zero - Lei 10.925/2004, Art. 1º, Inciso XVIII (Massas Alimentícias)."),
+                Some(
+                    "NCM 19020000 : Alíquota Zero - Lei 10.925/2004, Art. 1º, Inciso XVIII (Massas Alimentícias)."
+                ),
             ]
         );
 

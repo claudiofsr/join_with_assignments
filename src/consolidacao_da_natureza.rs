@@ -2,11 +2,10 @@ use polars::{datatypes::DataType, prelude::*};
 use std::ops::Neg;
 
 use crate::{
-    cfop_de_exportacao, coluna, cst_50_a_66, cst_de_receita_bruta, csts, csts_nao_tributados,
-    desprezar_pequenos_valores, entrada_de_credito, get_cnpj_base,
+    MyResult, Side::Left, cfop_de_exportacao, coluna, cst_50_a_66, cst_de_receita_bruta, csts,
+    csts_nao_tributados, desprezar_pequenos_valores, entrada_de_credito, get_cnpj_base,
     operacoes_de_ajustes_ou_descontos, operacoes_de_saida, receita_bruta_cumulativa,
     receita_bruta_nao_cumulativa, receita_nao_nula, round_float64_columns, saida_de_receita_bruta,
-    MyResult, Side::Left,
 };
 
 const SMALL_VALUE: f64 = 0.009; // menor que um centavo

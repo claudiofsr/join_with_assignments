@@ -2,11 +2,12 @@ use polars::prelude::*;
 use rayon::prelude::*;
 
 use crate::{
-    args::Arguments,
-    coluna, formatar_chave_eletronica, formatar_ncm, get_lazyframe_from_csv, get_opt_vectuples,
-    get_option_assignments, round_column, DataFrameExtension, MyResult,
+    DataFrameExtension, MyResult,
     Side::{Left, Middle, Right},
     VecTuples,
+    args::Arguments,
+    coluna, formatar_chave_eletronica, formatar_ncm, get_lazyframe_from_csv, get_opt_vectuples,
+    get_option_assignments, round_column,
 };
 
 /// Use Polars to get dataframe after Munkres assignments
@@ -418,8 +419,8 @@ fn check_correlation_between_dataframes(lazyframe: LazyFrame) -> Result<DataFram
 mod test_assignments {
     use super::*;
     use crate::{
-        apply_custom_schema_rules, configure_the_environment,
-        glosar_base_de_calculo::LazyFrameExtension, round_float64_columns, Side,
+        Side, apply_custom_schema_rules, configure_the_environment,
+        glosar_base_de_calculo::LazyFrameExtension, round_float64_columns,
     };
     use std::{collections::HashMap, env};
 
@@ -705,10 +706,12 @@ mod test_assignments {
     #[test]
     /// `cargo test -- --show-output read_csv_file_v1`
     fn read_csv_file_v1() -> MyResult<()> {
-        env::set_var("POLARS_FMT_TABLE_ROUNDED_CORNERS", "1"); // apply rounded corners to UTF8-styled tables.
-        env::set_var("POLARS_FMT_MAX_COLS", "10"); // maximum number of columns shown when formatting DataFrames.
-        env::set_var("POLARS_FMT_MAX_ROWS", "10"); // maximum number of rows shown when formatting DataFrames.
-        env::set_var("POLARS_FMT_STR_LEN", "20"); // maximum number of characters printed per string value.
+        unsafe {
+            env::set_var("POLARS_FMT_TABLE_ROUNDED_CORNERS", "1"); // apply rounded corners to UTF8-styled tables.
+            env::set_var("POLARS_FMT_MAX_COLS", "10"); // maximum number of columns shown when formatting DataFrames.
+            env::set_var("POLARS_FMT_MAX_ROWS", "10"); // maximum number of rows shown when formatting DataFrames.
+            env::set_var("POLARS_FMT_STR_LEN", "20"); // maximum number of characters printed per string value.
+        }
 
         // wget https://raw.githubusercontent.com/claudiofsr/join_with_assignments/master/src/tests/csv_file01
 
@@ -816,10 +819,12 @@ mod test_assignments {
     #[test]
     /// `cargo test -- --show-output read_csv_file_v2`
     fn read_csv_file_v2() -> MyResult<()> {
-        env::set_var("POLARS_FMT_TABLE_ROUNDED_CORNERS", "1"); // apply rounded corners to UTF8-styled tables.
-        env::set_var("POLARS_FMT_MAX_COLS", "60"); // maximum number of columns shown when formatting DataFrames.
-        env::set_var("POLARS_FMT_MAX_ROWS", "10"); // maximum number of rows shown when formatting DataFrames.
-        env::set_var("POLARS_FMT_STR_LEN", "52"); // maximum number of characters printed per string value.
+        unsafe {
+            env::set_var("POLARS_FMT_TABLE_ROUNDED_CORNERS", "1"); // apply rounded corners to UTF8-styled tables.
+            env::set_var("POLARS_FMT_MAX_COLS", "60"); // maximum number of columns shown when formatting DataFrames.
+            env::set_var("POLARS_FMT_MAX_ROWS", "10"); // maximum number of rows shown when formatting DataFrames.
+            env::set_var("POLARS_FMT_STR_LEN", "52"); // maximum number of characters printed per string value.
+        }
 
         let delimiter = ';';
         let file = "src/tests/csv_file02";
