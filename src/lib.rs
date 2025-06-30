@@ -1480,7 +1480,7 @@ mod tests_read_csv {
         let lazy_frame = read_csv_lazy(Some(file_path), Some(','), Side::Left)?;
         let df_output = lazy_frame.collect()?;
 
-        println!("df_output:\n{}", df_output);
+        println!("df_output:\n{df_output}");
 
         let df_expected = df! {
             "Linhas" => &[Some(10u64), None, Some(30u64)], // UInt64 with null
@@ -1490,7 +1490,7 @@ mod tests_read_csv {
             "extra_col_defined_in_map" => &[Some("true"), Some("false"), None], // String, with null for empty string ""
         }?;
 
-        println!("df_expected:\n{}", df_expected);
+        println!("df_expected:\n{df_expected}");
 
         // --- Compare the output DataFrame with the expected DataFrame ---
         // assert_eq! uses the PartialEq implementation for DataFrame,
@@ -1518,7 +1518,7 @@ mod tests_read_csv {
         let lazy_frame = read_csv_lazy(Some(file_path), Some(','), Side::Left)?;
         let df_output = lazy_frame.collect()?;
 
-        println!("df_output:\n{}", df_output);
+        println!("df_output:\n{df_output}");
 
         let df_expected = df! {
             "Linhas" => &[Some(10u64), None, Some(30u64)], // Int64 with null
@@ -1526,7 +1526,7 @@ mod tests_read_csv {
             "Valor Total do Item" => &[Some(1.1f64), Some(2.2f64), None], // Float64 with null
         }?;
 
-        println!("df_expected:\n{}", df_expected);
+        println!("df_expected:\n{df_expected}");
 
         assert_eq!(
             df_output, df_expected,
@@ -1573,7 +1573,7 @@ mod tests_replace_values_with_null {
             "foo" => &["", " ", "hello ", " <N/D> ", " *DIVERSOS* \n ", " world", " \n\r *DIVERSOS* \n ", "<N/D>"],
         }?;
 
-        println!("df_input: {}", df_input);
+        println!("df_input: {df_input}");
 
         // Create a Polars Series containing the *strings* to be treated as null markers.
         let series = Series::new("null_vals".into(), NULL_VALUES);
@@ -1584,10 +1584,10 @@ mod tests_replace_values_with_null {
             .str()
             .strip_chars(lit(NULL)) // Trim whitespace from string representation
             .is_in(literal_series, true); // Check if trimmed string is in the list
-        println!("condition: {}", condition);
+        println!("condition: {condition}");
 
         let replacement_expr: Expr = build_null_expression(true)?;
-        println!("replacement_expr: {}", replacement_expr);
+        println!("replacement_expr: {replacement_expr}");
 
         let mut df_temp = df_input
             .clone()
@@ -1600,7 +1600,7 @@ mod tests_replace_values_with_null {
         // let df_output = df_input.hstack(df_temp.get_columns())?;
         let df_output = concat_df_horizontal(&[df_input, df_temp], true)?;
 
-        println!("df_output: {}", df_output);
+        println!("df_output: {df_output}");
 
         let vec_from_series: Vec<&str> = df_output["foo_stripped"]
             .str()?
@@ -1608,7 +1608,7 @@ mod tests_replace_values_with_null {
             .map(|opt_str| opt_str.unwrap_or("null"))
             .collect();
 
-        println!("vec_from_series: {:?}", vec_from_series);
+        println!("vec_from_series: {vec_from_series:?}");
 
         let vec_from_series: Vec<Option<&str>> = df_output
             .column("foo_stripped")?
@@ -1616,7 +1616,7 @@ mod tests_replace_values_with_null {
             .iter() // Iterator over Option<&str>
             .collect();
 
-        println!("vec_from_series: {:?}", vec_from_series);
+        println!("vec_from_series: {vec_from_series:?}");
 
         let df_expected = df! {
             "foo" => &["", " ", "hello ", " <N/D> ", " *DIVERSOS* \n ", " world", " \n\r *DIVERSOS* \n ", "<N/D>"],

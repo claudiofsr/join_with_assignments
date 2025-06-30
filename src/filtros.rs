@@ -495,7 +495,7 @@ mod tests_is_in {
         // 1. Create the DataFrame (or just the Series to operate on in tests)
         //    DataFrame with a column named "numbers" mirroring pl.Series([1, 2, None])
         let df_original = df!("numbers" => &[Some(1i32), Some(2), None])?;
-        println!("DataFrame Original:\n{}", df_original);
+        println!("DataFrame Original:\n{df_original}");
 
         // 2. Create the 'other' list expression [1, 3]
         let series: Series = Series::new("null_vals".into(), &[1i32, 3]); // Series of i32
@@ -525,7 +525,7 @@ mod tests_is_in {
         // Explanation: 1 is in [1, 3], 2 is not, None is not considered equal to 1 or 3 when nulls_equal=False
 
         // 6. Assert
-        println!("Test default nulls_equal=false:\n{}", modified_df);
+        println!("Test default nulls_equal=false:\n{modified_df}");
         assert_eq!(modified_df["is_in_result"], expected_result.into());
 
         Ok(())
@@ -536,7 +536,7 @@ mod tests_is_in {
         // 1. Create the DataFrame (or just the Series to operate on in tests)
         //    DataFrame with a column named "numbers" mirroring pl.Series([1, 2, None])
         let df_original = df!("numbers" => &[Some(1i32), Some(2), None])?;
-        println!("DataFrame Original:\n{}", df_original);
+        println!("DataFrame Original:\n{df_original}");
 
         // 2. Create the 'other' list expression [1, 3]
         let series: Series = Series::new("null_vals".into(), &[1i32, 3]); // Series of i32
@@ -569,7 +569,7 @@ mod tests_is_in {
         // Explanation: 1 is in [1, 3], 2 is not, None is not considered equal to 1 or 3 when nulls_equal=False
 
         // 6. Assert
-        println!("Test default nulls_equal=false:\n{}", modified_df);
+        println!("Test default nulls_equal=false:\n{modified_df}");
         assert_eq!(modified_df["is_in_result"], expected_result.into());
 
         Ok(())
@@ -580,7 +580,7 @@ mod tests_is_in {
         // 1. Create the DataFrame (or just the Series to operate on in tests)
         //    DataFrame with a column named "numbers" mirroring pl.Series([1, 2, None])
         let df_original = df!("numbers" => &[Some(1i32), Some(2), None])?;
-        println!("DataFrame Original:\n{}", df_original);
+        println!("DataFrame Original:\n{df_original}");
 
         // 2. Create the 'other' list expression [1, None]
         //    We need a Series that can hold Option<i32> values
@@ -613,10 +613,7 @@ mod tests_is_in {
         );
 
         // 6. Assert
-        println!(
-            "Test nulls_equal=true with list [1, None]:\n{}",
-            modified_df
-        );
+        println!("Test nulls_equal=true with list [1, None]:\n{modified_df}");
         assert_eq!(modified_df["is_in_result"], expected_result.into());
 
         Ok(())

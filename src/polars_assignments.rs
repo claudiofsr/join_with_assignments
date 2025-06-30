@@ -736,7 +736,7 @@ mod test_assignments {
 
         // Get columns with into_iter()
         let vec_a: Vec<f64> = values_pa.f64()?.into_iter().flatten().collect();
-        println!("values_pa: {:?}", vec_a);
+        println!("values_pa: {vec_a:?}");
 
         // --- with_schema --- //
         println!("\n### --- with_schema --- ###\n");
@@ -804,7 +804,7 @@ mod test_assignments {
 
         // Get columns with into_iter()
         let vec_b: Vec<f64> = values_pb.f64()?.into_iter().flatten().collect();
-        println!("values_pb: {:?}", vec_b);
+        println!("values_pb: {vec_b:?}");
 
         assert_eq!(vec_a, [3623.56, 7379.51, 6783.56, 106.34, 828.98]);
         assert_eq!(vec_a, vec_b);
@@ -848,7 +848,7 @@ mod test_assignments {
 
         // Get columns with into_iter()
         let vec_a: Vec<f64> = values_pa.f64()?.into_iter().flatten().collect();
-        println!("values_pa: {:?}\n", vec_a);
+        println!("values_pa: {vec_a:?}\n");
 
         // --- with_schema --- //
         println!("\n### --- with_schema --- ###\n");
@@ -865,7 +865,7 @@ mod test_assignments {
 
         // Get columns with into_iter()
         let vec_b: Vec<f64> = values_pb.f64()?.into_iter().flatten().collect();
-        println!("values_pb: {:?}", vec_b);
+        println!("values_pb: {vec_b:?}");
 
         assert_eq!(vec_a, [3623.56, 7379.51, 6783.56, 106.34, 828.98]);
         assert_eq!(vec_a, vec_b);
