@@ -51,7 +51,7 @@ features = [
 ]
 
 [dependencies.polars]
-version = "0.49.1"
+version = "0.50.0"
 # git = "https://github.com/pola-rs/polars.git"
 # rev = "8a6bf4b"
 # https://github.com/pola-rs/polars/releases/tag/rs-0.49.1
@@ -82,17 +82,18 @@ features = [
     "serde-lazy",   # Support for serde serialization and deserialization.
     "strings",      # Extra string utilities for Utf8Chunked
     "temporal",     # Automatically try to parse dates/datetimes and time.
+    "timezones",
 ]
 
 [dependencies.polars-arrow ]
-version = "0.49.1"
+version = "0.50.0"
 
 [dependencies.rust_xlsxwriter]
-version = "0.89.0"
+# version = "0.89.1"
 # https://github.com/jmcnamara/rust_xlsxwriter/blob/main/CHANGELOG.md
 # git = "https://github.com/jmcnamara/rust_xlsxwriter.git"
 # Cargo.toml, update polars version
-# path = "/home/claudio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rust_xlsxwriter-0.88.0b"
+path = "/home/claudio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rust_xlsxwriter-0.89.1b"
 
 features = [
     # "constant_memory",

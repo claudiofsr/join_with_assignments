@@ -512,6 +512,7 @@ pub fn build_null_expression(apply_to_all_columns: bool) -> PolarsResult<Expr> {
     let replacement_expr: Expr = if apply_to_all_columns {
         // Universal Mode: Apply to ALL columns via casting and trimming string representation
         let condition = all() // Select current column value
+            .as_expr()
             .cast(DataType::String) // Cast to String
             .str()
             .strip_chars(lit(NULL)) // Trim whitespace from string representation
@@ -524,7 +525,7 @@ pub fn build_null_expression(apply_to_all_columns: bool) -> PolarsResult<Expr> {
             .keep() // Keep original column name
     } else {
         // String-Only Mode: Apply only to String columns, trim original string
-        let string_cols_selector = dtype_col(&DataType::String);
+        let string_cols_selector = dtype_col(&DataType::String).as_selector().as_expr();
 
         let condition = string_cols_selector // Select only string columns
             .clone() // Clone needed for use in `otherwise`
@@ -630,9 +631,11 @@ fn read_csv_lazy(
             // Use Arc to efficiently share the map ownership with the 'move' closure.
             let cols_dtype: HashMap<&str, DataType> = MyColumn::get_cols_dtype(side);
 
+            let plpath = PlPath::Local(path.clone().into());
+
             // Create a LazyCsvReader to process the file lazily.
             let result_lazyframe: PolarsResult<LazyFrame> =
-                LazyCsvReader::new(path) // Start lazy reader for the given path
+                LazyCsvReader::new(plpath) // Start lazy reader for the given path
                     .with_encoding(CsvEncoding::LossyUtf8) // Specify UTF-8 encoding with lossy conversion
                     .with_try_parse_dates(false) // Disable automatic date parsing during initial read
                     .with_separator(separator as u8) // Set the column delimiter
@@ -733,6 +736,7 @@ fn format_dataframe(data_frame: &DataFrame) -> PolarsResult<DataFrame> {
         .with_columns([
             // Apply cast only to the intersection of target and existing columns
             cols(columns_to_transform)
+                .as_expr()
                 .apply(descricao_da_origem, GetOutput::from_type(DataType::String)),
         ])
         .collect()
@@ -1584,6 +1588,7 @@ mod tests_replace_values_with_null {
         let literal_series: Expr = series.to_list_expr()?;
 
         let condition = all() // Select current column value
+            .as_expr()
             .cast(DataType::String) // Cast to String
             .str()
             .strip_chars(lit(NULL)) // Trim whitespace from string representation

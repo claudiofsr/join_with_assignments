@@ -84,7 +84,7 @@ fn format_fazyframe_a(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
             GetOutput::from_type(DataType::String),
         ))
         .with_column(col(ncm).map(formatar_ncm, GetOutput::from_type(DataType::String)))
-        .with_columns([cols(columns_with_float64).map(
+        .with_columns([cols(columns_with_float64).as_expr().map(
             |series| round_column(series, 2),
             GetOutput::from_type(DataType::Float64),
         )]);
@@ -130,7 +130,7 @@ fn format_fazyframe_b(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
         ))
         .with_column(col(ncm).map(formatar_ncm, GetOutput::from_type(DataType::String)))
         .with_columns([
-            cols(columns_with_float64).map(
+            cols(columns_with_float64).as_expr().map(
                 |series| round_column(series, 2),
                 GetOutput::from_type(DataType::Float64),
             ), //all()
@@ -339,7 +339,7 @@ fn join_with_interline_correlations(
     let lf_b_solution: LazyFrame = df_correlation
         .lazy()
         .join(lf_b, common_a, common_b, JoinType::Left.into())
-        .drop([coluna(Right, "count_lines")]);
+        .drop(by_name([coluna(Right, "count_lines")], true));
 
     // add two empty columns to lazyframe
     let lf_a = lf_a.with_columns([
@@ -357,7 +357,7 @@ fn join_with_interline_correlations(
 
     let lf_c: LazyFrame = lf_a
         .join(lf_b_solution, common_a, common_b, JoinType::Left.into())
-        .drop([coluna(Left, "count_lines")]);
+        .drop(by_name([coluna(Left, "count_lines")], true));
 
     Ok(lf_c)
 }
@@ -657,7 +657,7 @@ mod test_assignments {
 
         let lazyframe: LazyFrame = dataframe01.lazy().with_columns([
             //cols(selected)
-            all().map(
+            all().as_expr().map(
                 |series| round_float64_columns(series, 2),
                 GetOutput::same_type(),
             ),
@@ -718,11 +718,12 @@ mod test_assignments {
         let delimiter = ';';
         let file_path = "src/tests/csv_file01";
         let value_p = "Value P";
+        let plpath = PlPath::from_str(file_path);
 
         // --- with_infer_schema_length --- //
         println!("\n### --- with_infer_schema_length --- ###\n");
 
-        let result_lazyframe_a: PolarsResult<LazyFrame> = LazyCsvReader::new(file_path)
+        let result_lazyframe_a: PolarsResult<LazyFrame> = LazyCsvReader::new(plpath.clone())
             .with_try_parse_dates(true)
             .with_separator(delimiter as u8)
             .with_has_header(true)
@@ -766,7 +767,7 @@ mod test_assignments {
 
         let cols_dtype: Arc<HashMap<&'static str, DataType>> = Arc::new(column_dtypes);
 
-        let result_lazyframe_b: PolarsResult<LazyFrame> = LazyCsvReader::new(file_path)
+        let result_lazyframe_b: PolarsResult<LazyFrame> = LazyCsvReader::new(plpath)
             .with_try_parse_dates(false) // use regex
             .with_separator(delimiter as u8)
             .with_has_header(true)
@@ -827,13 +828,14 @@ mod test_assignments {
         }
 
         let delimiter = ';';
-        let file = "src/tests/csv_file02";
+        let file_path = "src/tests/csv_file02";
         let valor_item = coluna(Right, "valor_item"); // "Valor da Nota Proporcional : NF Item (Todos) SOMA"
+        let plpath = PlPath::from_str(file_path);
 
         // --- with_infer_schema_length --- //
         println!("\n### --- with_infer_schema_length --- ###\n");
 
-        let result_lazyframe: PolarsResult<LazyFrame> = LazyCsvReader::new(file)
+        let result_lazyframe: PolarsResult<LazyFrame> = LazyCsvReader::new(plpath)
             .with_encoding(CsvEncoding::LossyUtf8)
             .with_try_parse_dates(true)
             .with_separator(delimiter as u8)
@@ -859,7 +861,7 @@ mod test_assignments {
         println!("\n### --- with_schema --- ###\n");
 
         let lazyframe_b: LazyFrame =
-            get_lazyframe_from_csv(Some(file.into()), Some(delimiter), Right)?
+            get_lazyframe_from_csv(Some(file_path.into()), Some(delimiter), Right)?
                 .with_row_index(coluna(Right, "count_lines"), Some(0u32));
 
         let df_b = lazyframe_b.collect()?;

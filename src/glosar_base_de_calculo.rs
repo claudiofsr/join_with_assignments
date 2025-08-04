@@ -123,7 +123,7 @@ impl LazyFrameExtension for LazyFrame {
         ];
 
         // Remover coluna temporária
-        self.drop(columns)
+        self.drop(by_name(columns, true))
     }
 }
 
@@ -234,7 +234,7 @@ fn analisar_situacao02(lazyframe: LazyFrame, args: &Arguments) -> MyResult<LazyF
     let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_02, mensagem, lit(0))?;
 
     // Remover 2 colunas temporárias
-    let lf_result: LazyFrame = lf_result.drop([pa_ini, pa_fim]);
+    let lf_result: LazyFrame = lf_result.drop(by_name([pa_ini, pa_fim], true));
 
     Ok(lf_result)
 }
@@ -327,7 +327,7 @@ fn analisar_situacao03(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_03, mensagem, lit(0))?;
 
     // Remover coluna temporária
-    let lf_result: LazyFrame = lf_result.drop([columns[1], columns[3]]);
+    let lf_result: LazyFrame = lf_result.drop(by_name([columns[1], columns[3]], true));
 
     Ok(lf_result)
 }
@@ -595,7 +595,7 @@ fn analisar_situacao07(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_07, mensagem, lit(0))?;
 
     // Remover coluna temporária
-    let lf_result: LazyFrame = lf_result.drop([columns[3], columns[5]]);
+    let lf_result: LazyFrame = lf_result.drop(by_name([columns[3], columns[5]], true));
 
     Ok(lf_result)
 }

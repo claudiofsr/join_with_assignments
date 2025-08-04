@@ -350,7 +350,7 @@ fn format_to_excel(data_frame: &DataFrame) -> PolarsResult<DataFrame> {
     let df_formated: DataFrame = data_frame
         .clone()
         .lazy()
-        .with_columns([all().apply(format_data, GetOutput::same_type())])
+        .with_columns([all().as_expr().apply(format_data, GetOutput::same_type())])
         .collect()?;
 
     Ok(df_formated)

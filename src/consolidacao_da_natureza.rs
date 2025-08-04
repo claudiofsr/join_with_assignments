@@ -294,10 +294,13 @@ fn groupby_and_agg_values(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
             transferir_valores(2, "RBNC_NTributada"),
             transferir_valores(3, "RBNC_Exportação"),
         ])
-        .drop([
-            // Remover colunas temporárias
-            "Código do Tipo de Crédito",
-        ])
+        .drop(by_name(
+            [
+                // Remover colunas temporárias
+                "Código do Tipo de Crédito",
+            ],
+            true,
+        ))
         .group_by([
             col("CNPJ Base"),
             col("Ano do Período de Apuração"),
@@ -386,11 +389,12 @@ fn replicar_linha_de_soma_da_receita(lazyframe: LazyFrame) -> MyResult<LazyFrame
     let lazyframe: LazyFrame = lazyframe.with_columns([when(cst_50_a_66()?)
         .then(
             cols(selected_columns)
+                .as_expr()
                 .filter(cst_de_receita_bruta()?)
                 .sum() // soma de valores para cst entre 01 a 09
                 .over(discrimination_window),
         )
-        .otherwise(cols(selected_columns).over(discrimination_window))]);
+        .otherwise(cols(selected_columns).as_expr().over(discrimination_window))]);
 
     Ok(lazyframe)
 }
@@ -639,6 +643,7 @@ fn analisar_debitos_omitidos(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
             col("Valor Total do Item").alias("RBNC_Tributada"),
         )
         .with_columns([cols(["RBNC_NTributada", "RBNC_Exportação"])
+            .as_expr()
             .apply(|s| set_some_f64_value(s, None), GetOutput::same_type())]);
 
     Ok(debitos_omitidos_ncm_2309.collect()?.lazy())
@@ -673,14 +678,17 @@ fn remover_colunas_temporarias(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
             col("RecBrutaCumulativa").sum(),
             col("ReceitaBrutaTotal").sum(),
         ])
-        .drop([
-            // Remover colunas temporárias
-            "Registro",
-            "Código Fiscal de Operações e Prestações (CFOP)",
-            "Código NCM",
-            "Valor Total do Item",
-            //"ReceitaBrutaTotal",
-        ]);
+        .drop(by_name(
+            [
+                // Remover colunas temporárias
+                "Registro",
+                "Código Fiscal de Operações e Prestações (CFOP)",
+                "Código NCM",
+                "Valor Total do Item",
+                //"ReceitaBrutaTotal",
+            ],
+            true,
+        ));
 
     Ok(lazy)
 }
@@ -1083,14 +1091,20 @@ fn formatar_valores(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
 
     let lazy_formated: LazyFrame = lazyframe
         .with_columns([when(operacoes_de_saida()?)
-            .then(cols(valores).apply(|col| round_float64_columns(col, 4), GetOutput::same_type()))
+            .then(
+                cols(valores)
+                    .as_expr()
+                    .apply(|col| round_float64_columns(col, 4), GetOutput::same_type()),
+            )
             .otherwise(
-                cols(valores).apply(|col| round_float64_columns(col, 4), GetOutput::same_type()),
+                cols(valores)
+                    .as_expr()
+                    .apply(|col| round_float64_columns(col, 4), GetOutput::same_type()),
             )])
-        .with_columns([
-            cols(aliquotas).apply(|col| round_float64_columns(col, 4), GetOutput::same_type())
-        ])
-        .with_columns([cols(colunas_float64).apply(
+        .with_columns([cols(aliquotas)
+            .as_expr()
+            .apply(|col| round_float64_columns(col, 4), GetOutput::same_type())])
+        .with_columns([cols(colunas_float64).as_expr().apply(
             |col| desprezar_pequenos_valores(col, SMALL_VALUE),
             GetOutput::same_type(),
         )]);
@@ -1146,7 +1160,7 @@ fn rename_columns(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     ];
 
     let lazyframe: LazyFrame = lazyframe.select(&[
-        all().exclude(selected),
+        all().exclude_cols(selected).as_expr(),
         col("RBNC_Tributada").alias("Crédito vinculado à Receita Bruta Não Cumulativa: Tributada"),
         col("RBNC_NTributada")
             .alias("Crédito vinculado à Receita Bruta Não Cumulativa: Não Tributada"),
@@ -1245,7 +1259,7 @@ mod tests {
             .lazy()
             .select([col("text").str().split(lit(" ")).alias("tokens")])
             .with_row_index("row_nr", None)
-            .explode([col("tokens")])
+            .explode(cols(["tokens"]))
             .select([col("row_nr"), col("tokens")])
             .collect()?;
 
@@ -1281,7 +1295,7 @@ mod tests {
                     .alias("Código Div"),
             )
             // repeat each row in a polars dataframe a particular number of times?
-            .select(&[all().repeat_by(lit(2)).explode()])
+            .select(&[all().as_expr().repeat_by(lit(2)).explode()])
             //.explode([col("contador")]);
             // contador de linhas
             .with_row_index("contador", Some(1u32));

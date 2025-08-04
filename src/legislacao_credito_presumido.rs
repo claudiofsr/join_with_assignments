@@ -72,10 +72,13 @@ pub fn adicionar_coluna_de_credito_presumido(lazyframe: LazyFrame) -> MyResult<L
                 .otherwise(lit(NULL)) // replace by null
                 .alias(columns[1]), // .keep_name()
         )
-        .drop([
-            // Remover 2 colunas temporárias
-            side_a[2], side_b[2],
-        ]);
+        .drop(by_name(
+            [
+                // Remover 2 colunas temporárias
+                side_a[2], side_b[2],
+            ],
+            true,
+        ));
 
     Ok(lazyframe)
 }
