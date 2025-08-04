@@ -29,7 +29,7 @@ readme = "README.md"
 anstyle = "1.0"
 cc = { version = "1.2", features = ["parallel"] }
 chrono = { version = "0.4", features = [ "serde" ] }
-claudiofsr_lib = "0.14"
+claudiofsr_lib = "0.15"
 colored = "3.0"
 confy = "1.0"
 execution-time = "0.3"
@@ -37,9 +37,9 @@ pathfinding = "4.14"
 rayon = "1.10"
 regex = "1.11"
 serde = { version = "1.0", features = [ "derive" ] }
-sysinfo = "0.35"
+sysinfo = "0.36"
 tabled = { version = "0.20", features = ["ansi"] }
-toml = "0.8"
+toml = "0.9"
 
 [dependencies.clap]
 version = "4.5"
