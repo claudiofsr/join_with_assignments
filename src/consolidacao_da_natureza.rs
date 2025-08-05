@@ -504,24 +504,34 @@ fn analisar_operacoes_de_saida(
         .filter(operacoes_de_saida()?)
         .filter(receita_nao_nula())
         .group_by([
+            // --- These columns are kept as they are ---
             col("CNPJ Base"),
             col("Ano do Período de Apuração"),
             col("Trimestre do Período de Apuração"),
             col("Mês do Período de Apuração"),
             col("Tipo de Operação"),
             col("Tipo de Crédito"),
-            col("Código de Situação Tributária (CST)")
-                .apply(|s| set_some_i64_value(s, None), GetOutput::same_type()),
-            col("Registro").apply(|s| set_some_str_value(s, None), GetOutput::same_type()),
-            col("Código Fiscal de Operações e Prestações (CFOP)")
-                .apply(|s| set_some_i64_value(s, None), GetOutput::same_type()),
-            col("Código NCM").apply(|s| set_some_str_value(s, None), GetOutput::same_type()),
-            col("Alíquota de PIS/PASEP (em percentual)")
-                .apply(|s| set_some_f64_value(s, None), GetOutput::same_type()),
-            col("Alíquota de COFINS (em percentual)")
-                .apply(|s| set_some_f64_value(s, None), GetOutput::same_type()),
-            col("Natureza da Base de Cálculo dos Créditos")
-                .apply(|s| set_some_i64_value(s, Some(80)), GetOutput::same_type()),
+            // This is the most efficient and idiomatic way to create a new
+            // column filled with nulls of a specific type.
+            // `lit(NULL)` creates a null literal.
+            // `.cast(...)` sets the correct data type.
+            // Polars will automatically broadcast this literal to match the
+            // height of the DataFrame.
+            lit(NULL)
+                .cast(DataType::Int64)
+                .alias("Código de Situação Tributária (CST)"),
+            lit(NULL).cast(DataType::String).alias("Registro"),
+            lit(NULL)
+                .cast(DataType::Int64)
+                .alias("Código Fiscal de Operações e Prestações (CFOP)"),
+            lit(NULL).cast(DataType::String).alias("Código NCM"),
+            lit(NULL)
+                .cast(DataType::Float64)
+                .alias("Alíquota de PIS/PASEP (em percentual)"),
+            lit(NULL)
+                .cast(DataType::Float64)
+                .alias("Alíquota de COFINS (em percentual)"),
+            lit(80i64).alias("Natureza da Base de Cálculo dos Créditos"),
         ])
         .agg([
             col("Valor da Base de Cálculo das Contribuições").sum(),
@@ -534,8 +544,9 @@ fn analisar_operacoes_de_saida(
             col("ReceitaBrutaTotal").sum(),
         ])
         .with_column(
-            col("Valor da Base de Cálculo das Contribuições")
-                .apply(|s| set_some_f64_value(s, None), GetOutput::same_type()),
+            lit(NULL)
+                .cast(DataType::Float64)
+                .alias("Valor da Base de Cálculo das Contribuições"),
         );
 
     let receita_bruta_percentuais = receita_bruta_valores
@@ -606,20 +617,15 @@ fn analisar_debitos_omitidos(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
             col("Tipo de Operação"),
             col("Tipo de Crédito"),
             col("Código de Situação Tributária (CST)"),
-            col("Registro").apply(|s| set_some_str_value(s, None), GetOutput::same_type()),
-            col("Código Fiscal de Operações e Prestações (CFOP)")
-                .apply(|s| set_some_i64_value(s, None), GetOutput::same_type()),
-            col("Código NCM").apply(|s| set_some_str_value(s, None), GetOutput::same_type()),
-            col("Alíquota de PIS/PASEP (em percentual)").apply(
-                |s| set_some_f64_value(s, Some(1.65)),
-                GetOutput::same_type(),
-            ), // Alíquotas Básicas
-            col("Alíquota de COFINS (em percentual)").apply(
-                |s| set_some_f64_value(s, Some(7.60)),
-                GetOutput::same_type(),
-            ), // Alíquotas Básicas
-            col("Natureza da Base de Cálculo dos Créditos")
-                .apply(|s| set_some_i64_value(s, Some(90)), GetOutput::same_type()),
+            lit(NULL).cast(DataType::String).alias("Registro"),
+            lit(NULL)
+                .cast(DataType::Int64)
+                .alias("Código Fiscal de Operações e Prestações (CFOP)"),
+            lit(NULL).cast(DataType::String).alias("Código NCM"),
+            // Alíquotas Básicas
+            lit(1.65f64).alias("Alíquota de PIS/PASEP (em percentual)"),
+            lit(7.60f64).alias("Alíquota de COFINS (em percentual)"),
+            lit(90i64).alias("Natureza da Base de Cálculo dos Créditos"),
         ])
         .agg([
             // Após soma, negativar valores
@@ -642,9 +648,14 @@ fn analisar_debitos_omitidos(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
             // concentar valores dos Débitos na coluna: RBNC_Tributada.
             col("Valor Total do Item").alias("RBNC_Tributada"),
         )
-        .with_columns([cols(["RBNC_NTributada", "RBNC_Exportação"])
-            .as_expr()
-            .apply(|s| set_some_f64_value(s, None), GetOutput::same_type())]);
+        .with_columns([
+            // For the "RBNC_NTributada" column, we create a literal null expression,
+            // cast it to the correct type (f64), and alias it with the original column name
+            // to ensure it replaces the existing column.
+            lit(NULL).cast(DataType::Float64).alias("RBNC_NTributada"),
+            // We do the exact same thing for the "RBNC_Exportação" column.
+            lit(NULL).cast(DataType::Float64).alias("RBNC_Exportação"),
+        ]);
 
     Ok(debitos_omitidos_ncm_2309.collect()?.lazy())
 }
@@ -660,10 +671,11 @@ fn remover_colunas_temporarias(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
             col("Tipo de Operação"),
             col("Tipo de Crédito"),
             col("Código de Situação Tributária (CST)"),
-            col("Registro").apply(|s| set_some_str_value(s, None), GetOutput::same_type()),
-            col("Código Fiscal de Operações e Prestações (CFOP)")
-                .apply(|s| set_some_i64_value(s, None), GetOutput::same_type()),
-            col("Código NCM").apply(|s| set_some_str_value(s, None), GetOutput::same_type()),
+            lit(NULL).cast(DataType::String).alias("Registro"),
+            lit(NULL)
+                .cast(DataType::Int64)
+                .alias("Código Fiscal de Operações e Prestações (CFOP)"),
+            lit(NULL).cast(DataType::String).alias("Código NCM"),
             col("Alíquota de PIS/PASEP (em percentual)"),
             col("Alíquota de COFINS (em percentual)"),
             col("Natureza da Base de Cálculo dos Créditos"),
@@ -710,8 +722,7 @@ fn adicionar_valores_trimestrais(
             col("Ano do Período de Apuração"),
             col("Trimestre do Período de Apuração"),
             // Mês fictício 13, para fins de acumulação de valores trimestrais e ordenação
-            col("Mês do Período de Apuração")
-                .apply(|s| set_some_i64_value(s, Some(13)), GetOutput::same_type()),
+            lit(13i64).alias("Mês do Período de Apuração"),
             col("Tipo de Operação"),
             col("Tipo de Crédito"),
             col("Código de Situação Tributária (CST)"),
@@ -758,8 +769,7 @@ fn adicionar_linhas_de_soma_da_bc_dos_creditos(
             col("Mês do Período de Apuração"),
             col("Tipo de Operação"),
             col("Tipo de Crédito"),
-            col("Código de Situação Tributária (CST)")
-                .apply(|s| set_some_i64_value(s, Some(200)), GetOutput::same_type()),
+            lit(200i64).alias("Código de Situação Tributária (CST)"),
             col("Alíquota de PIS/PASEP (em percentual)"),
             col("Alíquota de COFINS (em percentual)"),
             col("Natureza da Base de Cálculo dos Créditos"),
@@ -808,11 +818,10 @@ fn adicionar_linhas_de_apuracao_de_pis(
         .clone()
         .filter(cst_200)
         .with_column(
-            col(cst)
-                // CST 210 temporário para fins de ordenação
-                .apply(|s| set_some_i64_value(s, Some(210)), GetOutput::same_type()),
+            // CST 210 temporário para fins de ordenação
+            lit(210i64).alias(cst),
         )
-        .with_column(col(aliq_cof).apply(|s| set_some_f64_value(s, None), GetOutput::same_type()))
+        .with_column(lit(NULL).cast(DataType::Float64).alias(aliq_cof))
         .with_columns([
             apuracao(aliq_pis, "Valor da Base de Cálculo das Contribuições"),
             apuracao(aliq_pis, "RBNC_Tributada"),
@@ -831,7 +840,7 @@ fn adicionar_linhas_de_apuracao_de_pis(
     let lazy_debitos_pis: LazyFrame = lazyframe
         .clone()
         .filter(col("Natureza da Base de Cálculo dos Créditos").eq(lit(90)))
-        .with_column(col(aliq_cof).apply(|s| set_some_f64_value(s, None), GetOutput::same_type()))
+        .with_column(lit(NULL).cast(DataType::Float64).alias(aliq_cof))
         .with_columns([
             apuracao(aliq_pis, "Valor da Base de Cálculo das Contribuições"),
             apuracao(aliq_pis, "RBNC_Tributada"),
@@ -869,11 +878,10 @@ fn adicionar_linhas_de_apuracao_de_cofins(
         .clone()
         .filter(cst_200)
         .with_column(
-            col(cst)
-                // CST 250 temporário para fins de ordenação
-                .apply(|s| set_some_i64_value(s, Some(250)), GetOutput::same_type()),
+            // CST 250 temporário para fins de ordenação
+            lit(250i64).alias(cst),
         )
-        .with_column(col(aliq_pis).apply(|s| set_some_f64_value(s, None), GetOutput::same_type()))
+        .with_column(lit(NULL).cast(DataType::Float64).alias(aliq_pis))
         .with_columns([
             apuracao(aliq_cof, "Valor da Base de Cálculo das Contribuições"),
             apuracao(aliq_cof, "RBNC_Tributada"),
@@ -892,7 +900,7 @@ fn adicionar_linhas_de_apuracao_de_cofins(
     let lazy_debitos_cofins: LazyFrame = lazyframe
         .clone()
         .filter(col("Natureza da Base de Cálculo dos Créditos").eq(lit(90)))
-        .with_column(col(aliq_pis).apply(|s| set_some_f64_value(s, None), GetOutput::same_type()))
+        .with_column(lit(NULL).cast(DataType::Float64).alias(aliq_pis))
         .with_columns([
             apuracao(aliq_cof, "Valor da Base de Cálculo das Contribuições"),
             apuracao(aliq_cof, "RBNC_Tributada"),
@@ -923,6 +931,8 @@ fn adicionar_bc_dos_creditos_valor_total(
 ) -> MyResult<LazyFrame> {
     // Selecionar apenas a linha de "Base de Cálculo dos Créditos:"
     let cst_200: Expr = col("Código de Situação Tributária (CST)").eq(lit(200));
+    let aliq_pis: &str = coluna(Left, "aliq_pis");
+    let aliq_cof: &str = coluna(Left, "aliq_cof");
 
     let bc_dos_creditos_valor_total: LazyFrame = lazyframe
         .clone()
@@ -938,15 +948,11 @@ fn adicionar_bc_dos_creditos_valor_total(
             col("Ano do Período de Apuração"),
             col("Trimestre do Período de Apuração"),
             col("Mês do Período de Apuração"),
-            col("Tipo de Operação").apply(|s| set_some_i64_value(s, None), GetOutput::same_type()),
-            col("Tipo de Crédito")
-                .apply(|s| set_some_i64_value(s, Some(100)), GetOutput::same_type()),
-            col("Código de Situação Tributária (CST)")
-                .apply(|s| set_some_i64_value(s, Some(400)), GetOutput::same_type()),
-            col("Alíquota de PIS/PASEP (em percentual)")
-                .apply(|s| set_some_f64_value(s, None), GetOutput::same_type()),
-            col("Alíquota de COFINS (em percentual)")
-                .apply(|s| set_some_f64_value(s, None), GetOutput::same_type()),
+            lit(NULL).cast(DataType::Int64).alias("Tipo de Operação"),
+            lit(100i64).alias("Tipo de Crédito"),
+            lit(400i64).alias("Código de Situação Tributária (CST)"),
+            lit(NULL).cast(DataType::Float64).alias(aliq_pis),
+            lit(NULL).cast(DataType::Float64).alias(aliq_cof),
             col("Natureza da Base de Cálculo dos Créditos"),
         ])
         .agg([
@@ -970,8 +976,8 @@ fn adicionar_saldo_de_cred_passivel_de_ressarcimento_pis(
     union_args: UnionArgs,
 ) -> MyResult<LazyFrame> {
     let natureza: &str = coluna(Left, "natureza");
-    //let aliq_pis: &str = coluna(Left, "aliq_pis");
-    //let aliq_cof: &str = coluna(Left, "aliq_cof");
+    let aliq_pis: &str = coluna(Left, "aliq_pis");
+    let aliq_cof: &str = coluna(Left, "aliq_cof");
 
     let series = Series::new(natureza.into(), [31, 41, 51, 61, 91, 201, 211, 221]);
     let literal_series: Expr = series.implode()?.into_series().lit();
@@ -989,15 +995,11 @@ fn adicionar_saldo_de_cred_passivel_de_ressarcimento_pis(
             col("Ano do Período de Apuração"),
             col("Trimestre do Período de Apuração"),
             col("Mês do Período de Apuração"),
-            col("Tipo de Operação").apply(|s| set_some_i64_value(s, None), GetOutput::same_type()),
-            col("Tipo de Crédito")
-                .apply(|s| set_some_i64_value(s, Some(100)), GetOutput::same_type()),
-            col("Código de Situação Tributária (CST)")
-                .apply(|s| set_some_i64_value(s, Some(410)), GetOutput::same_type()),
-            col("Alíquota de PIS/PASEP (em percentual)")
-                .apply(|s| set_some_f64_value(s, None), GetOutput::same_type()),
-            col("Alíquota de COFINS (em percentual)")
-                .apply(|s| set_some_f64_value(s, None), GetOutput::same_type()),
+            lit(NULL).cast(DataType::Int64).alias("Tipo de Operação"),
+            lit(100i64).alias("Tipo de Crédito"),
+            lit(410i64).alias("Código de Situação Tributária (CST)"),
+            lit(NULL).cast(DataType::Float64).alias(aliq_pis),
+            lit(NULL).cast(DataType::Float64).alias(aliq_cof),
             col("Natureza da Base de Cálculo dos Créditos"),
         ])
         .agg([
@@ -1021,8 +1023,8 @@ fn adicionar_saldo_de_cred_passivel_de_ressarcimento_cofins(
     union_args: UnionArgs,
 ) -> MyResult<LazyFrame> {
     let natureza: &str = coluna(Left, "natureza");
-    //let aliq_pis: &str = coluna(Left, "aliq_pis");
-    //let aliq_cof: &str = coluna(Left, "aliq_cof");
+    let aliq_pis: &str = coluna(Left, "aliq_pis");
+    let aliq_cof: &str = coluna(Left, "aliq_cof");
 
     let series = Series::new(natureza.into(), [35, 45, 55, 65, 95, 205, 215, 225]);
     let literal_series: Expr = series.implode()?.into_series().lit();
@@ -1040,15 +1042,11 @@ fn adicionar_saldo_de_cred_passivel_de_ressarcimento_cofins(
             col("Ano do Período de Apuração"),
             col("Trimestre do Período de Apuração"),
             col("Mês do Período de Apuração"),
-            col("Tipo de Operação").apply(|s| set_some_i64_value(s, None), GetOutput::same_type()),
-            col("Tipo de Crédito")
-                .apply(|s| set_some_i64_value(s, Some(100)), GetOutput::same_type()),
-            col("Código de Situação Tributária (CST)")
-                .apply(|s| set_some_i64_value(s, Some(450)), GetOutput::same_type()),
-            col("Alíquota de PIS/PASEP (em percentual)")
-                .apply(|s| set_some_f64_value(s, None), GetOutput::same_type()),
-            col("Alíquota de COFINS (em percentual)")
-                .apply(|s| set_some_f64_value(s, None), GetOutput::same_type()),
+            lit(NULL).cast(DataType::Int64).alias("Tipo de Operação"),
+            lit(100i64).alias("Tipo de Crédito"),
+            lit(450i64).alias("Código de Situação Tributária (CST)"),
+            lit(NULL).cast(DataType::Float64).alias(aliq_pis),
+            lit(NULL).cast(DataType::Float64).alias(aliq_cof),
             col("Natureza da Base de Cálculo dos Créditos"),
         ])
         .agg([
@@ -1174,59 +1172,6 @@ fn rename_columns(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     //.drop(selected);
 
     Ok(lazyframe)
-}
-
-/*
-pub fn set_some_value<T>(series: Series, opt_value: Option<T>) -> PolarsResult<Option<Series>>
-where
-    T: std::clone::Clone,
-    polars::prelude::Series: std::iter::FromIterator<std::option::Option<T>>,
-{
-    // A vector with all elements equal to the same value.
-    let values: Vec<Option<T>> = vec![opt_value; series.len()];
-    let series: Series = values.into_iter().collect();
-    Ok(Some(series))
-}
-*/
-
-pub fn set_some_i64_value(col: Column, opt_value: Option<i64>) -> PolarsResult<Option<Column>> {
-    /*
-    // A vector with all elements equal to the same value.
-    let values = vec![opt_value; series.len()];
-    let series: Series = values.into_iter().collect();
-    Ok(Some(series))
-    */
-
-    let new_col: Column = col
-        .i64()?
-        .into_iter()
-        .map(|_option_i64| opt_value)
-        .collect::<Int64Chunked>()
-        .into_column();
-
-    Ok(Some(new_col))
-}
-
-pub fn set_some_f64_value(col: Column, opt_value: Option<f64>) -> PolarsResult<Option<Column>> {
-    let new_col: Column = col
-        .f64()?
-        .into_iter()
-        .map(|_option_f64| opt_value)
-        .collect::<Float64Chunked>()
-        .into_column();
-
-    Ok(Some(new_col))
-}
-
-pub fn set_some_str_value(col: Column, opt_value: Option<&str>) -> PolarsResult<Option<Column>> {
-    let new_col: Column = col
-        .str()?
-        .into_iter()
-        .map(|_option_utf8| opt_value)
-        .collect::<StringChunked>()
-        .into_column();
-
-    Ok(Some(new_col))
 }
 
 #[cfg(test)]
