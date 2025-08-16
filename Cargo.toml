@@ -34,10 +34,10 @@ colored = "3.0"
 confy = "1.0"
 execution-time = "0.3"
 pathfinding = "4.14"
-rayon = "1.10"
+rayon = "1.11"
 regex = "1.11"
 serde = { version = "1.0", features = [ "derive" ] }
-sysinfo = "0.36"
+sysinfo = "0.37"
 tabled = { version = "0.20", features = ["ansi"] }
 toml = "0.9"
 
@@ -89,11 +89,11 @@ features = [
 version = "0.50.0"
 
 [dependencies.rust_xlsxwriter]
-# version = "0.89.1"
+version = "0.90.0"
 # https://github.com/jmcnamara/rust_xlsxwriter/blob/main/CHANGELOG.md
 # git = "https://github.com/jmcnamara/rust_xlsxwriter.git"
 # Cargo.toml, update polars version
-path = "/home/claudio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rust_xlsxwriter-0.89.1b"
+# path = "/home/claudio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rust_xlsxwriter-0.89.1b"
 
 features = [
     # "constant_memory",
