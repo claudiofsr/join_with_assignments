@@ -29,7 +29,7 @@ readme = "README.md"
 anstyle = "1.0"
 cc = { version = "1.2", features = ["parallel"] }
 chrono = { version = "0.4", features = [ "serde" ] }
-claudiofsr_lib = "0.15"
+claudiofsr_lib = "0.16"
 colored = "3.0"
 confy = "1.0"
 execution-time = "0.3"
@@ -105,7 +105,7 @@ features = [
 
 [dev-dependencies]
 # Dependencies ONLY needed for testing
-tempfile = "3.20"
+tempfile = "3.21"
 
 # Package release:
 # Cross-compile a Rust application from Linux to Windows
