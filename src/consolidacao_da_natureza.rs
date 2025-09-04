@@ -78,6 +78,7 @@ fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame, _auditar: bool) -> MyRe
     // 1: Entrada; 2: Saída; 3: Ajuste de Acréscimo; 4: Ajuste de Redução;
     // 5: Desconto da Contribuição Apurada no Próprio Período;
     // 6: Desconto Efetuado em Período Posterior; 7: Detalhamento.
+    //let excluir_cst_49: Expr = col(cst).is_not_null().and(col(cst).neq(lit(49)));
     let operacoes_desejadas: Expr = col(top).is_not_null().and(col(top).neq(lit(7)));
 
     // Natureza: '01 - Aquisição de Bens para Revenda' and CST neq 50
@@ -118,6 +119,7 @@ fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame, _auditar: bool) -> MyRe
     let lazy_filtered: LazyFrame = lazyframe
         //.filter(col("Ano do Período de Apuração").eq(lit(2022)))
         //.filter(col("Mês do Período de Apuração").eq(lit(6)))
+        //.filter(excluir_cst_49)
         .filter(operacoes_desejadas)
         .filter(
             entrada_de_credito()?
