@@ -4,8 +4,9 @@ use std::ops::Neg;
 use crate::{
     MyResult, Side::Left, cfop_de_exportacao, coluna, cst_50_a_66, cst_de_receita_bruta, csts,
     csts_nao_tributados, desprezar_pequenos_valores, entrada_de_credito, get_cnpj_base,
-    operacoes_de_ajustes_ou_descontos, operacoes_de_saida, receita_bruta_cumulativa,
-    receita_bruta_nao_cumulativa, receita_nao_nula, round_float64_columns, saida_de_receita_bruta,
+    get_output_as_string, get_output_same_type, operacoes_de_ajustes_ou_descontos,
+    operacoes_de_saida, receita_bruta_cumulativa, receita_bruta_nao_cumulativa, receita_nao_nula,
+    round_float64_columns, saida_de_receita_bruta,
 };
 
 const SMALL_VALUE: f64 = 0.009; // menor que um centavo
@@ -212,7 +213,7 @@ fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame, _auditar: bool) -> MyRe
                 .apply(
                     get_cnpj_base,
                     // GetOutput::from_type(DataType::String)
-                    |_, f| Ok(Field::new(f.name().clone(), DataType::String)),
+                    get_output_as_string,
                 )
                 .alias("CNPJ Base"),
         )
@@ -1098,19 +1099,19 @@ fn formatar_valores(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
             .then(
                 cols(valores)
                     .as_expr()
-                    .apply(|col| round_float64_columns(col, 4), |_, f| Ok(f.clone())),
+                    .apply(|col| round_float64_columns(col, 4), get_output_same_type),
             )
             .otherwise(
                 cols(valores)
                     .as_expr()
-                    .apply(|col| round_float64_columns(col, 4), |_, f| Ok(f.clone())),
+                    .apply(|col| round_float64_columns(col, 4), get_output_same_type),
             )])
         .with_columns([cols(aliquotas)
             .as_expr()
-            .apply(|col| round_float64_columns(col, 4), |_, f| Ok(f.clone()))])
+            .apply(|col| round_float64_columns(col, 4), get_output_same_type)])
         .with_columns([cols(colunas_float64).as_expr().apply(
             |col| desprezar_pequenos_valores(col, SMALL_VALUE),
-            |_, f| Ok(f.clone()),
+            get_output_same_type,
         )]);
 
     Ok(lazy_formated)
@@ -1183,7 +1184,7 @@ fn rename_columns(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::configure_the_environment;
+    use crate::{configure_the_environment, get_output_as_boolean};
 
     // cargo test -- --help
     // cargo test -- --nocapture
@@ -1265,7 +1266,7 @@ mod tests {
                         .into_column())
                 },
                 // GetOutput::from_type(DataType::Boolean),
-                |_, f| Ok(Field::new(f.name().clone(), DataType::Boolean)),
+                get_output_as_boolean,
             ))
             .then(lit("nº par").alias("Registro"))
             .otherwise(col("Registro")),

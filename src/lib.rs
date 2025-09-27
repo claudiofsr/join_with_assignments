@@ -71,6 +71,46 @@ pub type MyResult<T> = Result<T, MyError>;
 
 pub type VecTuples = Vec<(String, u64, u64)>;
 
+/**
+Returns a Field closure that indicates the output Series will have
+the same type as the input field.
+
+This mimics `GetOutput::same_type()`.
+
+GetOutput::same_type()
+|_, f| Ok(f.clone())
+
+GetOutput::from_type(DataType::UInt32)]
+|_, f| Ok(Field::new(f.name().clone(), DataType::UInt32))
+*/
+pub fn get_output_same_type(_: &Schema, field: &Field) -> PolarsResult<Field> {
+    Ok(field.clone())
+}
+
+pub fn get_output_as_uint32(_: &Schema, field: &Field) -> PolarsResult<Field> {
+    Ok(Field::new(field.name().clone(), DataType::UInt32))
+}
+
+pub fn get_output_as_uint64(_: &Schema, field: &Field) -> PolarsResult<Field> {
+    Ok(Field::new(field.name().clone(), DataType::UInt64))
+}
+
+pub fn get_output_as_date(_: &Schema, field: &Field) -> PolarsResult<Field> {
+    Ok(Field::new(field.name().clone(), DataType::Date))
+}
+
+pub fn get_output_as_f64(_: &Schema, field: &Field) -> PolarsResult<Field> {
+    Ok(Field::new(field.name().clone(), DataType::Float64))
+}
+
+pub fn get_output_as_string(_: &Schema, field: &Field) -> PolarsResult<Field> {
+    Ok(Field::new(field.name().clone(), DataType::String))
+}
+
+pub fn get_output_as_boolean(_: &Schema, field: &Field) -> PolarsResult<Field> {
+    Ok(Field::new(field.name().clone(), DataType::Boolean))
+}
+
 /// Trait providing DataFrame extension methods.
 pub trait DataFrameExtension {
     /// Reorders the DataFrame columns according to a predefined canonical order.

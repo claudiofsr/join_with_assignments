@@ -6,7 +6,9 @@ use chrono::{
     NaiveDate,
 };
 
-use crate::{Arguments, MyResult, Side::Left, coluna, operacoes_de_entrada_ou_saida};
+use crate::{
+    Arguments, MyResult, Side::Left, coluna, get_output_as_date, operacoes_de_entrada_ou_saida,
+};
 
 /// Colunas temporárias: `Período de Apuração Inicial` e `Período de Apuração Final`.
 ///
@@ -41,7 +43,7 @@ pub fn adicionar_coluna_periodo_de_apuracao_inicial_e_final(
             col(pa_ini).apply(
                 move |col: Column| subtrair_meses(col, 2, dt_start),
                 // GetOutput::from_type(DataType::Date),
-                |_, f| Ok(Field::new(f.name().clone(), DataType::Date)),
+                get_output_as_date,
             ),
         )
         .with_column(
@@ -50,7 +52,7 @@ pub fn adicionar_coluna_periodo_de_apuracao_inicial_e_final(
             col(pa_fim).apply(
                 move |col: Column| adicionar_meses(col, 1, dt_final),
                 // GetOutput::from_type(DataType::Date),
-                |_, f| Ok(Field::new(f.name().clone(), DataType::Date)),
+                get_output_as_date,
             ),
         );
 

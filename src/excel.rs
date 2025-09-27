@@ -1,14 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{
-    PolarsXlsxWriter,
-    Side::{
-        Left,
-        //Middle,
-        //Right,
-    },
-    coluna, format_dataframe,
-};
+use crate::{PolarsXlsxWriter, Side::Left, coluna, format_dataframe, get_output_same_type};
 
 use polars::prelude::*;
 use regex::Regex;
@@ -345,23 +337,6 @@ fn auto_color(df: &DataFrame, worksheet: &mut Worksheet, sheet_name: &str) -> Po
     Ok(())
 }
 
-/*
-    Update:
-    GetOutput::same_type()
-    |_, f| Ok(f.clone())
-
-    GetOutput::from_type(DataType::UInt32)]
-    |_, f| Ok(Field::new(f.name().clone(), DataType::UInt32))
-
-    geany polars-lazy-0.51.0/src/tests/aggregations.rs&
-    .map(|s| Ok(Some(&s * 2)), GetOutput::same_type())
-    .map(|s| Ok(&s * 2), |_, f| Ok(f.clone()))
-
-    polars-lazy-0.50.0/src/tests/queries.rs
-    .select([col("sepal_width").map(|s| Ok(Some(s * 200.0)), GetOutput::same_type())])
-    .select([col("sepal_width").map(|s| Ok(s * 200.0), |_, f| Ok(f.clone()))])
-*/
-
 /// Format data supported by Excel
 fn format_to_excel(data_frame: &DataFrame) -> PolarsResult<DataFrame> {
     let df_formated: DataFrame = data_frame
@@ -370,7 +345,8 @@ fn format_to_excel(data_frame: &DataFrame) -> PolarsResult<DataFrame> {
         .with_columns([all().as_expr().apply(
             format_data,
             // GetOutput::same_type()
-            |_, f| Ok(f.clone()),
+            //|_, f| Ok(f.clone()),
+            get_output_same_type,
         )])
         .collect()?;
 

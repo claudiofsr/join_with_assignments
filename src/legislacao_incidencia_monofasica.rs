@@ -1,7 +1,7 @@
 use polars::{prelude::*, series::Series};
 use rayon::prelude::*;
 
-use crate::{MyResult, operacoes_de_entrada_ou_saida};
+use crate::{MyResult, get_output_same_type, operacoes_de_entrada_ou_saida};
 
 /// Analisar legislação vigente das Contribuições conforme código NCM e descrição dos itens.
 ///
@@ -42,7 +42,7 @@ pub fn adicionar_coluna_de_incidencia_monofasica(lazyframe: LazyFrame) -> MyResu
             as_struct([col(side_a[0]).cast(DataType::String), col(side_a[1])].to_vec())
                 .apply(
                     |col: Column| analisar_colunas_selecionadas(&col),
-                    |_, f| Ok(f.clone()),
+                    get_output_same_type,
                 ) // GetOutput::from_type(DataType::String)
                 .alias(side_a[2]),
         )
@@ -50,7 +50,7 @@ pub fn adicionar_coluna_de_incidencia_monofasica(lazyframe: LazyFrame) -> MyResu
             as_struct([col(side_b[0]).cast(DataType::String), col(side_b[1])].to_vec())
                 .apply(
                     |col: Column| analisar_colunas_selecionadas(&col),
-                    |_, f| Ok(f.clone()),
+                    get_output_same_type,
                 ) // GetOutput::from_type(DataType::String)
                 .alias(side_b[2]),
         )

@@ -4,7 +4,8 @@ use crate::{
     adicionar_coluna_de_aliquota_zero, adicionar_coluna_de_credito_presumido,
     adicionar_coluna_de_incidencia_monofasica,
     adicionar_coluna_periodo_de_apuracao_inicial_e_final, coluna, cst_50_a_56, equal,
-    get_cnpj_base, operacoes_de_credito, round_column, unequal,
+    get_cnpj_base, get_output_as_f64, get_output_as_string, operacoes_de_credito, round_column,
+    unequal,
 };
 use polars::prelude::*;
 
@@ -64,7 +65,7 @@ impl LazyFrameExtension for LazyFrame {
             col(valor_bc).apply(
                 |series| round_column(series, 2),
                 // GetOutput::from_type(DataType::Float64),
-                |_, f| Ok(Field::new(f.name().clone(), DataType::Float64)),
+                get_output_as_f64,
             ),
             col(glosar)
                 // Substituir multiple_whitespaces " " por apenas um " "
@@ -99,21 +100,21 @@ impl LazyFrameExtension for LazyFrame {
                 .apply(
                     get_cnpj_base,
                     // GetOutput::from_type(DataType::String)
-                    |_, f| Ok(Field::new(f.name().clone(), DataType::String)),
+                    get_output_as_string,
                 )
                 .alias(columns[1]), // Coluna auxiliar
             col(columns[2])
                 .apply(
                     get_cnpj_base,
                     // GetOutput::from_type(DataType::String)
-                    |_, f| Ok(Field::new(f.name().clone(), DataType::String)),
+                    get_output_as_string,
                 )
                 .alias(columns[3]), // Coluna auxiliar
             col(columns[4])
                 .apply(
                     get_cnpj_base,
                     // GetOutput::from_type(DataType::String)
-                    |_, f| Ok(Field::new(f.name().clone(), DataType::String)),
+                    get_output_as_string,
                 )
                 .alias(columns[5]), // Coluna auxiliar
             col(columns[6])
@@ -414,19 +415,19 @@ fn analisar_situacao04(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
             col(valor_bc).apply(
                 |col| round_column(col, 2),
                 // GetOutput::from_type(DataType::Float64),
-                |_, f| Ok(Field::new(f.name().clone(), DataType::Float64)),
+                get_output_as_f64,
             ),
             lit("-"),
             col(valor_cte_vinculado).apply(
                 |col| round_column(col, 2),
                 // GetOutput::from_type(DataType::Float64),
-                |_, f| Ok(Field::new(f.name().clone(), DataType::Float64)),
+                get_output_as_f64,
             ),
             lit("="),
             valor_justo.clone().apply(
                 |col| round_column(col, 2),
                 // GetOutput::from_type(DataType::Float64),
-                |_, f| Ok(Field::new(f.name().clone(), DataType::Float64)),
+                get_output_as_f64,
             ),
             lit("&"),
         ],
@@ -469,13 +470,13 @@ fn analisar_situacao05(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
             col(valor_bc).apply(
                 |col| round_column(col, 2),
                 // GetOutput::from_type(DataType::Float64),
-                |_, f| Ok(Field::new(f.name().clone(), DataType::Float64)),
+                get_output_as_f64,
             ),
             lit("para"),
             delta.clone().apply(
                 |col| round_column(col, 2),
                 // GetOutput::from_type(DataType::Float64),
-                |_, f| Ok(Field::new(f.name().clone(), DataType::Float64)),
+                get_output_as_f64,
             ),
             lit("&"),
         ],

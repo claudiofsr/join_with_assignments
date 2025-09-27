@@ -7,7 +7,8 @@ use crate::{
     VecTuples,
     args::Arguments,
     coluna, formatar_chave_eletronica, formatar_ncm, get_lazyframe_from_csv, get_opt_vectuples,
-    get_option_assignments, round_column,
+    get_option_assignments, get_output_as_f64, get_output_as_string, get_output_as_uint64,
+    round_column,
 };
 
 /// Use Polars to get dataframe after Munkres assignments
@@ -82,17 +83,17 @@ fn format_fazyframe_a(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
         .with_column(col(chave).map(
             formatar_chave_eletronica,
             // GetOutput::from_type(DataType::String),
-            |_, f| Ok(Field::new(f.name().clone(), DataType::String)),
+            get_output_as_string,
         ))
         .with_column(col(ncm).map(
             formatar_ncm,
             // GetOutput::from_type(DataType::String)
-            |_, f| Ok(Field::new(f.name().clone(), DataType::String)),
+            get_output_as_string,
         ))
         .with_columns([cols(columns_with_float64).as_expr().map(
             |series| round_column(series, 2),
             // GetOutput::from_type(DataType::Float64),
-            |_, f| Ok(Field::new(f.name().clone(), DataType::Float64)),
+            get_output_as_f64,
         )]);
 
     // Lazy operations don’t execute until we call .collect()?.
@@ -133,20 +134,20 @@ fn format_fazyframe_b(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
         .with_column(col(chave).map(
             formatar_chave_eletronica,
             // GetOutput::from_type(DataType::String),
-            |_, f| Ok(Field::new(f.name().clone(), DataType::String)),
+            get_output_as_string,
         ))
         .with_column(col(ncm).map(
             formatar_ncm,
             // GetOutput::from_type(DataType::String)
-            |_, f| Ok(Field::new(f.name().clone(), DataType::String)),
+            get_output_as_string,
         ))
         .with_columns([
             cols(columns_with_float64).as_expr().map(
                 |series| round_column(series, 2),
                 // GetOutput::from_type(DataType::Float64),
-                |_, f| Ok(Field::new(f.name().clone(), DataType::Float64)),
+                get_output_as_f64,
             ), //all()
-               //.map(|series| round_float64_columns(series, 2), |_, f| Ok(f.clone()))
+               //.map(|series| round_float64_columns(series, 2), get_output_same_type)
         ]);
 
     // Lazy operations don’t execute until we call .collect()?.
@@ -258,7 +259,7 @@ fn join_lazyframes(
                     Ok(new_series.into())
                 },
                 // GetOutput::from_type(DataType::UInt64),
-                |_, f| Ok(Field::new(f.name().clone(), DataType::UInt64)),
+                get_output_as_uint64,
             )
             .alias("Munkres Assignments"),
         )
@@ -432,7 +433,7 @@ fn check_correlation_between_dataframes(lazyframe: LazyFrame) -> Result<DataFram
 mod test_assignments {
     use super::*;
     use crate::{
-        Side, apply_custom_schema_rules, configure_the_environment,
+        Side, apply_custom_schema_rules, configure_the_environment, get_output_same_type,
         glosar_base_de_calculo::LazyFrameExtension, round_float64_columns,
     };
     use std::{collections::HashMap, env};
@@ -672,7 +673,7 @@ mod test_assignments {
             //cols(selected)
             all().as_expr().map(
                 |series| round_float64_columns(series, 2),
-                |_, f| Ok(f.clone()),
+                get_output_same_type,
             ),
         ]);
 
