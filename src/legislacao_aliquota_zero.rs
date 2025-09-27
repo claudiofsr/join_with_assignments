@@ -44,7 +44,7 @@ pub fn adicionar_coluna_de_aliquota_zero(lazyframe: LazyFrame) -> MyResult<LazyF
             as_struct([col(side_a[0]).cast(DataType::String), col(side_a[1])].to_vec())
                 .apply(
                     |col: Column| analisar_colunas_selecionadas(&col),
-                    GetOutput::same_type(),
+                    |_, f| Ok(f.clone()),
                 ) // GetOutput::from_type(DataType::String)
                 .alias(side_a[2]),
         )
@@ -52,7 +52,7 @@ pub fn adicionar_coluna_de_aliquota_zero(lazyframe: LazyFrame) -> MyResult<LazyF
             as_struct([col(side_b[0]).cast(DataType::String), col(side_b[1])].to_vec())
                 .apply(
                     |col: Column| analisar_colunas_selecionadas(&col),
-                    GetOutput::same_type(),
+                    |_, f| Ok(f.clone()),
                 ) // GetOutput::from_type(DataType::String)
                 .alias(side_b[2]),
         )
@@ -83,7 +83,7 @@ pub fn adicionar_coluna_de_aliquota_zero(lazyframe: LazyFrame) -> MyResult<LazyF
     Ok(lazyframe)
 }
 
-fn analisar_colunas_selecionadas(col: &Column) -> Result<Option<Column>, PolarsError> {
+fn analisar_colunas_selecionadas(col: &Column) -> Result<Column, PolarsError> {
     // add feature "dtype-struct"
     let struct_chunked: &StructChunked = col.struct_()?;
 
@@ -114,7 +114,7 @@ fn analisar_colunas_selecionadas(col: &Column) -> Result<Option<Column>, PolarsE
         .collect::<StringChunked>()
         .into_column();
 
-    Ok(Some(col))
+    Ok(col)
 }
 
 /// Base Legal conforme código NCM e descrição do item.
@@ -566,7 +566,7 @@ mod tests {
 
         println!("dataframe 1: {df}\n");
 
-        fn multiply(s: &mut [Column]) -> Result<Option<Column>, PolarsError> {
+        fn multiply(s: &mut [Column]) -> Result<Column, PolarsError> {
             // Get the fields as Columns
             let col_0: &Column = &s[0];
             let col_1: &Column = &s[1];
@@ -586,11 +586,33 @@ mod tests {
                 .collect::<Int32Chunked>()
                 .into_series();
 
-            Ok(Some(new_series.into()))
+            Ok(new_series.into())
         }
 
-        // geany polars-0.47.1/tests/it/lazy/queries.rs
-        // let multiply = |s: &mut [Column]| (&(&s[0] * &s[0])? * &(&s[1] - 2)).map(Some);
+        /*
+        Update:
+        geany polars-0.50.0/tests/it/lazy/queries.rs&
+        let out = df
+            .clone()
+            .lazy()
+            .select([map_multiple(
+                multiply,
+                [col("A"), col("B")],
+                GetOutput::from_type(DataType::Int32),
+            )])
+            .collect()?;
+
+        geany polars-0.51.0/tests/it/lazy/queries.rs&
+        let out = df
+            .clone()
+            .lazy()
+            .select([map_multiple(
+                multiply,
+                [col("A"), col("B")],
+                |_, f| { Ok(Field::new(f[0].name().clone(), DataType::Int32)) }
+            )])
+            .collect()?;
+        */
 
         let df: DataFrame = df
             .clone()
@@ -598,7 +620,8 @@ mod tests {
             .with_columns([map_multiple(
                 multiply,
                 [col("A"), col("B")],
-                GetOutput::from_type(DataType::Int32),
+                // GetOutput::from_type(DataType::Int32),
+                |_, f| Ok(Field::new(f[0].name().clone(), DataType::Int32)),
             )
             .alias("Map Multiple")])
             .collect()?;
@@ -621,7 +644,8 @@ mod tests {
             .agg([apply_multiple(
                 multiply,
                 [col("A"), col("B")],
-                GetOutput::from_type(DataType::Int32),
+                // GetOutput::from_type(DataType::Int32),
+                |_, f| Ok(Field::new(f[0].name().clone(), DataType::Int32)),
                 false,
             )])
             .sort(["cars"], Default::default())

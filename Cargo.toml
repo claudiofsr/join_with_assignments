@@ -3,7 +3,7 @@ name = "join_with_assignments"
 authors = ["Claudio F S Rodrigues <claudiofsrodrigues@gmail.com>"]
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.88"
+rust-version = "1.90"
 homepage = "https://github.com/claudiofsr/join_with_assignments"
 repository = "https://github.com/claudiofsr/join_with_assignments"
 description = """
@@ -51,12 +51,12 @@ features = [
 ]
 
 [dependencies.polars]
-version = "0.50.0"
+version = "0.51.0"
 # git = "https://github.com/pola-rs/polars.git"
 # rev = "8a6bf4b"
-# https://github.com/pola-rs/polars/releases/tag/rs-0.49.1
+# https://github.com/pola-rs/polars/releases/tag/rs-0.51.0
 # git clone https://github.com/pola-rs/polars.git
-# path = "/home/claudio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/polars-0.49.1"
+# path = "/home/claudio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/polars-0.51.0"
 features = [
     "abs",        # Convert all values to their absolute/positive value.
     "concat_str", # Concat string data in linear time
@@ -86,14 +86,14 @@ features = [
 ]
 
 [dependencies.polars-arrow ]
-version = "0.50.0"
+version = "0.51.0"
 
 [dependencies.rust_xlsxwriter]
-version = "0.90.0"
+version = "0.90.2"
 # https://github.com/jmcnamara/rust_xlsxwriter/blob/main/CHANGELOG.md
 # git = "https://github.com/jmcnamara/rust_xlsxwriter.git"
 # Cargo.toml, update polars version
-# path = "/home/claudio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rust_xlsxwriter-0.89.1b"
+# path = "/home/claudio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rust_xlsxwriter-0.90.2b"
 
 features = [
     # "constant_memory",
@@ -105,7 +105,7 @@ features = [
 
 [dev-dependencies]
 # Dependencies ONLY needed for testing
-tempfile = "3.21"
+tempfile = "3.23"
 
 # Package release:
 # Cross-compile a Rust application from Linux to Windows

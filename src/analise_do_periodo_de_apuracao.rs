@@ -40,7 +40,8 @@ pub fn adicionar_coluna_periodo_de_apuracao_inicial_e_final(
             // col(pa_ini) - chrono::Duration::days(62).lit()
             col(pa_ini).apply(
                 move |col: Column| subtrair_meses(col, 2, dt_start),
-                GetOutput::from_type(DataType::Date),
+                // GetOutput::from_type(DataType::Date),
+                |_, f| Ok(Field::new(f.name().clone(), DataType::Date)),
             ),
         )
         .with_column(
@@ -48,7 +49,8 @@ pub fn adicionar_coluna_periodo_de_apuracao_inicial_e_final(
             // col(pa_fim) + chrono::Duration::days(31).lit()
             col(pa_fim).apply(
                 move |col: Column| adicionar_meses(col, 1, dt_final),
-                GetOutput::from_type(DataType::Date),
+                // GetOutput::from_type(DataType::Date),
+                |_, f| Ok(Field::new(f.name().clone(), DataType::Date)),
             ),
         );
 
@@ -62,7 +64,7 @@ pub fn subtrair_meses(
     col: Column,
     numero_de_mes: u32,
     dt: Option<u32>,
-) -> Result<Option<Column>, PolarsError> {
+) -> Result<Column, PolarsError> {
     match col.dtype() {
         DataType::Date => sub_month(col, numero_de_mes, dt),
         _ => {
@@ -78,11 +80,7 @@ pub fn subtrair_meses(
 // Polars does not have a FromIterator implementation on Series from an iterator of NaiveDate's.
 // https://stackoverflow.com/questions/76297868/convert-str-to-naivedate-datatype-in-rust-polars
 // https://stackoverflow.com/questions/75074357/filter-a-polars-dataframe-by-date-in-rust
-fn sub_month(
-    col: Column,
-    numero_de_mes: u32,
-    dt: Option<u32>,
-) -> Result<Option<Column>, PolarsError> {
+fn sub_month(col: Column, numero_de_mes: u32, dt: Option<u32>) -> Result<Column, PolarsError> {
     let date: Vec<Option<NaiveDate>> = col
         .date()?
         .as_date_iter()
@@ -100,14 +98,14 @@ fn sub_month(
         })
         .collect();
 
-    Ok(Some(Column::new("a".into(), date)))
+    Ok(Column::new("a".into(), date))
 }
 
 pub fn adicionar_meses(
     col: Column,
     numero_de_mes: u32,
     dt: Option<u32>,
-) -> Result<Option<Column>, PolarsError> {
+) -> Result<Column, PolarsError> {
     match col.dtype() {
         DataType::Date => add_month(col, numero_de_mes, dt),
         _ => {
@@ -120,11 +118,7 @@ pub fn adicionar_meses(
     }
 }
 
-fn add_month(
-    col: Column,
-    numero_de_mes: u32,
-    dt: Option<u32>,
-) -> Result<Option<Column>, PolarsError> {
+fn add_month(col: Column, numero_de_mes: u32, dt: Option<u32>) -> Result<Column, PolarsError> {
     let date: Vec<Option<NaiveDate>> = col
         .date()?
         .as_date_iter()
@@ -142,7 +136,7 @@ fn add_month(
         })
         .collect();
 
-    Ok(Some(Column::new("a".into(), date)))
+    Ok(Column::new("a".into(), date))
 }
 
 fn get_year_and_month(naive_date: NaiveDate, dt: Option<u32>) -> (i32, u32) {

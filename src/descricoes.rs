@@ -185,7 +185,7 @@ static NATUREZA_DA_BASE_DE_CALCULO_DOS_CREDITOS: Lazy<HashMap<i64, &'static str>
         ])
     });
 
-pub fn descricao_da_origem(col: Column) -> Result<Option<Column>, PolarsError> {
+pub fn descricao_da_origem(col: Column) -> Result<Column, PolarsError> {
     match col.dtype() {
         DataType::Int64 => indicador_da_origem(col),
         _ => {
@@ -198,7 +198,7 @@ pub fn descricao_da_origem(col: Column) -> Result<Option<Column>, PolarsError> {
     }
 }
 
-fn indicador_da_origem(col: Column) -> Result<Option<Column>, PolarsError> {
+fn indicador_da_origem(col: Column) -> Result<Column, PolarsError> {
     let new_col: Column = col
         .i64()?
         .into_iter()
@@ -214,10 +214,10 @@ fn indicador_da_origem(col: Column) -> Result<Option<Column>, PolarsError> {
         .collect::<StringChunked>()
         .into_column();
 
-    Ok(Some(new_col))
+    Ok(new_col)
 }
 
-pub fn descricao_do_tipo_de_operacao(col: Column) -> Result<Option<Column>, PolarsError> {
+pub fn descricao_do_tipo_de_operacao(col: Column) -> Result<Column, PolarsError> {
     match col.dtype() {
         DataType::Int64 => tipo_de_operacao(col),
         _ => {
@@ -230,7 +230,7 @@ pub fn descricao_do_tipo_de_operacao(col: Column) -> Result<Option<Column>, Pola
     }
 }
 
-fn tipo_de_operacao(col: Column) -> Result<Option<Column>, PolarsError> {
+fn tipo_de_operacao(col: Column) -> Result<Column, PolarsError> {
     let new_col: Column = col
         .i64()?
         .into_iter()
@@ -246,10 +246,10 @@ fn tipo_de_operacao(col: Column) -> Result<Option<Column>, PolarsError> {
         .collect::<StringChunked>()
         .into_column();
 
-    Ok(Some(new_col))
+    Ok(new_col)
 }
 
-pub fn descricao_do_tipo_de_credito(col: Column) -> Result<Option<Column>, PolarsError> {
+pub fn descricao_do_tipo_de_credito(col: Column) -> Result<Column, PolarsError> {
     match col.dtype() {
         DataType::Int64 => tipo_descricao(col),
         _ => {
@@ -262,7 +262,7 @@ pub fn descricao_do_tipo_de_credito(col: Column) -> Result<Option<Column>, Polar
     }
 }
 
-fn tipo_descricao(col: Column) -> Result<Option<Column>, PolarsError> {
+fn tipo_descricao(col: Column) -> Result<Column, PolarsError> {
     let new_col: Column = col
         .i64()?
         .into_iter()
@@ -275,10 +275,10 @@ fn tipo_descricao(col: Column) -> Result<Option<Column>, PolarsError> {
         .collect::<StringChunked>()
         .into_column();
 
-    Ok(Some(new_col))
+    Ok(new_col)
 }
 
-pub fn descricao_do_mes(col: Column) -> Result<Option<Column>, PolarsError> {
+pub fn descricao_do_mes(col: Column) -> Result<Column, PolarsError> {
     match col.dtype() {
         DataType::Int64 => tipo_mes(col),
         _ => {
@@ -291,7 +291,7 @@ pub fn descricao_do_mes(col: Column) -> Result<Option<Column>, PolarsError> {
     }
 }
 
-fn tipo_mes(col: Column) -> Result<Option<Column>, PolarsError> {
+fn tipo_mes(col: Column) -> Result<Column, PolarsError> {
     let new_col: Column = col
         .i64()?
         .into_iter()
@@ -304,12 +304,10 @@ fn tipo_mes(col: Column) -> Result<Option<Column>, PolarsError> {
         .collect::<StringChunked>()
         .into_column();
 
-    Ok(Some(new_col))
+    Ok(new_col)
 }
 
-pub fn descricao_da_natureza_da_bc_dos_creditos(
-    col: Column,
-) -> Result<Option<Column>, PolarsError> {
+pub fn descricao_da_natureza_da_bc_dos_creditos(col: Column) -> Result<Column, PolarsError> {
     match col.dtype() {
         DataType::Int64 => natureza_da_bc_dos_creditos(col),
         _ => {
@@ -322,7 +320,7 @@ pub fn descricao_da_natureza_da_bc_dos_creditos(
     }
 }
 
-fn natureza_da_bc_dos_creditos(col: Column) -> Result<Option<Column>, PolarsError> {
+fn natureza_da_bc_dos_creditos(col: Column) -> Result<Column, PolarsError> {
     let new_col: Column = col
         .i64()?
         .into_iter()
@@ -344,5 +342,5 @@ fn natureza_da_bc_dos_creditos(col: Column) -> Result<Option<Column>, PolarsErro
         .collect::<StringChunked>()
         .into_column();
 
-    Ok(Some(new_col))
+    Ok(new_col)
 }

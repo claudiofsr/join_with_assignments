@@ -81,12 +81,18 @@ fn format_fazyframe_a(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
         .with_column(col(count_lines).cast(DataType::UInt64))
         .with_column(col(chave).map(
             formatar_chave_eletronica,
-            GetOutput::from_type(DataType::String),
+            // GetOutput::from_type(DataType::String),
+            |_, f| Ok(Field::new(f.name().clone(), DataType::String)),
         ))
-        .with_column(col(ncm).map(formatar_ncm, GetOutput::from_type(DataType::String)))
+        .with_column(col(ncm).map(
+            formatar_ncm,
+            // GetOutput::from_type(DataType::String)
+            |_, f| Ok(Field::new(f.name().clone(), DataType::String)),
+        ))
         .with_columns([cols(columns_with_float64).as_expr().map(
             |series| round_column(series, 2),
-            GetOutput::from_type(DataType::Float64),
+            // GetOutput::from_type(DataType::Float64),
+            |_, f| Ok(Field::new(f.name().clone(), DataType::Float64)),
         )]);
 
     // Lazy operations don’t execute until we call .collect()?.
@@ -126,15 +132,21 @@ fn format_fazyframe_b(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
         .with_column(col(count_lines).cast(DataType::UInt64))
         .with_column(col(chave).map(
             formatar_chave_eletronica,
-            GetOutput::from_type(DataType::String),
+            // GetOutput::from_type(DataType::String),
+            |_, f| Ok(Field::new(f.name().clone(), DataType::String)),
         ))
-        .with_column(col(ncm).map(formatar_ncm, GetOutput::from_type(DataType::String)))
+        .with_column(col(ncm).map(
+            formatar_ncm,
+            // GetOutput::from_type(DataType::String)
+            |_, f| Ok(Field::new(f.name().clone(), DataType::String)),
+        ))
         .with_columns([
             cols(columns_with_float64).as_expr().map(
                 |series| round_column(series, 2),
-                GetOutput::from_type(DataType::Float64),
+                // GetOutput::from_type(DataType::Float64),
+                |_, f| Ok(Field::new(f.name().clone(), DataType::Float64)),
             ), //all()
-               //.map(|series| round_float64_columns(series, 2), GetOutput::same_type())
+               //.map(|series| round_float64_columns(series, 2), |_, f| Ok(f.clone()))
         ]);
 
     // Lazy operations don’t execute until we call .collect()?.
@@ -243,9 +255,10 @@ fn join_lazyframes(
 
                     let new_series = Series::new("New".into(), vec_series);
 
-                    Ok(Some(new_series.into()))
+                    Ok(new_series.into())
                 },
-                GetOutput::from_type(DataType::UInt64),
+                // GetOutput::from_type(DataType::UInt64),
+                |_, f| Ok(Field::new(f.name().clone(), DataType::UInt64)),
             )
             .alias("Munkres Assignments"),
         )
@@ -659,7 +672,7 @@ mod test_assignments {
             //cols(selected)
             all().as_expr().map(
                 |series| round_float64_columns(series, 2),
-                GetOutput::same_type(),
+                |_, f| Ok(f.clone()),
             ),
         ]);
 

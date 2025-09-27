@@ -209,7 +209,11 @@ fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame, _auditar: bool) -> MyRe
         */
         .with_column(
             col("CNPJ dos Estabelecimentos do Contribuinte")
-                .apply(get_cnpj_base, GetOutput::from_type(DataType::String))
+                .apply(
+                    get_cnpj_base,
+                    // GetOutput::from_type(DataType::String)
+                    |_, f| Ok(Field::new(f.name().clone(), DataType::String)),
+                )
                 .alias("CNPJ Base"),
         )
         .select(&selected)
@@ -1094,19 +1098,19 @@ fn formatar_valores(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
             .then(
                 cols(valores)
                     .as_expr()
-                    .apply(|col| round_float64_columns(col, 4), GetOutput::same_type()),
+                    .apply(|col| round_float64_columns(col, 4), |_, f| Ok(f.clone())),
             )
             .otherwise(
                 cols(valores)
                     .as_expr()
-                    .apply(|col| round_float64_columns(col, 4), GetOutput::same_type()),
+                    .apply(|col| round_float64_columns(col, 4), |_, f| Ok(f.clone())),
             )])
         .with_columns([cols(aliquotas)
             .as_expr()
-            .apply(|col| round_float64_columns(col, 4), GetOutput::same_type())])
+            .apply(|col| round_float64_columns(col, 4), |_, f| Ok(f.clone()))])
         .with_columns([cols(colunas_float64).as_expr().apply(
             |col| desprezar_pequenos_valores(col, SMALL_VALUE),
-            GetOutput::same_type(),
+            |_, f| Ok(f.clone()),
         )]);
 
     Ok(lazy_formated)
@@ -1253,15 +1257,15 @@ mod tests {
             //when(col("contador") % lit(2) == lit(0))
             when(col("contador").map(
                 move |col| {
-                    Ok(Some(
-                        col.u32()?
-                            .into_iter()
-                            .map(|opt_u32: Option<u32>| opt_u32.map(|value| value % 2 == 0))
-                            .collect::<BooleanChunked>()
-                            .into_column(),
-                    ))
+                    Ok(col
+                        .u32()?
+                        .into_iter()
+                        .map(|opt_u32: Option<u32>| opt_u32.map(|value| value % 2 == 0))
+                        .collect::<BooleanChunked>()
+                        .into_column())
                 },
-                GetOutput::from_type(DataType::Boolean),
+                // GetOutput::from_type(DataType::Boolean),
+                |_, f| Ok(Field::new(f.name().clone(), DataType::Boolean)),
             ))
             .then(lit("nº par").alias("Registro"))
             .otherwise(col("Registro")),

@@ -720,24 +720,33 @@ fn format_dataframe(data_frame: &DataFrame) -> PolarsResult<DataFrame> {
     data_frame
         .clone()
         .lazy()
-        .with_column(col(pa_mes).apply(descricao_do_mes, GetOutput::from_type(DataType::String)))
+        .with_column(col(pa_mes).apply(
+            descricao_do_mes,
+            // GetOutput::from_type(DataType::String)
+            |_, f| Ok(Field::new(f.name().clone(), DataType::String)),
+        ))
         .with_column(col(tipo_operacao).apply(
             descricao_do_tipo_de_operacao,
-            GetOutput::from_type(DataType::String),
+            // GetOutput::from_type(DataType::String),
+            |_, f| Ok(Field::new(f.name().clone(), DataType::String)),
         ))
         .with_column(col(tipo_cred).apply(
             descricao_do_tipo_de_credito,
-            GetOutput::from_type(DataType::String),
+            // GetOutput::from_type(DataType::String),
+            |_, f| Ok(Field::new(f.name().clone(), DataType::String)),
         ))
         .with_column(col(natureza).apply(
             descricao_da_natureza_da_bc_dos_creditos,
-            GetOutput::from_type(DataType::String),
+            // GetOutput::from_type(DataType::String),
+            |_, f| Ok(Field::new(f.name().clone(), DataType::String)),
         ))
         .with_columns([
             // Apply cast only to the intersection of target and existing columns
-            cols(columns_to_transform)
-                .as_expr()
-                .apply(descricao_da_origem, GetOutput::from_type(DataType::String)),
+            cols(columns_to_transform).as_expr().apply(
+                descricao_da_origem,
+                // GetOutput::from_type(DataType::String)
+                |_, f| Ok(Field::new(f.name().clone(), DataType::String)),
+            ),
         ])
         .collect()
 }
@@ -766,7 +775,7 @@ pub fn write_pqt(df: &DataFrame, basename: &str) -> PolarsResult<()> {
 /// #### Exemplo fictício:
 ///
 /// Se CNPJ: `12.345.678/0009-23`, então CNPJ Base: `12.345.678`.
-pub fn get_cnpj_base(col: Column) -> PolarsResult<Option<Column>> {
+pub fn get_cnpj_base(col: Column) -> PolarsResult<Column> {
     match col.dtype() {
         DataType::String => cnpj_base(col),
         _ => {
@@ -786,7 +795,7 @@ pub fn get_cnpj_base(col: Column) -> PolarsResult<Option<Column>> {
 /// `12.345.678/0009-23` -> `12.345.678`
 ///
 /// `<N/D> [Info do CT-e: 12.345.678/0009-23] [Info do CT-e: <N/D>] [Info do CT-e: 12.345.678/0009-23]` -> `12.345.678`
-fn cnpj_base(col: Column) -> PolarsResult<Option<Column>> {
+fn cnpj_base(col: Column) -> PolarsResult<Column> {
     let new_col: Column = col
         .str()?
         .into_iter()
@@ -810,10 +819,10 @@ fn cnpj_base(col: Column) -> PolarsResult<Option<Column>> {
         .collect::<StringChunked>()
         .into_column();
 
-    Ok(Some(new_col))
+    Ok(new_col)
 }
 
-pub fn desprezar_pequenos_valores(col: Column, delta: f64) -> PolarsResult<Option<Column>> {
+pub fn desprezar_pequenos_valores(col: Column, delta: f64) -> PolarsResult<Column> {
     let new_col: Column = col
         .f64()?
         .into_iter()
@@ -824,7 +833,7 @@ pub fn desprezar_pequenos_valores(col: Column, delta: f64) -> PolarsResult<Optio
         .collect::<Float64Chunked>()
         .into_column();
 
-    Ok(Some(new_col))
+    Ok(new_col)
 }
 
 pub fn add_leading_zeros(series: Series, fill: usize) -> PolarsResult<Option<Series>> {
@@ -859,21 +868,19 @@ fn leading_zeros(series: Series, fill: usize) -> PolarsResult<Option<Series>> {
 /// Filtra colunas do tipo float64.
 ///
 /// Posteriormente, arredonda os valores da coluna
-pub fn round_float64_columns(col: Column, decimals: u32) -> PolarsResult<Option<Column>> {
+pub fn round_float64_columns(col: Column, decimals: u32) -> PolarsResult<Column> {
     let series = match col.as_series() {
         Some(s) => s,
-        None => return Ok(Some(col)),
+        None => return Ok(col),
     };
 
     match series.dtype() {
-        DataType::Float64 => Ok(Some(
-            series.round(decimals, RoundMode::HalfAwayFromZero)?.into(),
-        )),
-        _ => Ok(Some(col)),
+        DataType::Float64 => Ok(series.round(decimals, RoundMode::HalfAwayFromZero)?.into()),
+        _ => Ok(col),
     }
 }
 
-pub fn round_column(col: Column, decimals: u32) -> PolarsResult<Option<Column>> {
+pub fn round_column(col: Column, decimals: u32) -> PolarsResult<Column> {
     match col.dtype() {
         // DataType::Float64 => Ok(Some(series.round(decimals)?)), <-- Bug panicking::panic_fmt
         DataType::Float64 => round_column_f64(col, decimals),
@@ -889,7 +896,7 @@ pub fn round_column(col: Column, decimals: u32) -> PolarsResult<Option<Column>> 
     }
 }
 
-fn round_column_f64(col: Column, decimals: u32) -> PolarsResult<Option<Column>> {
+fn round_column_f64(col: Column, decimals: u32) -> PolarsResult<Column> {
     let new_col: Column = col
         .f64()?
         .into_iter()
@@ -897,10 +904,10 @@ fn round_column_f64(col: Column, decimals: u32) -> PolarsResult<Option<Column>> 
         .collect::<Float64Chunked>()
         .into_column();
 
-    Ok(Some(new_col))
+    Ok(new_col)
 }
 
-fn round_column_str(col: Column, decimals: u32) -> PolarsResult<Option<Column>> {
+fn round_column_str(col: Column, decimals: u32) -> PolarsResult<Column> {
     let new_col: Column = col
         .str()?
         .into_iter()
@@ -908,7 +915,7 @@ fn round_column_str(col: Column, decimals: u32) -> PolarsResult<Option<Column>> 
         .collect::<Float64Chunked>()
         .into_column();
 
-    Ok(Some(new_col))
+    Ok(new_col)
 }
 
 fn get_opt_from_str(opt_str: Option<&str>, col: &Column, decimals: u32) -> Option<f64> {
@@ -938,7 +945,7 @@ fn get_opt_from_str(opt_str: Option<&str>, col: &Column, decimals: u32) -> Optio
 }
 
 /// NCM format: "12345678" --> "1234.56.78"
-pub fn formatar_ncm(col: Column) -> PolarsResult<Option<Column>> {
+pub fn formatar_ncm(col: Column) -> PolarsResult<Column> {
     let new_col: Column = col
         .str()?
         .into_iter()
@@ -946,10 +953,10 @@ pub fn formatar_ncm(col: Column) -> PolarsResult<Option<Column>> {
         .collect::<StringChunked>()
         .into_column();
 
-    Ok(Some(new_col))
+    Ok(new_col)
 }
 
-pub fn formatar_chave_eletronica(col: Column) -> PolarsResult<Option<Column>> {
+pub fn formatar_chave_eletronica(col: Column) -> PolarsResult<Column> {
     match col.dtype() {
         DataType::String => format_digits(col),
         _ => {
@@ -963,7 +970,7 @@ pub fn formatar_chave_eletronica(col: Column) -> PolarsResult<Option<Column>> {
 }
 
 // https://docs.rs/polars/latest/polars/prelude/string/struct.StringNameSpace.html#
-fn format_digits(col: Column) -> PolarsResult<Option<Column>> {
+fn format_digits(col: Column) -> PolarsResult<Column> {
     let new_col: Column = col
         .str()?
         .into_iter()
@@ -971,7 +978,7 @@ fn format_digits(col: Column) -> PolarsResult<Option<Column>> {
         .collect::<StringChunked>()
         .into_column();
 
-    Ok(Some(new_col))
+    Ok(new_col)
 }
 
 /// We use the as_ref method to get a reference to the optional string (opt_str).
@@ -1197,7 +1204,7 @@ mod tests_functions {
 
         println!("column: {col:?}\n");
 
-        assert_eq!(Some(Column::new("".into(), &valid)), col);
+        assert_eq!(Column::new("".into(), &valid), col);
 
         Ok(())
     }
@@ -1275,21 +1282,20 @@ mod tests_functions {
             .lazy()
             .select([map_multiple(
                 |columns| {
-                    Ok(Some(
-                        columns[0]
-                            .f64()?
-                            .into_no_null_iter()
-                            .zip(columns[1].f64()?.into_no_null_iter())
-                            .map(|(a, b)| {
-                                let out = black_box(a, b);
-                                Series::new("".into(), [out.0, out.1, out.2])
-                            })
-                            .collect::<ChunkedArray<ListType>>()
-                            .into_column(),
-                    ))
+                    Ok(columns[0]
+                        .f64()?
+                        .into_no_null_iter()
+                        .zip(columns[1].f64()?.into_no_null_iter())
+                        .map(|(a, b)| {
+                            let out = black_box(a, b);
+                            Series::new("".into(), [out.0, out.1, out.2])
+                        })
+                        .collect::<ChunkedArray<ListType>>()
+                        .into_column())
                 },
                 [col("a"), col("b")],
-                GetOutput::from_type(DataType::Float64),
+                // GetOutput::from_type(DataType::Float64),
+                |_, f| Ok(Field::new(f[0].name().clone(), DataType::Float64)),
             )
             .alias("Multiple Values")])
             .collect()?;
@@ -1315,16 +1321,14 @@ mod tests_functions {
             column_multiple_values.list()?.into_iter().collect();
 
         // É necessário formatar o número de casas decimais
-        let col_formatted: Vec<Option<Column>> = vec_opt_lines_efd
+        let col_formatted: Vec<Column> = vec_opt_lines_efd
             .into_iter()
             .flat_map(|opt_series| {
                 opt_series.and_then(|series| round_column(series.into(), 1).ok())
             })
             .collect();
 
-        let vec_col: Vec<Column> = col_formatted.into_iter().flatten().collect();
-
-        let vec_lines: Result<Vec<Vec<f64>>, Box<dyn Error>> = vec_col
+        let vec_lines: Result<Vec<Vec<f64>>, Box<dyn Error>> = col_formatted
             .iter()
             .map(|col| {
                 let chunkedarray_f64: &ChunkedArray<Float64Type> = col.f64()?;

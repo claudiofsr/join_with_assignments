@@ -345,28 +345,49 @@ fn auto_color(df: &DataFrame, worksheet: &mut Worksheet, sheet_name: &str) -> Po
     Ok(())
 }
 
+/*
+    Update:
+    GetOutput::same_type()
+    |_, f| Ok(f.clone())
+
+    GetOutput::from_type(DataType::UInt32)]
+    |_, f| Ok(Field::new(f.name().clone(), DataType::UInt32))
+
+    geany polars-lazy-0.51.0/src/tests/aggregations.rs&
+    .map(|s| Ok(Some(&s * 2)), GetOutput::same_type())
+    .map(|s| Ok(&s * 2), |_, f| Ok(f.clone()))
+
+    polars-lazy-0.50.0/src/tests/queries.rs
+    .select([col("sepal_width").map(|s| Ok(Some(s * 200.0)), GetOutput::same_type())])
+    .select([col("sepal_width").map(|s| Ok(s * 200.0), |_, f| Ok(f.clone()))])
+*/
+
 /// Format data supported by Excel
 fn format_to_excel(data_frame: &DataFrame) -> PolarsResult<DataFrame> {
     let df_formated: DataFrame = data_frame
         .clone()
         .lazy()
-        .with_columns([all().as_expr().apply(format_data, GetOutput::same_type())])
+        .with_columns([all().as_expr().apply(
+            format_data,
+            // GetOutput::same_type()
+            |_, f| Ok(f.clone()),
+        )])
         .collect()?;
 
     Ok(df_formated)
 }
 
 /// Format DataType
-fn format_data(col: Column) -> PolarsResult<Option<Column>> {
+fn format_data(col: Column) -> PolarsResult<Column> {
     match col.dtype() {
-        DataType::Int64 => Ok(Some(col.cast(&DataType::Int32)?)),
-        DataType::UInt64 => Ok(Some(col.cast(&DataType::UInt32)?)),
+        DataType::Int64 => Ok(col.cast(&DataType::Int32)?),
+        DataType::UInt64 => Ok(col.cast(&DataType::UInt32)?),
         DataType::String => truncate_col(col), // to_n_chars(col)
-        _ => Ok(Some(col)),
+        _ => Ok(col),
     }
 }
 
-fn truncate_col(col: Column) -> PolarsResult<Option<Column>> {
+fn truncate_col(col: Column) -> PolarsResult<Column> {
     let new_col: Column = col
         .str()?
         .into_iter()
@@ -376,7 +397,7 @@ fn truncate_col(col: Column) -> PolarsResult<Option<Column>> {
         .collect::<StringChunked>()
         .into_column();
 
-    Ok(Some(new_col))
+    Ok(new_col)
 }
 
 // https://stackoverflow.com/questions/38461429/how-can-i-truncate-a-string-to-have-at-most-n-characters

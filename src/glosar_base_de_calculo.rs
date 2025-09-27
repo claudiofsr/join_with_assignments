@@ -63,7 +63,8 @@ impl LazyFrameExtension for LazyFrame {
         self.with_columns([
             col(valor_bc).apply(
                 |series| round_column(series, 2),
-                GetOutput::from_type(DataType::Float64),
+                // GetOutput::from_type(DataType::Float64),
+                |_, f| Ok(Field::new(f.name().clone(), DataType::Float64)),
             ),
             col(glosar)
                 // Substituir multiple_whitespaces " " por apenas um " "
@@ -95,13 +96,25 @@ impl LazyFrameExtension for LazyFrame {
         self.with_columns([
             // Adicionar 3 colunas contendo CNPJ Base
             col(columns[0])
-                .apply(get_cnpj_base, GetOutput::from_type(DataType::String))
+                .apply(
+                    get_cnpj_base,
+                    // GetOutput::from_type(DataType::String)
+                    |_, f| Ok(Field::new(f.name().clone(), DataType::String)),
+                )
                 .alias(columns[1]), // Coluna auxiliar
             col(columns[2])
-                .apply(get_cnpj_base, GetOutput::from_type(DataType::String))
+                .apply(
+                    get_cnpj_base,
+                    // GetOutput::from_type(DataType::String)
+                    |_, f| Ok(Field::new(f.name().clone(), DataType::String)),
+                )
                 .alias(columns[3]), // Coluna auxiliar
             col(columns[4])
-                .apply(get_cnpj_base, GetOutput::from_type(DataType::String))
+                .apply(
+                    get_cnpj_base,
+                    // GetOutput::from_type(DataType::String)
+                    |_, f| Ok(Field::new(f.name().clone(), DataType::String)),
+                )
                 .alias(columns[5]), // Coluna auxiliar
             col(columns[6])
                 .str()
@@ -400,17 +413,20 @@ fn analisar_situacao04(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
             lit("Valor da Base de Cálculo = "),
             col(valor_bc).apply(
                 |col| round_column(col, 2),
-                GetOutput::from_type(DataType::Float64),
+                // GetOutput::from_type(DataType::Float64),
+                |_, f| Ok(Field::new(f.name().clone(), DataType::Float64)),
             ),
             lit("-"),
             col(valor_cte_vinculado).apply(
                 |col| round_column(col, 2),
-                GetOutput::from_type(DataType::Float64),
+                // GetOutput::from_type(DataType::Float64),
+                |_, f| Ok(Field::new(f.name().clone(), DataType::Float64)),
             ),
             lit("="),
             valor_justo.clone().apply(
                 |col| round_column(col, 2),
-                GetOutput::from_type(DataType::Float64),
+                // GetOutput::from_type(DataType::Float64),
+                |_, f| Ok(Field::new(f.name().clone(), DataType::Float64)),
             ),
             lit("&"),
         ],
@@ -452,12 +468,14 @@ fn analisar_situacao05(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
             lit("O valor da Base de Cálculo foi alterado de"),
             col(valor_bc).apply(
                 |col| round_column(col, 2),
-                GetOutput::from_type(DataType::Float64),
+                // GetOutput::from_type(DataType::Float64),
+                |_, f| Ok(Field::new(f.name().clone(), DataType::Float64)),
             ),
             lit("para"),
             delta.clone().apply(
                 |col| round_column(col, 2),
-                GetOutput::from_type(DataType::Float64),
+                // GetOutput::from_type(DataType::Float64),
+                |_, f| Ok(Field::new(f.name().clone(), DataType::Float64)),
             ),
             lit("&"),
         ],

@@ -44,7 +44,7 @@ pub fn adicionar_coluna_de_credito_presumido(lazyframe: LazyFrame) -> MyResult<L
             as_struct([col(side_a[0]).cast(DataType::String), col(side_a[1])].to_vec())
                 .apply(
                     |col: Column| analisar_colunas_selecionadas(&col),
-                    GetOutput::same_type(),
+                    |_, f| Ok(f.clone()),
                 ) // GetOutput::from_type(DataType::String)
                 .alias(side_a[2]),
         )
@@ -52,7 +52,7 @@ pub fn adicionar_coluna_de_credito_presumido(lazyframe: LazyFrame) -> MyResult<L
             as_struct([col(side_b[0]).cast(DataType::String), col(side_b[1])].to_vec())
                 .apply(
                     |col: Column| analisar_colunas_selecionadas(&col),
-                    GetOutput::same_type(),
+                    |_, f| Ok(f.clone()),
                 ) // GetOutput::from_type(DataType::String)
                 .alias(side_b[2]),
         )
@@ -83,7 +83,7 @@ pub fn adicionar_coluna_de_credito_presumido(lazyframe: LazyFrame) -> MyResult<L
     Ok(lazyframe)
 }
 
-fn analisar_colunas_selecionadas(col: &Column) -> Result<Option<Column>, PolarsError> {
+fn analisar_colunas_selecionadas(col: &Column) -> Result<Column, PolarsError> {
     // add feature "dtype-struct"
     let struct_chunked: &StructChunked = col.struct_()?;
 
@@ -114,7 +114,7 @@ fn analisar_colunas_selecionadas(col: &Column) -> Result<Option<Column>, PolarsE
         .collect::<StringChunked>()
         .into_column();
 
-    Ok(Some(col))
+    Ok(col)
 }
 
 /// Base Legal conforme código NCM e descrição do item.
