@@ -547,16 +547,16 @@ fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::configure_the_environment;
+    use crate::{configure_the_environment, get_output_as_int32_fields};
 
     // cargo test -- --help
     // cargo test -- --nocapture
     // cargo test -- --show-output
 
     #[test]
+    /// cargo test -- --show-output test_apply_multiple_columns
+    /// - Fonte: ~/.cargo/registry/src/index.crates.io-6f17d22bba15001f/polars-0.30.0/tests/it/lazy/queries.rs
     fn test_apply_multiple_columns() -> Result<(), PolarsError> {
-        // cargo test -- --show-output test_apply_multiple_columns
-        // Fonte: ~/.cargo/registry/src/index.crates.io-6f17d22bba15001f/polars-0.30.0/tests/it/lazy/queries.rs
         let df: DataFrame = df!(
             "A"=> [1, 2, 3, 4, 5],
             "fruits"=> ["banana", "banana", "apple", "apple", "banana"],
@@ -566,27 +566,14 @@ mod tests {
 
         println!("dataframe 1: {df}\n");
 
+        let _multiply_v1 = |s: &mut [Column]| &(&s[0] * &s[0])? * &(&s[1] - 2);
+
         fn multiply(s: &mut [Column]) -> Result<Column, PolarsError> {
             // Get the fields as Columns
             let col_0: &Column = &s[0];
             let col_1: &Column = &s[1];
 
-            // Get columns with into_iter()
-            let vec_opt_0: Vec<Option<i32>> = col_0.i32()?.into_iter().collect();
-            let vec_opt_1: Vec<Option<i32>> = col_1.i32()?.into_iter().collect();
-
-            // https://docs.rs/rayon/latest/rayon/iter/struct.MultiZip.html
-            // MultiZip is an iterator that zips up a tuple of parallel iterators to produce tuples of their items.
-            let new_series: Series = (vec_opt_0, vec_opt_1)
-                .into_par_iter() // rayon: parallel iterator
-                .map(|(opt_0, opt_1)| match (opt_0, opt_1) {
-                    (Some(val_0), Some(val_1)) => Some(val_0.pow(2) * (val_1 - 2)),
-                    _ => None,
-                })
-                .collect::<Int32Chunked>()
-                .into_series();
-
-            Ok(new_series.into())
+            (col_0 * col_0)? * (col_1 - 2)
         }
 
         /*
@@ -621,7 +608,8 @@ mod tests {
                 multiply,
                 [col("A"), col("B")],
                 // GetOutput::from_type(DataType::Int32),
-                |_, f| Ok(Field::new(f[0].name().clone(), DataType::Int32)),
+                // |_, f| Ok(Field::new(f[0].name().clone(), DataType::Int32)),
+                get_output_as_int32_fields,
             )
             .alias("Map Multiple")])
             .collect()?;
@@ -645,7 +633,8 @@ mod tests {
                 multiply,
                 [col("A"), col("B")],
                 // GetOutput::from_type(DataType::Int32),
-                |_, f| Ok(Field::new(f[0].name().clone(), DataType::Int32)),
+                // |_, f| Ok(Field::new(f[0].name().clone(), DataType::Int32)),
+                get_output_as_int32_fields,
                 false,
             )])
             .sort(["cars"], Default::default())

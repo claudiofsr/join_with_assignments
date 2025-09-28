@@ -200,6 +200,19 @@ fn groupby_fazyframe_b(lazyframe: LazyFrame) -> Result<LazyFrame, PolarsError> {
     Ok(lf_groupby)
 }
 
+/// Joins two LazyFrames, applies a custom UDF for Munkres assignments, and collects the result into a DataFrame.
+///
+/// This function performs an inner join on `lazyframe_a` and `lazyframe_b` based on a common "chave" (key) column.
+/// After the join, it calculates Munkres assignments between list-type columns
+/// "Valores dos Itens da Nota Fiscal EFD" and "Valores dos Itens da Nota Fiscal NFE"
+/// and adds the results as a new column "Munkres Assignments".
+///
+/// # Arguments
+/// * `lazyframe_a` - The left LazyFrame.
+/// * `lazyframe_b` - The right LazyFrame.
+///
+/// # Returns
+/// A `Result` containing the joined and processed DataFrame or a `PolarsError` if any operation fails.
 fn join_lazyframes(
     lazyframe_a: LazyFrame,
     lazyframe_b: LazyFrame,
@@ -207,8 +220,8 @@ fn join_lazyframes(
     let dataframe: DataFrame = lazyframe_a
         .join(
             lazyframe_b,
-            [col(coluna(Left, "chave"))],
-            [col(coluna(Right, "chave"))],
+            [col(coluna(Left, "chave"))], // Join key from the left DataFrame
+            [col(coluna(Right, "chave"))], // Join key from the right DataFrame
             JoinType::Inner.into(),
         )
         // An inner join produces a DataFrame that contains only the rows where the join key exists in both DataFrames.
@@ -224,11 +237,11 @@ fn join_lazyframes(
                 .to_vec(),
             )
             .apply(
-                |s| {
+                move |s| {
                     // Downcast to struct
                     let struct_chunked: &StructChunked = s.struct_()?;
 
-                    // Get the fields as Series
+                    // Get the individual Series (columns) from the struct by their names.
                     let ser_list_efd: &Series =
                         &struct_chunked.field_by_name("Valores dos Itens da Nota Fiscal EFD")?;
                     let ser_list_nfe: &Series =
@@ -247,6 +260,7 @@ fn join_lazyframes(
                         .map(
                             |(opt_ser_efd, opt_ser_nfe)| match (opt_ser_efd, opt_ser_nfe) {
                                 (Some(ser_efd), Some(ser_nfe)) => {
+                                    // If both Series are present, calculate Munkres assignments.
                                     get_option_assignments(ser_efd, ser_nfe)
                                 }
                                 _ => None,
@@ -254,10 +268,12 @@ fn join_lazyframes(
                         )
                         .collect();
 
+                    // Create a new Series from the calculated Munkres assignments.
                     let new_series = Series::new("New".into(), vec_series);
 
                     Ok(new_series.into())
                 },
+                // Define the output data type for the new column.
                 // GetOutput::from_type(DataType::UInt64),
                 get_output_as_uint64,
             )

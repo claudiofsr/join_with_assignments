@@ -76,6 +76,7 @@ Returns a Field closure that indicates the output Series will have
 the same type as the input field.
 
 This mimics `GetOutput::same_type()`.
+geany polars-plan-0.50.0/src/dsl/expr/expr_dyn_fn.rs&
 
 GetOutput::same_type()
 |_, f| Ok(f.clone())
@@ -87,16 +88,8 @@ pub fn get_output_same_type(_: &Schema, field: &Field) -> PolarsResult<Field> {
     Ok(field.clone())
 }
 
-pub fn get_output_as_uint32(_: &Schema, field: &Field) -> PolarsResult<Field> {
-    Ok(Field::new(field.name().clone(), DataType::UInt32))
-}
-
 pub fn get_output_as_uint64(_: &Schema, field: &Field) -> PolarsResult<Field> {
     Ok(Field::new(field.name().clone(), DataType::UInt64))
-}
-
-pub fn get_output_as_date(_: &Schema, field: &Field) -> PolarsResult<Field> {
-    Ok(Field::new(field.name().clone(), DataType::Date))
 }
 
 pub fn get_output_as_f64(_: &Schema, field: &Field) -> PolarsResult<Field> {
@@ -109,6 +102,14 @@ pub fn get_output_as_string(_: &Schema, field: &Field) -> PolarsResult<Field> {
 
 pub fn get_output_as_boolean(_: &Schema, field: &Field) -> PolarsResult<Field> {
     Ok(Field::new(field.name().clone(), DataType::Boolean))
+}
+
+pub fn get_output_as_date(_: &Schema, field: &Field) -> PolarsResult<Field> {
+    Ok(Field::new(field.name().clone(), DataType::Date))
+}
+
+pub fn get_output_as_int32_fields(_: &Schema, field: &[Field]) -> PolarsResult<Field> {
+    Ok(Field::new(field[0].name().clone(), DataType::Int32))
 }
 
 /// Trait providing DataFrame extension methods.
@@ -290,7 +291,19 @@ pub fn show_sysinfo() {
     println!("Number of CPUs: {:>9}\n", sys.cpus().len());
 }
 
+/// Calculates Munkres assignments between two Series of f64 values.
+///
+/// This function expects two Series, attempts to downcast them to `Float64Type` (f64),
+/// extracts the numerical values, and then applies the `munkres_assignments` algorithm.
+///
+/// # Arguments
+/// * `series_efd` - A Series containing f64 values for the EFD items.
+/// * `series_nfe` - A Series containing f64 values for the NFE items.
+///
+/// # Returns
+/// An `Option<Series>` containing a Series of u64 assignments if successful, otherwise `None`.
 pub fn get_option_assignments(series_efd: Series, series_nfe: Series) -> Option<Series> {
+    // Attempt to downcast the Series to a ChunkedArray of Float64Type.
     let result_chunkedarray_f64_efd: Result<&ChunkedArray<Float64Type>, PolarsError> =
         series_efd.f64();
     let result_chunkedarray_f64_nfe: Result<&ChunkedArray<Float64Type>, PolarsError> =
@@ -310,16 +323,19 @@ pub fn get_option_assignments(series_efd: Series, series_nfe: Series) -> Option<
 
             // if vec_float64_efd.len() * vec_float64_nfe.len() > 0 {
 
+            // Perform Munkres assignment only if both vectors are not empty.
             if !vec_float64_efd.is_empty() && !vec_float64_nfe.is_empty() {
                 let assignments: Vec<u64> =
                     munkres_assignments(&vec_float64_efd, &vec_float64_nfe, false);
+                // Return the assignments as a new Series.
                 Some(Series::new("new".into(), assignments))
             } else {
+                // If either vector is empty, no assignments can be made.
                 None
             }
         }
         _ => {
-            eprintln!("Float64Type PolarsError!");
+            eprintln!("Error: Expected Float64Type, but received different types.");
             eprintln!(
                 "series_efd.dtype(): {} ; series_efd: {series_efd}",
                 series_efd.dtype()
