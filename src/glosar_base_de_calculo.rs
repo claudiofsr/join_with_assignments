@@ -4,7 +4,7 @@ use crate::{
     adicionar_coluna_de_aliquota_zero, adicionar_coluna_de_credito_presumido,
     adicionar_coluna_de_incidencia_monofasica,
     adicionar_coluna_periodo_de_apuracao_inicial_e_final, coluna, cst_50_a_56, equal,
-    get_cnpj_base, get_output_as_f64, get_output_as_string, operacoes_de_credito, round_column,
+    get_cnpj_base, get_output_as_float64, get_output_as_string, operacoes_de_credito, round_column,
     unequal,
 };
 use polars::prelude::*;
@@ -65,7 +65,7 @@ impl LazyFrameExtension for LazyFrame {
             col(valor_bc).apply(
                 |series| round_column(series, 2),
                 // GetOutput::from_type(DataType::Float64),
-                get_output_as_f64,
+                get_output_as_float64,
             ),
             col(glosar)
                 // Substituir multiple_whitespaces " " por apenas um " "
@@ -415,19 +415,19 @@ fn analisar_situacao04(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
             col(valor_bc).apply(
                 |col| round_column(col, 2),
                 // GetOutput::from_type(DataType::Float64),
-                get_output_as_f64,
+                get_output_as_float64,
             ),
             lit("-"),
             col(valor_cte_vinculado).apply(
                 |col| round_column(col, 2),
                 // GetOutput::from_type(DataType::Float64),
-                get_output_as_f64,
+                get_output_as_float64,
             ),
             lit("="),
             valor_justo.clone().apply(
                 |col| round_column(col, 2),
                 // GetOutput::from_type(DataType::Float64),
-                get_output_as_f64,
+                get_output_as_float64,
             ),
             lit("&"),
         ],
@@ -470,13 +470,13 @@ fn analisar_situacao05(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
             col(valor_bc).apply(
                 |col| round_column(col, 2),
                 // GetOutput::from_type(DataType::Float64),
-                get_output_as_f64,
+                get_output_as_float64,
             ),
             lit("para"),
             delta.clone().apply(
                 |col| round_column(col, 2),
                 // GetOutput::from_type(DataType::Float64),
-                get_output_as_f64,
+                get_output_as_float64,
             ),
             lit("&"),
         ],
@@ -491,26 +491,80 @@ fn analisar_situacao05(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
 
 fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     let glosar: &str = coluna(Middle, "glosar");
-    let cnpj_particip: &str = coluna(Left, "cnpj_particip"); // "CNPJ do Participante",
-    let num_doc: &str = coluna(Left, "num_doc"); // "Nº do Documento Fiscal",
+    let periodo_de_apuracao: &str = coluna(Left, "pa"); // "Período de Apuração",
+    let chave_efd: &str = coluna(Left, "chave");
+    let chave_nfe: &str = coluna(Right, "chave");
 
-    let series: Series = Series::new("c".into(), ["12.345.678/0009-01"]);
-    let literal_series: Expr = series.implode()?.into_series().lit();
-    let cnpj: Expr = col(cnpj_particip).is_in(literal_series, true);
+    // Selecionar colunas nesta ordem
+    let selected: [Expr; 3] = [col(periodo_de_apuracao), col(chave_efd), col(chave_nfe)];
 
-    let series: Series = Series::new("n".into(), [654321]);
-    let literal_series: Expr = series.implode()?.into_series().lit();
-    let num_doc: Expr = col(num_doc).is_in(literal_series, true);
+    let df_groupby_chave_efd = lazyframe
+        .clone()
+        .select(&selected)
+        .filter(col(periodo_de_apuracao).is_not_null())
+        .filter(
+            col(chave_efd)
+                .is_not_null()
+                .or(col(chave_nfe).is_not_null()),
+        )
+        .group_by([
+            col(chave_efd),
+            //col(chave_nfe)
+        ])
+        .agg([
+            col(periodo_de_apuracao).unique(),
+            col(periodo_de_apuracao).unique().count().alias("Count"),
+        ])
+        .filter(col("Count").gt(1)) // filtar chaves repetidas
+        .with_column(
+            col(periodo_de_apuracao)
+                .list()
+                .slice(lit(1), col("Count"))
+                .alias("Datas Inválidas"),
+        )
+        .collect()?;
 
-    let situacao_06: Expr = operacoes_de_credito()?.and(cnpj).and(num_doc);
+    println!("Chaves em Duplicidade: {df_groupby_chave_efd}\n");
+
+    let column_efd = df_groupby_chave_efd.column(chave_efd)?;
+    println!("column_efd: {column_efd:?}\n");
+
+    let column_datas_invalidas = df_groupby_chave_efd.column("Datas Inválidas")?;
+    println!("column_datas_invalidas: {column_datas_invalidas:?}\n");
+
+    let literal_series: Expr = column_efd.implode()?.into_series().lit();
+    let chave_repetida: Expr = col(chave_efd).is_in(literal_series, true);
+
+    /*
+    let literal_series: Expr = df_groupby_chave_efd
+        .lazy() // Volte para LazyFrame para usar explode e then collect
+        .select([col("Datas Inválidas").explode()]) // Explode as listas em datas individuais
+        .collect()? // Coleta para obter um DataFrame com uma coluna de Series de Date
+        .column("Datas Inválidas")? // Pega a Series resultante
+        .implode()? // Implode para ter uma única lista de todas as datas
+        .into_series() // Transforma em Series
+        .lit(); // Cria a literal Expr
+    */
+
+    let literal_series: Expr = column_datas_invalidas
+        .as_materialized_series()
+        .clone()
+        .lit();
+    let datas_invalidas: Expr = col(periodo_de_apuracao).is_in(literal_series, true);
+
+    //let situacao_06: Expr = chave_repetida.and(datas_invalidas);
+    let situacao_06: Expr = operacoes_de_credito()?
+        .and(chave_repetida)
+        .and(datas_invalidas);
 
     println!("situacao_06: {situacao_06:?}\n");
+    // std::process::exit(1);
 
     let mensagem: Expr = concat_str(
         [
             col(glosar),
             lit("Situação 06:"),
-            lit("Item de Documento Fiscal usado em duplicidade."),
+            lit("Documento Fiscal usado em duplicidade."),
             lit("&"),
         ],
         " ",

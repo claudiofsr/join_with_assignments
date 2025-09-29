@@ -7,7 +7,7 @@ use crate::{
     VecTuples,
     args::Arguments,
     coluna, formatar_chave_eletronica, formatar_ncm, get_lazyframe_from_csv, get_opt_vectuples,
-    get_option_assignments, get_output_as_f64, get_output_as_string, get_output_as_uint64,
+    get_option_assignments, get_output_as_float64, get_output_as_string, get_output_as_uint64,
     round_column,
 };
 
@@ -93,7 +93,7 @@ fn format_fazyframe_a(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
         .with_columns([cols(columns_with_float64).as_expr().map(
             |series| round_column(series, 2),
             // GetOutput::from_type(DataType::Float64),
-            get_output_as_f64,
+            get_output_as_float64,
         )]);
 
     // Lazy operations don’t execute until we call .collect()?.
@@ -145,7 +145,7 @@ fn format_fazyframe_b(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
             cols(columns_with_float64).as_expr().map(
                 |series| round_column(series, 2),
                 // GetOutput::from_type(DataType::Float64),
-                get_output_as_f64,
+                get_output_as_float64,
             ), //all()
                //.map(|series| round_float64_columns(series, 2), get_output_same_type)
         ]);

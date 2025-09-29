@@ -88,11 +88,18 @@ pub fn get_output_same_type(_: &Schema, field: &Field) -> PolarsResult<Field> {
     Ok(field.clone())
 }
 
+pub fn get_output_as_int32_fields(_: &Schema, field: &[Field]) -> PolarsResult<Field> {
+    Ok(Field::new(field[0].name().clone(), DataType::Int32))
+}
+
+/**
+Macro para definir funções get_output_as_X_datatype
+
 pub fn get_output_as_uint64(_: &Schema, field: &Field) -> PolarsResult<Field> {
     Ok(Field::new(field.name().clone(), DataType::UInt64))
 }
 
-pub fn get_output_as_f64(_: &Schema, field: &Field) -> PolarsResult<Field> {
+pub fn get_output_as_float64(_: &Schema, field: &Field) -> PolarsResult<Field> {
     Ok(Field::new(field.name().clone(), DataType::Float64))
 }
 
@@ -107,10 +114,20 @@ pub fn get_output_as_boolean(_: &Schema, field: &Field) -> PolarsResult<Field> {
 pub fn get_output_as_date(_: &Schema, field: &Field) -> PolarsResult<Field> {
     Ok(Field::new(field.name().clone(), DataType::Date))
 }
-
-pub fn get_output_as_int32_fields(_: &Schema, field: &[Field]) -> PolarsResult<Field> {
-    Ok(Field::new(field[0].name().clone(), DataType::Int32))
+*/
+macro_rules! define_output_field_fn {
+    ($fn_name:ident, $data_type:expr) => {
+        pub fn $fn_name(_: &Schema, field: &Field) -> PolarsResult<Field> {
+            Ok(Field::new(field.name().clone(), $data_type))
+        }
+    };
 }
+
+define_output_field_fn!(get_output_as_uint64, DataType::UInt64);
+define_output_field_fn!(get_output_as_float64, DataType::Float64);
+define_output_field_fn!(get_output_as_string, DataType::String);
+define_output_field_fn!(get_output_as_boolean, DataType::Boolean);
+define_output_field_fn!(get_output_as_date, DataType::Date);
 
 /// Trait providing DataFrame extension methods.
 pub trait DataFrameExtension {
