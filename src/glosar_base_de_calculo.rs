@@ -539,7 +539,6 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     let literal_series: Expr = column_efd.implode()?.into_series().lit();
     let chave_repetida: Expr = col(chave_efd).is_in(literal_series, true);
 
-    /*
     let literal_series: Expr = df_groupby_chave_efd
         .lazy() // Volte para LazyFrame para usar explode e then collect
         .select([col("Datas Inválidas").explode()]) // Explode as listas em datas individuais
@@ -548,12 +547,14 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
         .implode()? // Implode para ter uma única lista de todas as datas
         .into_series() // Transforma em Series
         .lit(); // Cria a literal Expr
-    */
 
+    /*
     let literal_series: Expr = column_datas_invalidas
         .as_materialized_series()
         .clone()
         .lit();
+    */
+
     let datas_invalidas: Expr = col(periodo_de_apuracao).is_in(literal_series, true);
 
     //let situacao_06: Expr = chave_repetida.and(datas_invalidas);
