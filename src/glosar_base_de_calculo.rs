@@ -526,6 +526,10 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
 
     println!("Chaves em Duplicidade: {df_groupby_chave_efd}\n");
 
+    if df_groupby_chave_efd.height() == 0 {
+        return Ok(lazyframe);
+    }
+
     let column_efd = df_groupby_chave_efd.column(chave_efd)?;
     println!("column_efd: {column_efd:?}\n");
 
