@@ -496,44 +496,30 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     let periodo_de_apuracao: &str = coluna(Left, "pa"); // "Período de Apuração",
     let chave_efd: &str = coluna(Left, "chave");
     let chave_nfe: &str = coluna(Right, "chave");
+    let chaves: &str = "Chaves de Docs Fiscais"; // unificar duas colunas em uma coluna
     let len_min = 10;
 
     // Selecionar colunas nesta ordem
-    let selected: [Expr; 3] = [col(periodo_de_apuracao), col(chave_efd), col(chave_nfe)];
+    let selected: [Expr; 2] = [col(periodo_de_apuracao), col(chaves)];
 
-    let df_unificar_colunas_de_chaves = lazyframe
+    let lazyframe = lazyframe.with_column(
+        // Criar uma lista com os valores de ambas as chaves para cada linha
+        concat_list([col(chave_efd), col(chave_nfe)])?
+            .list()
+            .drop_nulls() // Remove nulls da lista (se Strings podem ser nulas)
+            .list()
+            .unique() // Aplica a operação unique dentro de cada lista
+            .explode()
+            .alias(chaves),
+    );
+
+    let df_groupby_chaves = lazyframe
         .clone()
         .select(&selected)
         .filter(col(periodo_de_apuracao).is_not_null())
-        .filter(
-            col(chave_efd)
-                .is_not_null()
-                .or(col(chave_nfe).is_not_null()),
-        )
-        .filter(
-            col(chave_efd)
-                .str()
-                .len_bytes()
-                .gt(len_min)
-                .or(col(chave_nfe).str().len_bytes().gt(len_min)),
-        )
-        .with_column(
-            // Criar uma lista com os valores de ambas as chaves para cada linha
-            concat_list([col(chave_efd), col(chave_nfe)])?
-                .list()
-                .drop_nulls() // Remove nulls da lista (se Strings podem ser nulas)
-                .list()
-                .unique() // Aplica a operação unique dentro de cada lista
-                .explode()
-                .alias("Chaves de Docs Fiscais"),
-        )
-        .collect()?;
-
-    println!("df_unificar_colunas_de_chaves: {df_unificar_colunas_de_chaves}\n");
-
-    let df_groupby_chave_efd = df_unificar_colunas_de_chaves
-        .lazy()
-        .group_by([col("Chaves de Docs Fiscais")])
+        .filter(col(chaves).is_not_null())
+        .filter(col(chaves).str().len_bytes().gt(len_min))
+        .group_by([col(chaves)])
         .agg([
             col(periodo_de_apuracao)
                 .unique()
@@ -544,13 +530,20 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
         .with_column(
             col(periodo_de_apuracao)
                 .list()
+                .first()
+                .alias("Período Válido"),
+        )
+        .with_column(
+            col(periodo_de_apuracao)
+                .list()
                 //.shift(lit(-1))
                 .slice(lit(1), col("Count") - lit(1)) // excluir primeira data
                 .alias("Períodos Inválidos"),
         )
+        .rename([periodo_de_apuracao], ["Períodos de Apuração"], true)
         .collect()?;
 
-    if df_groupby_chave_efd.height() == 0 {
+    if df_groupby_chaves.height() == 0 {
         return Ok(lazyframe);
     }
 
@@ -558,45 +551,54 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     unsafe {
         env::set_var("POLARS_FMT_MAX_ROWS", "100"); // maximum number of rows shown when formatting DataFrames.
     }
-    println!("Chaves em Duplicidade: {df_groupby_chave_efd}\n");
+    println!("Chaves utilizadas em Períodos de Apuração distintos: {df_groupby_chaves}\n");
     configure_the_environment(); // Retornar à configuração padrão.
 
-    let column_efd = df_groupby_chave_efd.column("Chaves de Docs Fiscais")?;
-    let column_períodos_invalidos = df_groupby_chave_efd.column("Períodos Inválidos")?;
+    let lz_unificado: LazyFrame = lazyframe.clone().join(
+        df_groupby_chaves.lazy(),
+        vec![col(chaves)], // left_on
+        vec![col(chaves)], // right_on
+        JoinType::Left.into(),
+    );
 
-    let series_efd: Series = column_efd.implode()?.into_series();
-    println!("series_efd: {series_efd:?}\n");
-    let chave_repetida: Expr = col(chave_efd).is_in(series_efd.lit(), true);
-
-    let series_pin: Series = column_períodos_invalidos
-        .as_materialized_series()
-        .explode(true)? // Explode as listas em datas individuais
-        .clone()
-        .implode()? // Implode para ter uma única lista de todas as datas
-        .into_series(); // Transforma em Series
-    println!("series_pin: {series_pin:?}\n");
-    let períodos_invalidos: Expr = col(periodo_de_apuracao).is_in(series_pin.lit(), true);
-
-    //let situacao_06: Expr = chave_repetida.and(períodos_invalidos);
     let situacao_06: Expr = operacoes_de_credito()?
-        .and(chave_repetida)
-        .and(períodos_invalidos);
+        .and(col("Count").is_not_null())
+        .and(col("Count").gt(1)) // Multipla utilização de Docs Fiscais
+        .and(col(periodo_de_apuracao).neq(col("Período Válido")));
 
     println!("situacao_06: {situacao_06:?}\n");
     // std::process::exit(1);
+
+    // let datas = concat_str([col("Períodos de Apuração")], ", ", true);
 
     let mensagem: Expr = concat_str(
         [
             col(glosar),
             lit("Situação 06:"),
-            lit("Documento Fiscal usado em duplicidade."),
+            lit("Chaves utilizadas em Períodos de Apuração distintos."),
+            col(chave_efd),
+            lit("pertence a"),
+            col("Count"),
+            lit("Períodos de Apuração distintos."),
+            //col("Períodos de Apuração").list().join(" ".into(), true),
             lit("&"),
         ],
         " ",
         true,
     );
 
-    let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_06, mensagem, lit(0))?;
+    let lf_result: LazyFrame = aplicar_situacao(lz_unificado, situacao_06, mensagem, lit(0))?;
+
+    let columns: Vec<&str> = vec![
+        chaves,
+        "Count",
+        "Períodos de Apuração",
+        "Período Válido",
+        "Períodos Inválidos",
+    ];
+
+    // Remover colunas temporárias
+    let lf_result = lf_result.drop(by_name(columns, true));
 
     Ok(lf_result)
 }
