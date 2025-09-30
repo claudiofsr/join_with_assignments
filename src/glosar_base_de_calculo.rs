@@ -491,6 +491,19 @@ fn analisar_situacao05(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     Ok(lf_result)
 }
 
+/// Remover colunas temporárias
+fn remover_colunas_temporarias_sit06(lazyframe: LazyFrame) -> LazyFrame {
+    let columns: Vec<&str> = vec![
+        "Chaves de Docs Fiscais",
+        "Count",
+        "Períodos de Apuração",
+        "Período Válido",
+        "Períodos Inválidos",
+    ];
+
+    lazyframe.drop(by_name(columns, true))
+}
+
 fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     let glosar: &str = coluna(Middle, "glosar");
     let periodo_de_apuracao: &str = coluna(Left, "pa"); // "Período de Apuração",
@@ -530,20 +543,22 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
         .with_column(
             col(periodo_de_apuracao)
                 .list()
-                .first()
+                .first() // Get the first period (which is the smallest due to sorting)
                 .alias("Período Válido"),
         )
         .with_column(
             col(periodo_de_apuracao)
                 .list()
                 //.shift(lit(-1))
-                .slice(lit(1), col("Count") - lit(1)) // excluir primeira data
+                .slice(lit(1), col("Count") - lit(1)) // Exclude the first date
                 .alias("Períodos Inválidos"),
         )
         .rename([periodo_de_apuracao], ["Períodos de Apuração"], true)
         .collect()?;
 
+    // Early exit if no duplicates found
     if df_groupby_chaves.height() == 0 {
+        let lazyframe = remover_colunas_temporarias_sit06(lazyframe);
         return Ok(lazyframe);
     }
 
@@ -576,7 +591,8 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
             col(glosar),
             lit("Situação 06:"),
             lit("Chave utilizada em Períodos de Apuração distintos."),
-            col(chave_efd),
+            lit("A chave"),
+            col(chaves),
             lit("pertence a"),
             col("Count"),
             lit("Períodos de Apuração distintos."),
@@ -589,16 +605,7 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
 
     let lf_result: LazyFrame = aplicar_situacao(lz_unificado, situacao_06, mensagem, lit(0))?;
 
-    let columns: Vec<&str> = vec![
-        chaves,
-        "Count",
-        "Períodos de Apuração",
-        "Período Válido",
-        "Períodos Inválidos",
-    ];
-
-    // Remover colunas temporárias
-    let lf_result = lf_result.drop(by_name(columns, true));
+    let lf_result = remover_colunas_temporarias_sit06(lf_result);
 
     Ok(lf_result)
 }
