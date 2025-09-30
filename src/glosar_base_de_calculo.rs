@@ -544,7 +544,6 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
         .implode()? // Implode para ter uma única lista de todas as datas
         .into_series(); // Transforma em Series
     println!("series_pin: {series_pin:?}\n");
-
     let períodos_invalidos: Expr = col(periodo_de_apuracao).is_in(series_pin.lit(), true);
 
     //let situacao_06: Expr = chave_repetida.and(períodos_invalidos);
