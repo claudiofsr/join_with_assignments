@@ -1,11 +1,13 @@
+use std::env;
+
 use crate::{
     Arguments, DataFrameExtension, MyResult,
     Side::{Left, Middle, Right},
     adicionar_coluna_de_aliquota_zero, adicionar_coluna_de_credito_presumido,
     adicionar_coluna_de_incidencia_monofasica,
-    adicionar_coluna_periodo_de_apuracao_inicial_e_final, coluna, cst_50_a_56, equal,
-    get_cnpj_base, get_output_as_float64, get_output_as_string, operacoes_de_credito, round_column,
-    unequal,
+    adicionar_coluna_periodo_de_apuracao_inicial_e_final, coluna, configure_the_environment,
+    cst_50_a_56, equal, get_cnpj_base, get_output_as_float64, get_output_as_string,
+    operacoes_de_credito, round_column, unequal,
 };
 use polars::prelude::*;
 
@@ -494,20 +496,44 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     let periodo_de_apuracao: &str = coluna(Left, "pa"); // "Período de Apuração",
     let chave_efd: &str = coluna(Left, "chave");
     let chave_nfe: &str = coluna(Right, "chave");
+    let len_min = 10;
 
     // Selecionar colunas nesta ordem
     let selected: [Expr; 3] = [col(periodo_de_apuracao), col(chave_efd), col(chave_nfe)];
 
-    let df_groupby_chave_efd = lazyframe
+    let df_unificar_colunas_de_chaves = lazyframe
         .clone()
         .select(&selected)
         .filter(col(periodo_de_apuracao).is_not_null())
-        .filter(col(chave_efd).is_not_null())
-        .filter(col(chave_efd).str().len_bytes().gt(20))
-        .group_by([
-            col(chave_efd),
-            //col(chave_nfe)
-        ])
+        .filter(
+            col(chave_efd)
+                .is_not_null()
+                .or(col(chave_nfe).is_not_null()),
+        )
+        .filter(
+            col(chave_efd)
+                .str()
+                .len_bytes()
+                .gt(len_min)
+                .or(col(chave_nfe).str().len_bytes().gt(len_min)),
+        )
+        .with_column(
+            // Criar uma lista com os valores de ambas as chaves para cada linha
+            concat_list([col(chave_efd), col(chave_nfe)])?
+                .list()
+                .drop_nulls() // Remove nulls da lista (se Strings podem ser nulas)
+                .list()
+                .unique() // Aplica a operação unique dentro de cada lista
+                .explode()
+                .alias("Chaves de Docs Fiscais"),
+        )
+        .collect()?;
+
+    println!("df_unificar_colunas_de_chaves: {df_unificar_colunas_de_chaves}\n");
+
+    let df_groupby_chave_efd = df_unificar_colunas_de_chaves
+        .lazy()
+        .group_by([col("Chaves de Docs Fiscais")])
         .agg([
             col(periodo_de_apuracao)
                 .unique()
@@ -528,9 +554,14 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
         return Ok(lazyframe);
     }
 
+    // Imprimir no máximo 100 linhas do DataFrame
+    unsafe {
+        env::set_var("POLARS_FMT_MAX_ROWS", "100"); // maximum number of rows shown when formatting DataFrames.
+    }
     println!("Chaves em Duplicidade: {df_groupby_chave_efd}\n");
+    configure_the_environment(); // Retornar à configuração padrão.
 
-    let column_efd = df_groupby_chave_efd.column(chave_efd)?;
+    let column_efd = df_groupby_chave_efd.column("Chaves de Docs Fiscais")?;
     let column_períodos_invalidos = df_groupby_chave_efd.column("Períodos Inválidos")?;
 
     let series_efd: Series = column_efd.implode()?.into_series();

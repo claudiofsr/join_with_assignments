@@ -73,6 +73,7 @@ features = [
     "lazy",         # Lazy API
     "list_eval",    # Apply expressions over list elements
     "list_gather",  # Take sublist by multiple indices
+    "list_drop_nulls",
     "parquet",      # Read Apache Parquet format
     "regex",        # Use regexes in column selection
     "repeat_by",    # Repeat element in an Array N times, where N is given by another array.

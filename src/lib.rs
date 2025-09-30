@@ -71,6 +71,53 @@ pub type MyResult<T> = Result<T, MyError>;
 
 pub type VecTuples = Vec<(String, u64, u64)>;
 
+// https://pola-rs.github.io/polars/sysinfo/index.html
+pub fn show_sysinfo() {
+    // Please note that we use "new_all" to ensure that all list of
+    // components, network interfaces, disks and users are already
+    // filled!
+    let mut sys = System::new_all();
+
+    // First we update all information of our `System` struct.
+    sys.refresh_all();
+
+    let opt_sys_name: Option<String> = System::name();
+    let opt_sys_kerv: Option<String> = System::kernel_version();
+    let opt_sys_osve: Option<String> = System::os_version();
+
+    match (opt_sys_name, opt_sys_kerv, opt_sys_osve) {
+        (Some(sys_name), Some(sys_kerv), Some(sys_osve)) => {
+            // Display system information:
+            println!("System name:           {sys_name}");
+            println!("System kernel version: {sys_kerv}");
+            println!("System OS version:     {sys_osve}");
+        }
+        _ => return,
+    }
+
+    // RAM and swap information
+    // 1 Byte = 8 bits
+    let sys_used_memory: u64 = sys.used_memory() / (1024 * 1024);
+    let sys_total_memory: u64 = sys.total_memory() / (1024 * 1024);
+
+    println!("Memory used/total: {sys_used_memory:>8}/{sys_total_memory} Mbytes");
+
+    // Number of CPUs:
+    println!("Number of CPUs: {:>9}\n", sys.cpus().len());
+}
+
+/// Polar arguments with ENV vars
+pub fn configure_the_environment() {
+    // https://stackoverflow.com/questions/70830241/rust-polars-how-to-show-all-columns/75675569#75675569
+    // https://pola-rs.github.io/polars/polars/index.html#config-with-env-vars
+    unsafe {
+        env::set_var("POLARS_FMT_TABLE_ROUNDED_CORNERS", "1"); // apply rounded corners to UTF8-styled tables.
+        env::set_var("POLARS_FMT_MAX_COLS", "10"); // maximum number of columns shown when formatting DataFrames.
+        env::set_var("POLARS_FMT_MAX_ROWS", "10"); // maximum number of rows shown when formatting DataFrames.
+        env::set_var("POLARS_FMT_STR_LEN", "52"); // maximum number of characters printed per string value.
+    }
+}
+
 /**
 Returns a Field closure that indicates the output Series will have
 the same type as the input field.
@@ -259,53 +306,6 @@ pub fn conditionally_remove_null_columns(
     } else {
         Ok(data_frame)
     }
-}
-
-/// Polar arguments with ENV vars
-pub fn configure_the_environment() {
-    // https://stackoverflow.com/questions/70830241/rust-polars-how-to-show-all-columns/75675569#75675569
-    // https://pola-rs.github.io/polars/polars/index.html#config-with-env-vars
-    unsafe {
-        env::set_var("POLARS_FMT_TABLE_ROUNDED_CORNERS", "1"); // apply rounded corners to UTF8-styled tables.
-        env::set_var("POLARS_FMT_MAX_COLS", "10"); // maximum number of columns shown when formatting DataFrames.
-        env::set_var("POLARS_FMT_MAX_ROWS", "10"); // maximum number of rows shown when formatting DataFrames.
-        env::set_var("POLARS_FMT_STR_LEN", "52"); // maximum number of characters printed per string value.
-    }
-}
-
-// https://pola-rs.github.io/polars/sysinfo/index.html
-pub fn show_sysinfo() {
-    // Please note that we use "new_all" to ensure that all list of
-    // components, network interfaces, disks and users are already
-    // filled!
-    let mut sys = System::new_all();
-
-    // First we update all information of our `System` struct.
-    sys.refresh_all();
-
-    let opt_sys_name: Option<String> = System::name();
-    let opt_sys_kerv: Option<String> = System::kernel_version();
-    let opt_sys_osve: Option<String> = System::os_version();
-
-    match (opt_sys_name, opt_sys_kerv, opt_sys_osve) {
-        (Some(sys_name), Some(sys_kerv), Some(sys_osve)) => {
-            // Display system information:
-            println!("System name:           {sys_name}");
-            println!("System kernel version: {sys_kerv}");
-            println!("System OS version:     {sys_osve}");
-        }
-        _ => return,
-    }
-
-    // RAM and swap information
-    // 1 Byte = 8 bits
-    let sys_used_memory: u64 = sys.used_memory() / (1024 * 1024);
-    let sys_total_memory: u64 = sys.total_memory() / (1024 * 1024);
-
-    println!("Memory used/total: {sys_used_memory:>8}/{sys_total_memory} Mbytes");
-
-    // Number of CPUs:
-    println!("Number of CPUs: {:>9}\n", sys.cpus().len());
 }
 
 /// Calculates Munkres assignments between two Series of f64 values.
