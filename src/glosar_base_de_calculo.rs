@@ -518,7 +518,8 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
         .with_column(
             col(periodo_de_apuracao)
                 .list()
-                .slice(lit(1), col("Count"))
+                //.shift(lit(-1))
+                .slice(lit(1), col("Count") - lit(1)) // excluir primeira data
                 .alias("Períodos Inválidos"),
         )
         .collect()?;
@@ -532,27 +533,19 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     let column_efd = df_groupby_chave_efd.column(chave_efd)?;
     let column_períodos_invalidos = df_groupby_chave_efd.column("Períodos Inválidos")?;
 
-    let literal_series_efd: Expr = column_efd.implode()?.into_series().lit();
-    let chave_repetida: Expr = col(chave_efd).is_in(literal_series_efd, true);
+    let series_efd: Series = column_efd.implode()?.into_series();
+    println!("series_efd: {series_efd:?}\n");
+    let chave_repetida: Expr = col(chave_efd).is_in(series_efd.lit(), true);
 
-    /*
-    let literal_series_pin: Expr = df_groupby_chave_efd
-        .lazy() // Volte para LazyFrame para usar explode e then collect
-        .select([col("Períodos Inválidos").explode()]) // Explode as listas em datas individuais
-        .collect()? // Coleta para obter um DataFrame com uma coluna de Series de Date
-        .column("Períodos Inválidos")? // Pega a Series resultante
-        .implode()? // Implode para ter uma única lista de todas as datas
-        .into_series() // Transforma em Series
-        .lit(); // Cria a literal Expr
-    */
-
-    let literal_series_pin: Expr = column_períodos_invalidos
+    let series_pin: Series = column_períodos_invalidos
         .as_materialized_series()
         .explode(true)? // Explode as listas em datas individuais
         .clone()
-        .lit();
+        .implode()? // Implode para ter uma única lista de todas as datas
+        .into_series(); // Transforma em Series
+    println!("series_pin: {series_pin:?}\n");
 
-    let períodos_invalidos: Expr = col(periodo_de_apuracao).is_in(literal_series_pin, true);
+    let períodos_invalidos: Expr = col(periodo_de_apuracao).is_in(series_pin.lit(), true);
 
     //let situacao_06: Expr = chave_repetida.and(períodos_invalidos);
     let situacao_06: Expr = operacoes_de_credito()?
