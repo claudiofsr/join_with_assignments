@@ -502,17 +502,16 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
         .clone()
         .select(&selected)
         .filter(col(periodo_de_apuracao).is_not_null())
-        .filter(
-            col(chave_efd)
-                .is_not_null()
-                .or(col(chave_nfe).is_not_null()),
-        )
+        .filter(col(chave_efd).is_not_null())
+        .filter(col(chave_efd).str().len_bytes().gt(20))
         .group_by([
             col(chave_efd),
             //col(chave_nfe)
         ])
         .agg([
-            col(periodo_de_apuracao).unique(),
+            col(periodo_de_apuracao)
+                .unique()
+                .sort(SortOptions::default()),
             col(periodo_de_apuracao).unique().count().alias("Count"),
         ])
         .filter(col("Count").gt(1)) // filtar chaves repetidas
@@ -520,47 +519,45 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
             col(periodo_de_apuracao)
                 .list()
                 .slice(lit(1), col("Count"))
-                .alias("Datas Inválidas"),
+                .alias("Períodos Inválidos"),
         )
         .collect()?;
-
-    println!("Chaves em Duplicidade: {df_groupby_chave_efd}\n");
 
     if df_groupby_chave_efd.height() == 0 {
         return Ok(lazyframe);
     }
 
+    println!("Chaves em Duplicidade: {df_groupby_chave_efd}\n");
+
     let column_efd = df_groupby_chave_efd.column(chave_efd)?;
-    println!("column_efd: {column_efd:?}\n");
+    let column_períodos_invalidos = df_groupby_chave_efd.column("Períodos Inválidos")?;
 
-    let column_datas_invalidas = df_groupby_chave_efd.column("Datas Inválidas")?;
-    println!("column_datas_invalidas: {column_datas_invalidas:?}\n");
+    let literal_series_efd: Expr = column_efd.implode()?.into_series().lit();
+    let chave_repetida: Expr = col(chave_efd).is_in(literal_series_efd, true);
 
-    let literal_series: Expr = column_efd.implode()?.into_series().lit();
-    let chave_repetida: Expr = col(chave_efd).is_in(literal_series, true);
-
-    let literal_series: Expr = df_groupby_chave_efd
+    /*
+    let literal_series_pin: Expr = df_groupby_chave_efd
         .lazy() // Volte para LazyFrame para usar explode e then collect
-        .select([col("Datas Inválidas").explode()]) // Explode as listas em datas individuais
+        .select([col("Períodos Inválidos").explode()]) // Explode as listas em datas individuais
         .collect()? // Coleta para obter um DataFrame com uma coluna de Series de Date
-        .column("Datas Inválidas")? // Pega a Series resultante
+        .column("Períodos Inválidos")? // Pega a Series resultante
         .implode()? // Implode para ter uma única lista de todas as datas
         .into_series() // Transforma em Series
         .lit(); // Cria a literal Expr
-
-    /*
-    let literal_series: Expr = column_datas_invalidas
-        .as_materialized_series()
-        .clone()
-        .lit();
     */
 
-    let datas_invalidas: Expr = col(periodo_de_apuracao).is_in(literal_series, true);
+    let literal_series_pin: Expr = column_períodos_invalidos
+        .as_materialized_series()
+        .explode(true)? // Explode as listas em datas individuais
+        .clone()
+        .lit();
 
-    //let situacao_06: Expr = chave_repetida.and(datas_invalidas);
+    let períodos_invalidos: Expr = col(periodo_de_apuracao).is_in(literal_series_pin, true);
+
+    //let situacao_06: Expr = chave_repetida.and(períodos_invalidos);
     let situacao_06: Expr = operacoes_de_credito()?
         .and(chave_repetida)
-        .and(datas_invalidas);
+        .and(períodos_invalidos);
 
     println!("situacao_06: {situacao_06:?}\n");
     // std::process::exit(1);
