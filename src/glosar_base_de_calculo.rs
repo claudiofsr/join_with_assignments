@@ -575,7 +575,7 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
         [
             col(glosar),
             lit("Situação 06:"),
-            lit("Chaves utilizadas em Períodos de Apuração distintos."),
+            lit("Chave utilizada em Períodos de Apuração distintos."),
             col(chave_efd),
             lit("pertence a"),
             col("Count"),
