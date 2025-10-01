@@ -6,8 +6,8 @@ use crate::{
     adicionar_coluna_de_aliquota_zero, adicionar_coluna_de_credito_presumido,
     adicionar_coluna_de_incidencia_monofasica,
     adicionar_coluna_periodo_de_apuracao_inicial_e_final, coluna, configure_the_environment,
-    cst_50_a_56, equal, get_cnpj_base, get_output_as_date, get_output_as_float64,
-    get_output_as_string, operacoes_de_credito, processar_lista_de_datas, round_column, unequal,
+    cst_50_a_56, equal, formatar_lista_de_datas, get_cnpj_base, get_output_as_date,
+    get_output_as_float64, get_output_as_string, operacoes_de_credito, round_column, unequal,
 };
 use polars::prelude::*;
 
@@ -559,7 +559,7 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
         )
         .with_column(
             col("Períodos de Apuração")
-                .map(processar_lista_de_datas, get_output_as_date)
+                .map(formatar_lista_de_datas, get_output_as_date)
                 .alias("Períodos Formatados"),
         )
         .collect()?;

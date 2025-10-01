@@ -1196,7 +1196,7 @@ pub fn extract_ncm(input: &str) -> String {
         .unwrap_or_else(|| input.to_string()) // Return the original input if no match is found.
 }
 
-pub fn processar_lista_de_datas(coluna: Column) -> PolarsResult<Column> {
+pub fn formatar_lista_de_datas(coluna: Column) -> PolarsResult<Column> {
     // println!("coluna: {coluna:?}");
 
     // Crie um iterador e aplique a formatação
@@ -1315,8 +1315,8 @@ mod tests_functions {
     }
 
     #[test]
-    /// `cargo test -- --show-output formatar_lista_de_datas`
-    fn formatar_lista_de_datas() -> PolarsResult<()> {
+    /// `cargo test -- --show-output formatar_datas`
+    fn formatar_datas() -> PolarsResult<()> {
         let datas1 = vec![
             NaiveDate::from_ymd_opt(2023, 1, 1).unwrap(),
             NaiveDate::from_ymd_opt(2023, 5, 10).unwrap(),
@@ -1342,7 +1342,7 @@ mod tests_functions {
             .lazy()
             .with_column(
                 col("Períodos de Apuração")
-                    .map(processar_lista_de_datas, get_output_as_date)
+                    .map(formatar_lista_de_datas, get_output_as_date)
                     .alias("Períodos Formatados"),
             )
             .collect()?;
