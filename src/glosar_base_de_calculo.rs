@@ -492,7 +492,7 @@ fn analisar_situacao05(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
 }
 
 /// Remover colunas temporárias
-fn remover_colunas_temporarias_sit06(lazyframe: LazyFrame) -> LazyFrame {
+fn remover_colunas_temporarias_sit06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     let columns: Vec<&str> = vec![
         "Chaves de Docs Fiscais",
         "Count",
@@ -502,7 +502,24 @@ fn remover_colunas_temporarias_sit06(lazyframe: LazyFrame) -> LazyFrame {
         "Períodos Formatados",
     ];
 
-    lazyframe.drop(by_name(columns, true))
+    let schema = lazyframe.clone().collect_schema()?;
+    let mut existing_columns_to_drop = Vec::new();
+
+    // Itera sobre as colunas que você quer remover
+    // e adiciona à lista se elas existirem no esquema do LazyFrame.
+    for col_name in columns {
+        if schema.contains(col_name) {
+            existing_columns_to_drop.push(col_name);
+        }
+    }
+
+    // Se houver colunas para remover, use o método drop do LazyFrame.
+    if !existing_columns_to_drop.is_empty() {
+        Ok(lazyframe.drop(by_name(existing_columns_to_drop, true)))
+    } else {
+        // Se nenhuma das colunas especificadas existir, retorne o LazyFrame original.
+        Ok(lazyframe)
+    }
 }
 
 fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
@@ -576,7 +593,7 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
 
     // Early exit if no duplicates found
     if df_groupby_chaves.height() == 0 {
-        let lazyframe = remover_colunas_temporarias_sit06(lazyframe);
+        let lazyframe = remover_colunas_temporarias_sit06(lazyframe)?;
         return Ok(lazyframe);
     }
 
@@ -622,7 +639,7 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
 
     let lf_result: LazyFrame = aplicar_situacao(lz_unificado, situacao_06, mensagem, lit(0))?;
 
-    let lf_result = remover_colunas_temporarias_sit06(lf_result);
+    let lf_result = remover_colunas_temporarias_sit06(lf_result)?;
 
     Ok(lf_result)
 }
