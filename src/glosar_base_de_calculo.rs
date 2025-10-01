@@ -6,8 +6,8 @@ use crate::{
     adicionar_coluna_de_aliquota_zero, adicionar_coluna_de_credito_presumido,
     adicionar_coluna_de_incidencia_monofasica,
     adicionar_coluna_periodo_de_apuracao_inicial_e_final, coluna, configure_the_environment,
-    cst_50_a_56, equal, get_cnpj_base, get_output_as_float64, get_output_as_string,
-    operacoes_de_credito, round_column, unequal,
+    cst_50_a_56, equal, get_cnpj_base, get_output_as_date, get_output_as_float64,
+    get_output_as_string, operacoes_de_credito, processar_lista_de_datas, round_column, unequal,
 };
 use polars::prelude::*;
 
@@ -499,6 +499,7 @@ fn remover_colunas_temporarias_sit06(lazyframe: LazyFrame) -> LazyFrame {
         "Períodos de Apuração",
         "Período Válido",
         "Períodos Inválidos",
+        "Períodos Formatados",
     ];
 
     lazyframe.drop(by_name(columns, true))
@@ -536,24 +537,31 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
         .agg([
             col(periodo_de_apuracao)
                 .unique()
-                .sort(SortOptions::default()),
+                .sort(SortOptions::default())
+                //.dt()
+                //.strftime("%d/%m/%Y")
+                .alias("Períodos de Apuração"),
             col(periodo_de_apuracao).unique().count().alias("Count"),
         ])
         .filter(col("Count").gt(1)) // filtar chaves repetidas
         .with_column(
-            col(periodo_de_apuracao)
+            col("Períodos de Apuração")
                 .list()
                 .first() // Get the first period (which is the smallest due to sorting)
                 .alias("Período Válido"),
         )
         .with_column(
-            col(periodo_de_apuracao)
+            col("Períodos de Apuração")
                 .list()
                 //.shift(lit(-1))
                 .slice(lit(1), col("Count") - lit(1)) // Exclude the first date
                 .alias("Períodos Inválidos"),
         )
-        .rename([periodo_de_apuracao], ["Períodos de Apuração"], true)
+        .with_column(
+            col("Períodos de Apuração")
+                .map(processar_lista_de_datas, get_output_as_date)
+                .alias("Períodos Formatados"),
+        )
         .collect()?;
 
     // Early exit if no duplicates found
@@ -579,12 +587,14 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     let situacao_06: Expr = operacoes_de_credito()?
         .and(col("Count").is_not_null())
         .and(col("Count").gt(1)) // Multipla utilização de Docs Fiscais
-        .and(col(periodo_de_apuracao).neq(col("Período Válido")));
+        .and(
+            col(periodo_de_apuracao)
+                //.cast(DataType::String)
+                .neq(col("Período Válido")),
+        );
 
     println!("situacao_06: {situacao_06:?}\n");
     // std::process::exit(1);
-
-    // let datas = concat_str([col("Períodos de Apuração")], ", ", true);
 
     let mensagem: Expr = concat_str(
         [
@@ -595,8 +605,9 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
             col(chaves),
             lit("pertence a"),
             col("Count"),
-            lit("Períodos de Apuração distintos."),
-            //col("Períodos de Apuração").list().join(" ".into(), true),
+            lit("Períodos de Apuração distintos:"),
+            col("Períodos Formatados"),
+            lit("."),
             lit("&"),
         ],
         " ",

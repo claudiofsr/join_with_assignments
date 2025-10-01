@@ -50,6 +50,7 @@ pub use self::{
     xlsx_writer::PolarsXlsxWriter,
 };
 
+use chrono::NaiveDate;
 use claudiofsr_lib::RoundFloat;
 use polars::prelude::*;
 use regex::Regex;
@@ -1195,6 +1196,37 @@ pub fn extract_ncm(input: &str) -> String {
         .unwrap_or_else(|| input.to_string()) // Return the original input if no match is found.
 }
 
+pub fn processar_lista_de_datas(coluna: Column) -> PolarsResult<Column> {
+    // println!("coluna: {coluna:?}");
+
+    // Crie um iterador e aplique a formatação
+    let str_date: PolarsResult<Vec<Option<String>>> = coluna
+        .list()?
+        .into_iter()
+        .map(|opt_series| {
+            match opt_series {
+                Some(list_series) => {
+                    // Se a lista não é nula, formate cada data e junte com um espaço
+                    let dates_as_strings: Vec<String> = list_series
+                        .date()? // Retorna um PolarsResult<DateChunked>
+                        .as_date_iter() // Retorna um iterator de Option<NaiveDate>
+                        .flatten() // Remove os Nones do iterador, deixando apenas NaiveDate
+                        .map(|date: NaiveDate| date.format("%d/%m/%Y").to_string())
+                        .collect();
+                    let string = format!("[{}]", dates_as_strings.join(", "));
+                    Ok(Some(string)) // Retorna Some(String) para esta linha
+                }
+                None => Ok(None), // Se a Series original era null, a nova Series também será null
+            }
+        })
+        .collect();
+
+    let new_col = Column::new("new".into(), str_date?);
+    // println!("new_col: {new_col:?}");
+
+    Ok(new_col)
+}
+
 pub fn quit() {
     std::process::exit(0);
 }
@@ -1278,6 +1310,49 @@ mod tests_functions {
         println!("column: {col:?}\n");
 
         assert_eq!(Column::new("".into(), &valid), col);
+
+        Ok(())
+    }
+
+    #[test]
+    /// `cargo test -- --show-output formatar_lista_de_datas`
+    fn formatar_lista_de_datas() -> PolarsResult<()> {
+        let datas1 = vec![
+            NaiveDate::from_ymd_opt(2023, 1, 1).unwrap(),
+            NaiveDate::from_ymd_opt(2023, 5, 10).unwrap(),
+        ];
+        let datas2 = vec![NaiveDate::from_ymd_opt(2024, 9, 15).unwrap()];
+
+        let series_datas1 = Series::new("row1".into(), datas1);
+        let series_datas2 = Series::new("row2".into(), datas2);
+
+        // 1. Crie o conteúdo da Series como uma estrutura serializável.
+        let datas = vec![Some(series_datas1), Some(series_datas2), None];
+
+        // 2. Crie a Series explicitamente, com um nome e o conteúdo.
+        let series_list_dates = Series::new("Períodos de Apuração".into(), datas);
+
+        // 3. Crie o DataFrame usando a Series criada.
+        // let df = DataFrame::new(vec![series_list_dates.into()])?;
+        let df = df! { "Períodos de Apuração" => series_list_dates }?;
+
+        println!("DataFrame Original:\n{}", df);
+
+        let df_formatado = df
+            .lazy()
+            .with_column(
+                col("Períodos de Apuração")
+                    .map(processar_lista_de_datas, get_output_as_date)
+                    .alias("Períodos Formatados"),
+            )
+            .collect()?;
+
+        println!("\nDataFrame Formatado:\n{}", df_formatado);
+
+        let datas = vec![Some("[01/01/2023, 10/05/2023]"), Some("[15/09/2024]"), None];
+        let coluna_formatada = Column::new("fmt".into(), datas);
+
+        assert_eq!(df_formatado["Períodos Formatados"], coluna_formatada);
 
         Ok(())
     }

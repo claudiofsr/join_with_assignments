@@ -71,9 +71,12 @@ features = [
     "dtype-i16",    # fix: "unsupported data type when reading CSV: i16 when reading CSV"
     "is_in",        # Check for membership in Series
     "lazy",         # Lazy API
+    "list_any_all",
+    "list_count",
     "list_eval",    # Apply expressions over list elements
     "list_gather",  # Take sublist by multiple indices
     "list_drop_nulls",
+    "list_sets",
     "parquet",      # Read Apache Parquet format
     "regex",        # Use regexes in column selection
     "repeat_by",    # Repeat element in an Array N times, where N is given by another array.
