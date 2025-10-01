@@ -1338,7 +1338,59 @@ mod tests_functions {
 
         println!("DataFrame Original:\n{}", df);
 
-        let df_formatado = df
+        // use .eval()
+        let df_formatado_eval = df
+            .clone()
+            .lazy()
+            /*
+            .with_column(
+                col("Períodos de Apuração")
+                    .list()
+                    .eval(col("").dt().strftime("%d/%m/%Y"))
+                    .list()
+                    .join(lit(", "), true)
+                    .map(
+                        |col| {
+                            let strings: Vec<Option<String>> = col
+                                .str()?
+                                .iter()
+                                .map(|opt_str| opt_str.map(|s| format!("[{s}]")))
+                                .collect();
+                            Ok(Column::new("".into(), strings))
+                        },
+                        get_output_as_string,
+                    )
+                    .alias("Períodos Formatados"),
+            )
+            */
+            .with_column(
+                when(col("Períodos de Apuração").is_null()) // Condição: Se a coluna original é null
+                    .then(lit(NULL)) // Então, a saída é NULL
+                    .otherwise(
+                        // Caso contrário (se não é null), execute toda a lógica de formatação
+                        concat_str(
+                            [
+                                lit("["),
+                                col("Períodos de Apuração")
+                                    .list()
+                                    .eval(col("").dt().strftime("%d/%m/%Y"))
+                                    .list()
+                                    .join(lit(", "), true)
+                                    .alias("Períodos Formatados"),
+                                lit("]"),
+                            ],
+                            "",
+                            true,
+                        ),
+                    )
+                    .alias("Períodos Formatados"),
+            )
+            .collect()?;
+
+        println!("\nDataFrame Formatado com eval:\n{}", df_formatado_eval);
+
+        // use .map()
+        let df_formatado_map = df
             .lazy()
             .with_column(
                 col("Períodos de Apuração")
@@ -1347,12 +1399,13 @@ mod tests_functions {
             )
             .collect()?;
 
-        println!("\nDataFrame Formatado:\n{}", df_formatado);
+        println!("\nDataFrame Formatado com map:\n{}", df_formatado_map);
 
         let datas = vec![Some("[01/01/2023, 10/05/2023]"), Some("[15/09/2024]"), None];
         let coluna_formatada = Column::new("fmt".into(), datas);
 
-        assert_eq!(df_formatado["Períodos Formatados"], coluna_formatada);
+        assert_eq!(df_formatado_eval["Períodos Formatados"], coluna_formatada);
+        assert_eq!(df_formatado_map["Períodos Formatados"], coluna_formatada);
 
         Ok(())
     }

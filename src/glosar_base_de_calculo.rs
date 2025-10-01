@@ -6,8 +6,8 @@ use crate::{
     adicionar_coluna_de_aliquota_zero, adicionar_coluna_de_credito_presumido,
     adicionar_coluna_de_incidencia_monofasica,
     adicionar_coluna_periodo_de_apuracao_inicial_e_final, coluna, configure_the_environment,
-    cst_50_a_56, equal, formatar_lista_de_datas, get_cnpj_base, get_output_as_date,
-    get_output_as_float64, get_output_as_string, operacoes_de_credito, round_column, unequal,
+    cst_50_a_56, equal, get_cnpj_base, get_output_as_float64, get_output_as_string,
+    operacoes_de_credito, round_column, unequal,
 };
 use polars::prelude::*;
 
@@ -557,9 +557,19 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
                 .slice(lit(1), col("Count") - lit(1)) // Exclude the first date
                 .alias("Períodos Inválidos"),
         )
+        /*
         .with_column(
             col("Períodos de Apuração")
                 .map(formatar_lista_de_datas, get_output_as_date)
+                .alias("Períodos Formatados"),
+        )
+        */
+        .with_column(
+            col("Períodos de Apuração")
+                .list()
+                .eval(col("").dt().strftime("%d/%m/%Y"))
+                .list()
+                .join(lit(", "), true)
                 .alias("Períodos Formatados"),
         )
         .collect()?;
@@ -587,11 +597,7 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     let situacao_06: Expr = operacoes_de_credito()?
         .and(col("Count").is_not_null())
         .and(col("Count").gt(1)) // Multipla utilização de Docs Fiscais
-        .and(
-            col(periodo_de_apuracao)
-                //.cast(DataType::String)
-                .neq(col("Período Válido")),
-        );
+        .and(col(periodo_de_apuracao).neq(col("Período Válido")));
 
     println!("situacao_06: {situacao_06:?}\n");
     // std::process::exit(1);
@@ -605,9 +611,9 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
             col(chaves),
             lit("pertence a"),
             col("Count"),
-            lit("Períodos de Apuração distintos:"),
+            lit("Períodos de Apuração distintos:["),
             col("Períodos Formatados"),
-            lit("."),
+            lit("]."),
             lit("&"),
         ],
         " ",
