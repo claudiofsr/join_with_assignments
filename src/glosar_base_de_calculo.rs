@@ -671,14 +671,15 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
         .collect()?;
 
     // Early exit if no duplicate keys across periods are found
-    if df_groupby_chaves.height() == 0 {
+    let number_of_rows = df_groupby_chaves.height().min(10000);
+    if number_of_rows == 0 {
         let lazyframe = lazyframe.drop_columns(&colunas_temporarias)?;
         return Ok(lazyframe);
     }
 
-    // Imprimir no máximo 100 linhas do DataFrame
+    // Imprimir até as 10.000 primeiras linhas do DataFrame
     unsafe {
-        env::set_var("POLARS_FMT_MAX_ROWS", "100"); // maximum number of rows shown when formatting DataFrames.
+        env::set_var("POLARS_FMT_MAX_ROWS", number_of_rows.to_string()); // maximum number of rows shown when formatting DataFrames.
     }
     println!("Chaves utilizadas em Períodos de Apuração distintos: {df_groupby_chaves}\n");
     configure_the_environment(); // Retornar à configuração padrão.
@@ -810,18 +811,17 @@ fn analisar_situacao06b(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
         .collect()?;
 
     // Early exit if no duplicate keys across periods are found
-    if df_groupby_chaves.height() == 0 {
+    let number_of_rows = df_groupby_chaves.height().min(10000);
+    if number_of_rows == 0 {
         let lazyframe = lazyframe.drop_columns(&colunas_temporarias)?;
         return Ok(lazyframe);
     }
 
-    // Imprimir no máximo 100 linhas do DataFrame
+    // Imprimir até as 10.000 primeiras linhas do DataFrame
     unsafe {
-        env::set_var("POLARS_FMT_MAX_ROWS", "100"); // maximum number of rows shown when formatting DataFrames.
+        env::set_var("POLARS_FMT_MAX_ROWS", number_of_rows.to_string()); // maximum number of rows shown when formatting DataFrames.
     }
-    println!(
-        "Documentos Fiscais utilizados em Períodos de Apuração distintos: {df_groupby_chaves}\n"
-    );
+    println!("Chaves utilizadas em Períodos de Apuração distintos: {df_groupby_chaves}\n");
     configure_the_environment(); // Retornar à configuração padrão.
 
     // --- Step 2: Join the analysis results back to the original LazyFrame ---
