@@ -627,7 +627,7 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
             col(chaves_unificadas),
             lit("pertence a"),
             col(period_count),
-            lit("Períodos de Apuração distintos:["),
+            lit("Períodos de Apuração distintos: ["),
             col(periodos_formatados),
             lit("]."),
             lit("&"),
