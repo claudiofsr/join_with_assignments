@@ -659,6 +659,15 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
                 .join(lit(", "), true)
                 .alias(periodos_formatados),
         )
+        .sort_by_exprs(
+            vec![col(periodo_valido), col(chaves_unificadas)],
+            // https://github.com/pola-rs/polars/pull/15590
+            SortMultipleOptions::default()
+                .with_maintain_order(true)
+                .with_multithreaded(true)
+                .with_order_descending(false)
+                .with_nulls_last(false),
+        )
         .collect()?;
 
     // Early exit if no duplicate keys across periods are found
@@ -788,6 +797,15 @@ fn analisar_situacao06b(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
                 .list()
                 .join(lit(", "), true)
                 .alias(periodos_formatados),
+        )
+        .sort_by_exprs(
+            vec![col(periodo_valido), col(cnpj_particip), col(num_doc)],
+            // https://github.com/pola-rs/polars/pull/15590
+            SortMultipleOptions::default()
+                .with_maintain_order(true)
+                .with_multithreaded(true)
+                .with_order_descending(false)
+                .with_nulls_last(false),
         )
         .collect()?;
 
