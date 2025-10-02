@@ -496,21 +496,28 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     let periodo_de_apuracao: &str = coluna(Left, "pa"); // "Período de Apuração",
     let chave_efd: &str = coluna(Left, "chave");
     let chave_nfe: &str = coluna(Right, "chave");
-    let chaves: &str = "Chaves de Docs Fiscais"; // unificar duas colunas em uma coluna
     let len_min = 10;
 
+    // Define temporary column names
+    let chaves_unificadas = "Chaves de Documentos Fiscais";
+    let period_count = "Nº de Períodos";
+    let periodos = "Períodos de Apuração";
+    let periodo_valido = "Período Válido";
+    let periodos_invalidos = "Períodos Inválidos";
+    let periodos_formatados = "Períodos Formatados";
+
+    // Collect all temporary column names for later removal
     let colunas_temporarias: Vec<&str> = vec![
-        "Chaves de Docs Fiscais",
-        "Count",
-        "Períodos de Apuração",
-        "Período Válido",
-        "Períodos Inválidos",
-        "Períodos Formatados",
+        chaves_unificadas,
+        period_count,
+        periodos,
+        periodo_valido,
+        periodos_invalidos,
+        periodos_formatados,
     ];
 
-    // Selecionar colunas nesta ordem
-    let selected: [Expr; 2] = [col(periodo_de_apuracao), col(chaves)];
-
+    // --- Step 1: Unify EFD and NFe keys into a single temporary column ---
+    // Unificar duas colunas em uma coluna
     let lazyframe = lazyframe.with_column(
         // Criar uma lista com os valores de ambas as chaves para cada linha
         concat_list([col(chave_efd), col(chave_nfe)])?
@@ -519,57 +526,69 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
             .list()
             .unique() // Aplica a operação unique dentro de cada lista
             .explode()
-            .alias(chaves),
+            .alias(chaves_unificadas),
     );
 
+    // Selecionar colunas nesta ordem
+    let selected: [Expr; 2] = [col(periodo_de_apuracao), col(chaves_unificadas)];
+
+    // --- Step 2: Group by unified keys to find keys used in multiple accounting periods ---
     let df_groupby_chaves = lazyframe
         .clone()
         .select(&selected)
         .filter(col(periodo_de_apuracao).is_not_null())
-        .filter(col(chaves).is_not_null())
-        .filter(col(chaves).str().len_bytes().gt(len_min))
-        .group_by([col(chaves)])
+        .filter(col(chaves_unificadas).is_not_null())
+        .filter(col(chaves_unificadas).str().len_bytes().gt(len_min))
+        .group_by([col(chaves_unificadas)])
         .agg([
+            // Collect all unique accounting periods for each key, sorted
             col(periodo_de_apuracao)
                 .unique()
                 .sort(SortOptions::default())
                 //.dt()
                 //.strftime("%d/%m/%Y")
-                .alias("Períodos de Apuração"),
-            col(periodo_de_apuracao).unique().count().alias("Count"),
+                .alias(periodos),
+            // Count how many unique accounting periods each key appears in
+            col(periodo_de_apuracao)
+                .unique()
+                .count()
+                .alias(period_count),
         ])
-        .filter(col("Count").gt(1)) // filtar chaves repetidas
+        .filter(col(period_count).gt(1)) // filtar chaves repetidas
+        // Add a column for the first (smallest) accounting period for each key
         .with_column(
-            col("Períodos de Apuração")
+            col(periodos)
                 .list()
                 .first() // Get the first period (which is the smallest due to sorting)
-                .alias("Período Válido"),
+                .alias(periodo_valido),
         )
+        // Add a column for subsequent (invalid) accounting periods for each key
         .with_column(
-            col("Períodos de Apuração")
+            col(periodos)
                 .list()
                 //.shift(lit(-1))
-                .slice(lit(1), col("Count") - lit(1)) // Exclude the first date
-                .alias("Períodos Inválidos"),
+                .slice(lit(1), col(period_count) - lit(1)) // Exclude the first period
+                .alias(periodos_invalidos),
         )
         /*
         .with_column(
-            col("Períodos de Apuração")
+            col(periodos)
                 .map(formatar_lista_de_datas, get_output_as_date)
-                .alias("Períodos Formatados"),
+                .alias(periodos_formatados),
         )
         */
+        // Add a column with all unique periods formatted as a comma-separated string
         .with_column(
-            col("Períodos de Apuração")
+            col(periodos)
                 .list()
                 .eval(col("").dt().strftime("%d/%m/%Y"))
                 .list()
                 .join(lit(", "), true)
-                .alias("Períodos Formatados"),
+                .alias(periodos_formatados),
         )
         .collect()?;
 
-    // Early exit if no duplicates found
+    // Early exit if no duplicate keys across periods are found
     if df_groupby_chaves.height() == 0 {
         let lazyframe = remove_temporary_columns(lazyframe, &colunas_temporarias)?;
         return Ok(lazyframe);
@@ -582,17 +601,19 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     println!("Chaves utilizadas em Períodos de Apuração distintos: {df_groupby_chaves}\n");
     configure_the_environment(); // Retornar à configuração padrão.
 
+    // --- Step 3: Join the analysis results back to the original LazyFrame ---
     let lz_unificado: LazyFrame = lazyframe.clone().join(
         df_groupby_chaves.lazy(),
-        vec![col(chaves)], // left_on
-        vec![col(chaves)], // right_on
+        vec![col(chaves_unificadas)], // Left join key
+        vec![col(chaves_unificadas)], // Right join key
         JoinType::Left.into(),
     );
 
+    // --- Step 4: Define 'Situation 06' condition and generate 'glosa' message ---
     let situacao_06: Expr = operacoes_de_credito()?
-        .and(col("Count").is_not_null())
-        .and(col("Count").gt(1)) // Multipla utilização de Docs Fiscais
-        .and(col(periodo_de_apuracao).neq(col("Período Válido")));
+        .and(col(period_count).is_not_null())
+        .and(col(period_count).gt(1)) // Multipla utilização de Docs Fiscais
+        .and(col(periodo_de_apuracao).neq(col(periodo_valido)));
 
     println!("situacao_06: {situacao_06:?}\n");
     // std::process::exit(1);
@@ -603,11 +624,11 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
             lit("Situação 06:"),
             lit("Chave utilizada em Períodos de Apuração distintos."),
             lit("A chave"),
-            col(chaves),
+            col(chaves_unificadas),
             lit("pertence a"),
-            col("Count"),
+            col(period_count),
             lit("Períodos de Apuração distintos:["),
-            col("Períodos Formatados"),
+            col(periodos_formatados),
             lit("]."),
             lit("&"),
         ],
@@ -617,6 +638,7 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
 
     let lf_result: LazyFrame = aplicar_situacao(lz_unificado, situacao_06, mensagem, lit(0))?;
 
+    // Remove all temporary columns created during this analysis
     let lf_result = remove_temporary_columns(lf_result, &colunas_temporarias)?;
 
     Ok(lf_result)
