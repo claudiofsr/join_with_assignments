@@ -1227,46 +1227,6 @@ pub fn formatar_lista_de_datas(coluna: Column) -> PolarsResult<Column> {
     Ok(new_col)
 }
 
-/// Removes temporary columns from a LazyFrame.
-///
-/// This function iterates through a list of column names and removes them
-/// from the LazyFrame if they exist in its schema. This prevents errors
-/// when attempting to drop non-existent columns.
-///
-/// # Arguments
-///
-/// * `lazy_frame` - The input `LazyFrame` from which to remove columns.
-/// * `columns_to_drop` - A slice of string references, where each string is the name
-///   of a column to be potentially removed.
-///
-/// # Returns
-///
-/// A `MyResult<LazyFrame>` containing the `LazyFrame` with specified columns
-/// removed, or an error if schema collection fails.
-fn remove_temporary_columns(
-    lazy_frame: LazyFrame,
-    columns_to_drop: &[&str],
-) -> MyResult<LazyFrame> {
-    // Collect the schema to identify existing columns.
-    let schema = lazy_frame.clone().collect_schema()?;
-
-    // Filter the provided `columns_to_drop` to only include those
-    // that actually exist in the `LazyFrame`'s schema.
-    let existing_columns_to_drop: Vec<&str> = columns_to_drop
-        .iter()
-        .filter(|col_name| schema.contains(col_name))
-        .copied() // Dereference and collect owned string slices
-        .collect();
-
-    // If there are any columns confirmed to exist, proceed with dropping them.
-    // Otherwise, return the original LazyFrame unchanged.
-    if !existing_columns_to_drop.is_empty() {
-        Ok(lazy_frame.drop(by_name(existing_columns_to_drop, true)))
-    } else {
-        Ok(lazy_frame)
-    }
-}
-
 pub fn quit() {
     std::process::exit(0);
 }
@@ -1280,6 +1240,7 @@ pub fn quit() {
 #[cfg(test)]
 mod tests_functions {
     use super::*;
+    use crate::glosar_base_de_calculo::LazyFrameExtension;
     use std::error::Error;
 
     // cargo test -- --help
@@ -1355,7 +1316,7 @@ mod tests_functions {
     }
 
     #[test]
-    fn test_remove_temporary_columns() -> MyResult<()> {
+    fn test_drop_columns() -> MyResult<()> {
         let lf = df![
             "col_a" => &[1, 2, 3],
             "col_b" => &["a", "b", "c"],
@@ -1367,8 +1328,8 @@ mod tests_functions {
 
         let columns_to_remove = &["col_c_temp", "non_existent", "col_e_temp"];
 
-        let result_lf = remove_temporary_columns(lf, columns_to_remove)?;
-        let df = result_lf.collect()?;
+        let lf = lf.drop_columns(columns_to_remove)?;
+        let df = lf.collect()?;
 
         let col_names: Vec<&str> = df
             .get_column_names()

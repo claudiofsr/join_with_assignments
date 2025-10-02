@@ -7,7 +7,7 @@ use crate::{
     adicionar_coluna_de_incidencia_monofasica,
     adicionar_coluna_periodo_de_apuracao_inicial_e_final, coluna, configure_the_environment,
     cst_50_a_56, equal, get_cnpj_base, get_output_as_float64, get_output_as_string,
-    operacoes_de_credito, remove_temporary_columns, round_column, unequal,
+    operacoes_de_credito, round_column, unequal,
 };
 use polars::prelude::*;
 
@@ -52,9 +52,10 @@ pub trait LazyFrameExtension {
     /// Adicionar 3 colunas contendo CNPJ Base
     fn adicionar_colunas_auxiliares(self) -> Self;
 
-    /// Remover colunas auxiliares das situações de glosa.
-    #[allow(dead_code)]
-    fn remover_colunas_auxiliares(self) -> Self;
+    /// Removes columns from a LazyFrame.
+    fn drop_columns(self, columns_to_drop: &[&str]) -> PolarsResult<Self>
+    where
+        Self: std::marker::Sized;
 }
 
 impl LazyFrameExtension for LazyFrame {
@@ -127,19 +128,28 @@ impl LazyFrameExtension for LazyFrame {
         ])
     }
 
-    fn remover_colunas_auxiliares(self) -> Self {
-        let columns: Vec<&str> = vec![
-            "Alíquota Zero",
-            "Crédito Presumido",
-            "Incidência Monofásica",
-            "CNPJ Base do Contribuinte",
-            "CNPJ Base do Remetente",
-            "CNPJ Base do Destinatário",
-            "Valor Total de Documentos Vinculados",
-        ];
+    fn drop_columns(self, columns_to_drop: &[&str]) -> PolarsResult<Self>
+    where
+        Self: std::marker::Sized,
+    {
+        // Collect the schema to identify existing columns.
+        let schema = self.clone().collect_schema()?;
 
-        // Remover coluna temporária
-        self.drop(by_name(columns, true))
+        // Filter the provided `columns_to_drop` to only include those
+        // that actually exist in the `LazyFrame`'s schema.
+        let existing_columns_to_drop: Vec<&str> = columns_to_drop
+            .iter()
+            .filter(|col_name| schema.contains(col_name))
+            .copied() // Dereference and collect owned string slices
+            .collect();
+
+        // If there are any columns confirmed to exist, proceed with dropping them.
+        // Otherwise, return the original LazyFrame unchanged.
+        if !existing_columns_to_drop.is_empty() {
+            Ok(self.drop(by_name(existing_columns_to_drop, true)))
+        } else {
+            Ok(self)
+        }
     }
 }
 
@@ -250,7 +260,7 @@ fn analisar_situacao02(lazyframe: LazyFrame, args: &Arguments) -> MyResult<LazyF
     let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_02, mensagem, lit(0))?;
 
     // Remover 2 colunas temporárias
-    let lf_result: LazyFrame = lf_result.drop(by_name([pa_ini, pa_fim], true));
+    let lf_result: LazyFrame = lf_result.drop_columns(&[pa_ini, pa_fim])?;
 
     Ok(lf_result)
 }
@@ -343,7 +353,7 @@ fn analisar_situacao03(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_03, mensagem, lit(0))?;
 
     // Remover coluna temporária
-    let lf_result: LazyFrame = lf_result.drop(by_name([columns[1], columns[3]], true));
+    let lf_result: LazyFrame = lf_result.drop_columns(&[columns[1], columns[3]])?;
 
     Ok(lf_result)
 }
@@ -590,7 +600,7 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
 
     // Early exit if no duplicate keys across periods are found
     if df_groupby_chaves.height() == 0 {
-        let lazyframe = remove_temporary_columns(lazyframe, &colunas_temporarias)?;
+        let lazyframe = lazyframe.drop_columns(&colunas_temporarias)?;
         return Ok(lazyframe);
     }
 
@@ -639,7 +649,7 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     let lf_result: LazyFrame = aplicar_situacao(lz_unificado, situacao_06, mensagem, lit(0))?;
 
     // Remove all temporary columns created during this analysis
-    let lf_result = remove_temporary_columns(lf_result, &colunas_temporarias)?;
+    let lf_result = lf_result.drop_columns(&colunas_temporarias)?;
 
     Ok(lf_result)
 }
@@ -736,7 +746,7 @@ fn analisar_situacao07(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     let lf_result: LazyFrame = aplicar_situacao(lazyframe, situacao_07, mensagem, lit(0))?;
 
     // Remover coluna temporária
-    let lf_result: LazyFrame = lf_result.drop(by_name([columns[3], columns[5]], true));
+    let lf_result = lf_result.drop_columns(&[columns[3], columns[5]])?;
 
     Ok(lf_result)
 }

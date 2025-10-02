@@ -8,6 +8,7 @@ use crate::{
     args::Arguments,
     coluna, formatar_chave_eletronica, formatar_ncm, get_lazyframe_from_csv, get_opt_vectuples,
     get_option_assignments, get_output_as_float64, get_output_as_string, get_output_as_uint64,
+    glosar_base_de_calculo::LazyFrameExtension,
     round_column,
 };
 
@@ -154,7 +155,7 @@ fn format_fazyframe_b(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     Ok(lz.collect()?.lazy())
 }
 
-fn groupby_fazyframe_a(lazyframe: LazyFrame) -> Result<LazyFrame, PolarsError> {
+fn groupby_fazyframe_a(lazyframe: LazyFrame) -> PolarsResult<LazyFrame> {
     let count_lines = coluna(Left, "count_lines");
     let chave = coluna(Left, "chave");
     let valor_item = coluna(Left, "valor_item");
@@ -174,7 +175,7 @@ fn groupby_fazyframe_a(lazyframe: LazyFrame) -> Result<LazyFrame, PolarsError> {
     Ok(lf_groupby)
 }
 
-fn groupby_fazyframe_b(lazyframe: LazyFrame) -> Result<LazyFrame, PolarsError> {
+fn groupby_fazyframe_b(lazyframe: LazyFrame) -> PolarsResult<LazyFrame> {
     let count_lines = coluna(Right, "count_lines");
     let chave = coluna(Right, "chave");
     let valor_item = coluna(Right, "valor_item");
@@ -213,10 +214,7 @@ fn groupby_fazyframe_b(lazyframe: LazyFrame) -> Result<LazyFrame, PolarsError> {
 ///
 /// # Returns
 /// A `Result` containing the joined and processed DataFrame or a `PolarsError` if any operation fails.
-fn join_lazyframes(
-    lazyframe_a: LazyFrame,
-    lazyframe_b: LazyFrame,
-) -> Result<DataFrame, PolarsError> {
+fn join_lazyframes(lazyframe_a: LazyFrame, lazyframe_b: LazyFrame) -> PolarsResult<DataFrame> {
     let dataframe: DataFrame = lazyframe_a
         .join(
             lazyframe_b,
@@ -288,7 +286,7 @@ fn join_lazyframes(
     Ok(dataframe)
 }
 
-fn get_vec_from_assignments(dataframe: DataFrame) -> Result<Vec<Option<VecTuples>>, PolarsError> {
+fn get_vec_from_assignments(dataframe: DataFrame) -> PolarsResult<Vec<Option<VecTuples>>> {
     // Get columns from dataframe
     let aggregation: &Column = dataframe.column(coluna(Left, "chave"))?;
     let lines_efd: &Column = dataframe.column(coluna(Left, "count_lines"))?;
@@ -325,9 +323,7 @@ fn get_vec_from_assignments(dataframe: DataFrame) -> Result<Vec<Option<VecTuples
     Ok(vec_opt_vec_tuples)
 }
 
-fn make_df_correlation(
-    vec_opt_vec_tuples: Vec<Option<VecTuples>>,
-) -> Result<DataFrame, PolarsError> {
+fn make_df_correlation(vec_opt_vec_tuples: Vec<Option<VecTuples>>) -> PolarsResult<DataFrame> {
     // Transform a vector of tuples into many vectors
     let mut col_chaves: Vec<String> = Vec::new();
     let mut col_lines_efd: Vec<u64> = Vec::new();
@@ -358,7 +354,7 @@ fn join_with_interline_correlations(
     lf_a: LazyFrame,
     lf_b: LazyFrame,
     df_correlation: DataFrame,
-) -> Result<LazyFrame, PolarsError> {
+) -> PolarsResult<LazyFrame> {
     let columns = (coluna(Left, "chave"), coluna(Right, "count_lines"));
     let common_a = [col(columns.0), col(columns.1)];
     let common_b = [col(columns.0), col(columns.1)];
@@ -369,7 +365,7 @@ fn join_with_interline_correlations(
     let lf_b_solution: LazyFrame = df_correlation
         .lazy()
         .join(lf_b, common_a, common_b, JoinType::Left.into())
-        .drop(by_name([coluna(Right, "count_lines")], true));
+        .drop_columns(&[coluna(Right, "count_lines")])?;
 
     // add two empty columns to lazyframe
     let lf_a = lf_a.with_columns([
@@ -387,12 +383,12 @@ fn join_with_interline_correlations(
 
     let lf_c: LazyFrame = lf_a
         .join(lf_b_solution, common_a, common_b, JoinType::Left.into())
-        .drop(by_name([coluna(Left, "count_lines")], true));
+        .drop_columns(&[coluna(Left, "count_lines")])?;
 
     Ok(lf_c)
 }
 
-fn check_correlation_between_dataframes(lazyframe: LazyFrame) -> Result<DataFrame, PolarsError> {
+fn check_correlation_between_dataframes(lazyframe: LazyFrame) -> PolarsResult<DataFrame> {
     let delta: f64 = 0.05;
     let chave_is_null: Expr = col(coluna(Right, "chave")).is_null();
 
