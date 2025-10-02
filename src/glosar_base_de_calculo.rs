@@ -230,6 +230,7 @@ pub fn glosar_bc(dataframe: &DataFrame, args: &Arguments) -> MyResult<DataFrame>
     let lazyframe: LazyFrame = analisar_situacao04(lazyframe)?;
     // let lazyframe: LazyFrame = analisar_situacao05(lazyframe)?;
     let lazyframe: LazyFrame = analisar_situacao06(lazyframe)?;
+    let lazyframe: LazyFrame = analisar_situacao06b(lazyframe)?;
     let lazyframe: LazyFrame = analisar_situacao07(lazyframe)?;
     let lazyframe: LazyFrame = analisar_situacao08(lazyframe)?;
     let lazyframe: LazyFrame = analisar_situacao09(lazyframe)?;
@@ -712,6 +713,140 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
 
     // Remove all temporary columns created during this analysis
     let lf_result = lf_result.drop_columns(&colunas_temporarias)?;
+
+    Ok(lf_result)
+}
+
+fn analisar_situacao06b(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
+    let glosar: &str = coluna(Middle, "glosar");
+    let periodo_de_apuracao: &str = coluna(Left, "pa"); // "Período de Apuração",
+    let cnpj_particip: &str = coluna(Left, "cnpj_particip");
+    let num_doc: &str = coluna(Left, "num_doc");
+
+    // Define temporary column names
+    let period_count = "Nº de Períodos";
+    let periodos = "Períodos de Apuração";
+    let periodo_valido = "Período Válido";
+    let periodos_invalidos = "Períodos Inválidos";
+    let periodos_formatados = "Períodos Formatados";
+
+    // Collect all temporary column names for later removal
+    let colunas_temporarias: Vec<&str> = vec![
+        period_count,
+        periodos,
+        periodo_valido,
+        periodos_invalidos,
+        periodos_formatados,
+    ];
+
+    // Selecionar colunas nesta ordem
+    let selected: [Expr; 3] = [col(periodo_de_apuracao), col(cnpj_particip), col(num_doc)];
+
+    // --- Step 1: Group by unified keys to find keys used in multiple accounting periods ---
+    let df_groupby_chaves = lazyframe
+        .clone()
+        .select(&selected)
+        .filter(col(periodo_de_apuracao).is_not_null())
+        .filter(col(cnpj_particip).is_not_null())
+        .filter(col(num_doc).is_not_null())
+        .group_by([col(cnpj_particip), col(num_doc)])
+        .agg([
+            // Collect all unique accounting periods for each key, sorted
+            col(periodo_de_apuracao)
+                .unique()
+                .sort(SortOptions::default())
+                //.dt()
+                //.strftime("%d/%m/%Y")
+                .alias(periodos),
+            // Count how many unique accounting periods each key appears in
+            col(periodo_de_apuracao)
+                .unique()
+                .count()
+                .alias(period_count),
+        ])
+        .filter(col(period_count).gt(1)) // filtar chaves repetidas
+        // Add a column for the first (smallest) accounting period for each key
+        .with_column(
+            col(periodos)
+                .list()
+                .first() // Get the first period (which is the smallest due to sorting)
+                .alias(periodo_valido),
+        )
+        // Add a column for subsequent (invalid) accounting periods for each key
+        .with_column(
+            col(periodos)
+                .list()
+                //.shift(lit(-1))
+                .slice(lit(1), col(period_count) - lit(1)) // Exclude the first period
+                .alias(periodos_invalidos),
+        )
+        // Add a column with all unique periods formatted as a comma-separated string
+        .with_column(
+            col(periodos)
+                .list()
+                .eval(col("").dt().strftime("%d/%m/%Y"))
+                .list()
+                .join(lit(", "), true)
+                .alias(periodos_formatados),
+        )
+        .collect()?;
+
+    // Early exit if no duplicate keys across periods are found
+    if df_groupby_chaves.height() == 0 {
+        let lazyframe = lazyframe.drop_columns(&colunas_temporarias)?;
+        return Ok(lazyframe);
+    }
+
+    // Imprimir no máximo 100 linhas do DataFrame
+    unsafe {
+        env::set_var("POLARS_FMT_MAX_ROWS", "100"); // maximum number of rows shown when formatting DataFrames.
+    }
+    println!(
+        "Documentos Fiscais utilizados em Períodos de Apuração distintos: {df_groupby_chaves}\n"
+    );
+    configure_the_environment(); // Retornar à configuração padrão.
+
+    // --- Step 2: Join the analysis results back to the original LazyFrame ---
+    let lz_unificado: LazyFrame = lazyframe.clone().join(
+        df_groupby_chaves.lazy(),
+        vec![col(cnpj_particip), col(num_doc)], // Left join key
+        vec![col(cnpj_particip), col(num_doc)], // Right join key
+        JoinType::Left.into(),
+    );
+
+    // --- Step 3: Define 'Situation 06' condition and generate 'glosa' message ---
+    let situacao_06b: Expr = operacoes_de_credito()?
+        .and(col(period_count).is_not_null())
+        .and(col(period_count).gt(1)) // Multipla utilização de Docs Fiscais
+        .and(col(periodo_de_apuracao).neq(col(periodo_valido)));
+
+    println!("situacao_06b: {situacao_06b:?}\n");
+    // std::process::exit(1);
+
+    let mensagem: Expr = concat_str(
+        [
+            col(glosar),
+            lit("Situação 06b:"),
+            lit("Documento Fiscal utilizado em Períodos de Apuração distintos."),
+            lit("O Documento Fiscal do CNPJ: "),
+            col(cnpj_particip),
+            lit("de número: "),
+            col(num_doc),
+            lit("pertence a"),
+            col(period_count),
+            lit("Períodos de Apuração distintos: ["),
+            col(periodos_formatados),
+            lit("]."),
+            lit("&"),
+        ],
+        " ",
+        true,
+    );
+
+    let lf_result: LazyFrame = aplicar_situacao(lz_unificado, situacao_06b, mensagem, lit(0))?;
+
+    // Remove all temporary columns created during this analysis
+    let lf_result = lf_result.lazy().drop_columns(&colunas_temporarias)?;
 
     Ok(lf_result)
 }
