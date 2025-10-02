@@ -1227,6 +1227,46 @@ pub fn formatar_lista_de_datas(coluna: Column) -> PolarsResult<Column> {
     Ok(new_col)
 }
 
+/// Removes temporary columns from a LazyFrame.
+///
+/// This function iterates through a list of column names and removes them
+/// from the LazyFrame if they exist in its schema. This prevents errors
+/// when attempting to drop non-existent columns.
+///
+/// # Arguments
+///
+/// * `lazy_frame` - The input `LazyFrame` from which to remove columns.
+/// * `columns_to_drop` - A slice of string references, where each string is the name
+///   of a column to be potentially removed.
+///
+/// # Returns
+///
+/// A `MyResult<LazyFrame>` containing the `LazyFrame` with specified columns
+/// removed, or an error if schema collection fails.
+fn remove_temporary_columns(
+    lazy_frame: LazyFrame,
+    columns_to_drop: &[&str],
+) -> MyResult<LazyFrame> {
+    // Collect the schema to identify existing columns.
+    let schema = lazy_frame.clone().collect_schema()?;
+
+    // Filter the provided `columns_to_drop` to only include those
+    // that actually exist in the `LazyFrame`'s schema.
+    let existing_columns_to_drop: Vec<&str> = columns_to_drop
+        .iter()
+        .filter(|col_name| schema.contains(col_name))
+        .copied() // Dereference and collect owned string slices
+        .collect();
+
+    // If there are any columns confirmed to exist, proceed with dropping them.
+    // Otherwise, return the original LazyFrame unchanged.
+    if !existing_columns_to_drop.is_empty() {
+        Ok(lazy_frame.drop(by_name(existing_columns_to_drop, true)))
+    } else {
+        Ok(lazy_frame)
+    }
+}
+
 pub fn quit() {
     std::process::exit(0);
 }
@@ -1310,6 +1350,43 @@ mod tests_functions {
         println!("column: {col:?}\n");
 
         assert_eq!(Column::new("".into(), &valid), col);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_remove_temporary_columns() -> MyResult<()> {
+        let lf = df![
+            "col_a" => &[1, 2, 3],
+            "col_b" => &["a", "b", "c"],
+            "col_c_temp" => &[true, false, true],
+            "col_d" => &[10.0, 20.0, 30.0],
+            "col_e_temp" => &[4, 5, 6],
+        ]?
+        .lazy();
+
+        let columns_to_remove = &["col_c_temp", "non_existent", "col_e_temp"];
+
+        let result_lf = remove_temporary_columns(lf, columns_to_remove)?;
+        let df = result_lf.collect()?;
+
+        let col_names: Vec<&str> = df
+            .get_column_names()
+            .into_iter()
+            .map(|c| c.as_str())
+            .collect();
+
+        // Assert that only existing temporary columns are removed
+        assert!(!col_names.contains(&"col_c_temp"));
+        assert!(!col_names.contains(&"col_e_temp"));
+
+        // Assert that other original columns are still present
+        assert!(col_names.contains(&"col_a"));
+        assert!(col_names.contains(&"col_b"));
+        assert!(col_names.contains(&"col_d"));
+
+        // Assert the final number of columns
+        assert_eq!(df.width(), 3); // 5 initial - 2 removed = 3
 
         Ok(())
     }

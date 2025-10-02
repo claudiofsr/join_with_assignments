@@ -7,7 +7,7 @@ use crate::{
     adicionar_coluna_de_incidencia_monofasica,
     adicionar_coluna_periodo_de_apuracao_inicial_e_final, coluna, configure_the_environment,
     cst_50_a_56, equal, get_cnpj_base, get_output_as_float64, get_output_as_string,
-    operacoes_de_credito, round_column, unequal,
+    operacoes_de_credito, remove_temporary_columns, round_column, unequal,
 };
 use polars::prelude::*;
 
@@ -491,37 +491,6 @@ fn analisar_situacao05(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     Ok(lf_result)
 }
 
-/// Remover colunas temporárias
-fn remover_colunas_temporarias_sit06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
-    let columns: Vec<&str> = vec![
-        "Chaves de Docs Fiscais",
-        "Count",
-        "Períodos de Apuração",
-        "Período Válido",
-        "Períodos Inválidos",
-        "Períodos Formatados",
-    ];
-
-    let schema = lazyframe.clone().collect_schema()?;
-    let mut existing_columns_to_drop = Vec::new();
-
-    // Itera sobre as colunas que você quer remover
-    // e adiciona à lista se elas existirem no esquema do LazyFrame.
-    for col_name in columns {
-        if schema.contains(col_name) {
-            existing_columns_to_drop.push(col_name);
-        }
-    }
-
-    // Se houver colunas para remover, use o método drop do LazyFrame.
-    if !existing_columns_to_drop.is_empty() {
-        Ok(lazyframe.drop(by_name(existing_columns_to_drop, true)))
-    } else {
-        // Se nenhuma das colunas especificadas existir, retorne o LazyFrame original.
-        Ok(lazyframe)
-    }
-}
-
 fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     let glosar: &str = coluna(Middle, "glosar");
     let periodo_de_apuracao: &str = coluna(Left, "pa"); // "Período de Apuração",
@@ -529,6 +498,15 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     let chave_nfe: &str = coluna(Right, "chave");
     let chaves: &str = "Chaves de Docs Fiscais"; // unificar duas colunas em uma coluna
     let len_min = 10;
+
+    let colunas_temporarias: Vec<&str> = vec![
+        "Chaves de Docs Fiscais",
+        "Count",
+        "Períodos de Apuração",
+        "Período Válido",
+        "Períodos Inválidos",
+        "Períodos Formatados",
+    ];
 
     // Selecionar colunas nesta ordem
     let selected: [Expr; 2] = [col(periodo_de_apuracao), col(chaves)];
@@ -593,7 +571,7 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
 
     // Early exit if no duplicates found
     if df_groupby_chaves.height() == 0 {
-        let lazyframe = remover_colunas_temporarias_sit06(lazyframe)?;
+        let lazyframe = remove_temporary_columns(lazyframe, &colunas_temporarias)?;
         return Ok(lazyframe);
     }
 
@@ -639,7 +617,7 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
 
     let lf_result: LazyFrame = aplicar_situacao(lz_unificado, situacao_06, mensagem, lit(0))?;
 
-    let lf_result = remover_colunas_temporarias_sit06(lf_result)?;
+    let lf_result = remove_temporary_columns(lf_result, &colunas_temporarias)?;
 
     Ok(lf_result)
 }
