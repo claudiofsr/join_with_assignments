@@ -40,7 +40,7 @@ pub use self::{
     },
     excel::*,
     filtros::*,
-    glosar_base_de_calculo::glosar_bc,
+    glosar_base_de_calculo::{LazyFrameExtension, glosar_bc},
     legislacao_aliquota_zero::adicionar_coluna_de_aliquota_zero,
     legislacao_credito_presumido::adicionar_coluna_de_credito_presumido,
     legislacao_incidencia_monofasica::adicionar_coluna_de_incidencia_monofasica,

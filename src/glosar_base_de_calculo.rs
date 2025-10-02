@@ -38,7 +38,7 @@ println!("cte_valor_lazyframe: {:?}", cte_valor_lazyframe.collect()?);
 // ### --- cte_valor.csv --- ###
 */
 
-/// Trait extension to LazyFrame
+/// Trait extension for `LazyFrame` to provide additional functionalities.
 pub trait LazyFrameExtension {
     /// Format LazyFrame values
     ///
@@ -52,7 +52,65 @@ pub trait LazyFrameExtension {
     /// Adicionar 3 colunas contendo CNPJ Base
     fn adicionar_colunas_auxiliares(self) -> Self;
 
-    /// Removes columns from a LazyFrame.
+    /// Removes specified columns from a `LazyFrame`.
+    ///
+    /// This function takes a list of column names and drops them from the `LazyFrame`.
+    /// It first checks if the columns exist in the `LazyFrame`'s schema to avoid errors
+    /// when attempting to drop non-existent columns.
+    ///
+    /// ### Arguments
+    ///
+    /// * `self` - The `LazyFrame` instance.
+    /// * `columns_to_drop` - A slice of string slices representing the names of the
+    ///   columns to be dropped.
+    ///
+    /// ### Returns
+    ///
+    /// A `PolarsResult` containing the modified `LazyFrame` with the specified columns
+    /// removed, or an error if the schema collection fails.
+    ///
+    /// ### Examples
+    ///
+    /// ```rust
+    /// use polars::prelude::*;
+    /// use crate::join_with_assignments::LazyFrameExtension;
+    ///
+    /// fn main() -> PolarsResult<()> {
+    ///     let df = df! {
+    ///         "col1" => &[1, 2, 3],
+    ///         "col2" => &["a", "b", "c"],
+    ///         "col3" => &[true, false, true],
+    ///         "col4" => &[10.0, 20.0, 30.0],
+    ///     }?;
+    ///
+    ///     let lf = df.lazy();
+    ///     // Attempt to drop existing and non-existing columns
+    ///     let dropped_lf = lf.drop_columns(&["col2", "col_nonexistent", "col4"])?;
+    ///
+    ///     let collected_df = dropped_lf.collect()?;
+    ///     println!("{:?}", collected_df);
+    ///
+    ///     // Expected output will not contain "col2" and "col4",
+    ///     // and "col_nonexistent" will be ignored.
+    ///     // Output should only have "col1" and "col3".
+    ///
+    ///     let col_names: Vec<&str> = collected_df
+    ///         .get_column_names()
+    ///         .into_iter()
+    ///         .map(|c| c.as_str())
+    ///         .collect();
+    ///     
+    ///     assert!(col_names.contains(&"col1"));
+    ///     assert!(col_names.contains(&"col3"));
+    ///
+    ///     assert!(!col_names.contains(&"col2"));
+    ///     assert!(!col_names.contains(&"col4"));
+    ///
+    ///     // Assert the final number of columns
+    ///     assert_eq!(collected_df.width(), 2); // 4 initial - 2 removed = 2
+    ///     Ok(())
+    /// }
+    /// ```
     fn drop_columns(self, columns_to_drop: &[&str]) -> PolarsResult<Self>
     where
         Self: std::marker::Sized;
@@ -132,23 +190,27 @@ impl LazyFrameExtension for LazyFrame {
     where
         Self: std::marker::Sized,
     {
-        // Collect the schema to identify existing columns.
+        // Clone the LazyFrame to allow for schema collection without consuming the original.
+        // This is a common pattern when you need to inspect the frame's metadata
+        // before applying transformations.
         let schema = self.clone().collect_schema()?;
 
         // Filter the provided `columns_to_drop` to only include those
         // that actually exist in the `LazyFrame`'s schema.
+        // This prevents Polars from raising an error for non-existent columns.
         let existing_columns_to_drop: Vec<&str> = columns_to_drop
             .iter()
-            .filter(|col_name| schema.contains(col_name))
-            .copied() // Dereference and collect owned string slices
+            .filter(|&col_name| schema.contains(col_name))
+            .copied() // Dereference and collect owned string slices from the iterator
             .collect();
 
-        // If there are any columns confirmed to exist, proceed with dropping them.
-        // Otherwise, return the original LazyFrame unchanged.
-        if !existing_columns_to_drop.is_empty() {
-            Ok(self.drop(by_name(existing_columns_to_drop, true)))
-        } else {
+        if existing_columns_to_drop.is_empty() {
+            // If no valid columns are found to drop, return the original LazyFrame as is.
             Ok(self)
+        } else {
+            // Use the `drop` method with `by_name` to remove the identified existing columns.
+            // The `true` argument indicates that we are dropping columns by their names.
+            Ok(self.drop(by_name(existing_columns_to_drop, true)))
         }
     }
 }
