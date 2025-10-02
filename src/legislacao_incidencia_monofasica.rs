@@ -1,7 +1,10 @@
 use polars::{prelude::*, series::Series};
 use rayon::prelude::*;
 
-use crate::{MyResult, get_output_same_type, operacoes_de_entrada_ou_saida};
+use crate::{
+    MyResult, get_output_same_type, glosar_base_de_calculo::LazyFrameExtension,
+    operacoes_de_entrada_ou_saida,
+};
 
 /// Analisar legislação vigente das Contribuições conforme código NCM e descrição dos itens.
 ///
@@ -70,13 +73,8 @@ pub fn adicionar_coluna_de_incidencia_monofasica(lazyframe: LazyFrame) -> MyResu
                 .otherwise(lit(NULL)) // replace by null
                 .alias(columns[1]), // .keep_name()
         )
-        .drop(by_name(
-            [
-                // Remover 2 colunas temporárias
-                side_a[2], side_b[2],
-            ],
-            true,
-        ));
+        // Remover 2 colunas temporárias
+        .drop_columns(&[side_a[2], side_b[2]])?;
 
     Ok(lazyframe)
 }

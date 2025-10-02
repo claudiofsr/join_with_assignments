@@ -4,9 +4,9 @@ use std::ops::Neg;
 use crate::{
     MyResult, Side::Left, cfop_de_exportacao, coluna, cst_50_a_66, cst_de_receita_bruta, csts,
     csts_nao_tributados, desprezar_pequenos_valores, entrada_de_credito, get_cnpj_base,
-    get_output_as_string, get_output_same_type, operacoes_de_ajustes_ou_descontos,
-    operacoes_de_saida, receita_bruta_cumulativa, receita_bruta_nao_cumulativa, receita_nao_nula,
-    round_float64_columns, saida_de_receita_bruta,
+    get_output_as_string, get_output_same_type, glosar_base_de_calculo::LazyFrameExtension,
+    operacoes_de_ajustes_ou_descontos, operacoes_de_saida, receita_bruta_cumulativa,
+    receita_bruta_nao_cumulativa, receita_nao_nula, round_float64_columns, saida_de_receita_bruta,
 };
 
 const SMALL_VALUE: f64 = 0.009; // menor que um centavo
@@ -301,13 +301,8 @@ fn groupby_and_agg_values(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
             transferir_valores(2, "RBNC_NTributada"),
             transferir_valores(3, "RBNC_Exportação"),
         ])
-        .drop(by_name(
-            [
-                // Remover colunas temporárias
-                "Código do Tipo de Crédito",
-            ],
-            true,
-        ))
+        // Remover colunas temporárias
+        .drop_columns(&["Código do Tipo de Crédito"])?
         .group_by([
             col("CNPJ Base"),
             col("Ano do Período de Apuração"),
@@ -669,6 +664,16 @@ fn analisar_debitos_omitidos(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
 
 /// Agregar colunas para em seguida remover colunas temporárias
 fn remover_colunas_temporarias(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
+    // Collect all temporary column names for later removal
+    let colunas_temporarias: Vec<&str> = vec![
+        // Remover colunas temporárias
+        "Registro",
+        "Código Fiscal de Operações e Prestações (CFOP)",
+        "Código NCM",
+        "Valor Total do Item",
+        //"ReceitaBrutaTotal",
+    ];
+
     let lazy: LazyFrame = lazyframe
         .group_by([
             col("CNPJ Base"),
@@ -697,17 +702,7 @@ fn remover_colunas_temporarias(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
             col("RecBrutaCumulativa").sum(),
             col("ReceitaBrutaTotal").sum(),
         ])
-        .drop(by_name(
-            [
-                // Remover colunas temporárias
-                "Registro",
-                "Código Fiscal de Operações e Prestações (CFOP)",
-                "Código NCM",
-                "Valor Total do Item",
-                //"ReceitaBrutaTotal",
-            ],
-            true,
-        ));
+        .drop_columns(&colunas_temporarias)?;
 
     Ok(lazy)
 }
