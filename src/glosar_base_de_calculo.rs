@@ -606,7 +606,7 @@ fn analisar_situacao06a(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     let selected: [Expr; 2] = [col(periodo_de_apuracao), col(chaves_unificadas)];
 
     // --- Step 2: Group by unified keys to find keys used in multiple accounting periods ---
-    let df_groupby_chaves = lazyframe
+    let mut df_groupby_chaves = lazyframe
         .clone()
         .select(&selected)
         .filter(col(periodo_de_apuracao).is_not_null())
@@ -677,25 +677,9 @@ fn analisar_situacao06a(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
         return Ok(lazyframe);
     }
 
-    // Imprimir todas as linhas do DataFrame
-    unsafe {
-        env::set_var("POLARS_FMT_MAX_ROWS", number_of_rows.to_string()); // maximum number of rows shown when formatting DataFrames.
-    }
-    println!(
-        "Documentos Fiscais utilizados em Períodos de Apuração distintos: {df_groupby_chaves}\n"
-    );
-
-    // Criar e escrever DataFrame para um arquivo .txt
-    let filename = "dataframe_situacao06a.txt";
-    let mut file = File::create(filename)?;
-    file.write_all(df_groupby_chaves.to_string().as_bytes())?; // Escreve os bytes da string no arquivo
-    println!("DataFrame salvo em '{filename}'");
-
-    configure_the_environment(); // Retornar à configuração padrão.
-
     // --- Step 3: Join the analysis results back to the original LazyFrame ---
     let lz_unificado: LazyFrame = lazyframe.clone().join(
-        df_groupby_chaves.lazy(),
+        df_groupby_chaves.clone().lazy(),
         vec![col(chaves_unificadas)], // Left join key
         vec![col(chaves_unificadas)], // Right join key
         JoinType::Left.into(),
@@ -733,6 +717,25 @@ fn analisar_situacao06a(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     // Remove all temporary columns created during this analysis
     let lf_result = lf_result.drop_columns(&colunas_temporarias)?;
 
+    // Remover a coluna periodos_formatados de DataFrame
+    df_groupby_chaves.drop_in_place(periodos_formatados)?;
+
+    // Imprimir todas as linhas do DataFrame
+    unsafe {
+        env::set_var("POLARS_FMT_MAX_ROWS", number_of_rows.to_string()); // maximum number of rows shown when formatting DataFrames.
+    }
+    println!(
+        "Documentos Fiscais utilizados em Períodos de Apuração distintos: {df_groupby_chaves}\n"
+    );
+
+    // Criar e escrever DataFrame para um arquivo .txt
+    let filename = "dataframe_situacao06a.txt";
+    let mut file = File::create(filename)?;
+    file.write_all(df_groupby_chaves.to_string().as_bytes())?; // Escreve os bytes da string no arquivo
+    println!("DataFrame salvo em '{filename}'\n");
+
+    configure_the_environment(); // Retornar à configuração padrão.    
+
     Ok(lf_result)
 }
 
@@ -762,7 +765,7 @@ fn analisar_situacao06b(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     let selected: [Expr; 3] = [col(periodo_de_apuracao), col(cnpj_particip), col(num_doc)];
 
     // --- Step 1: Group by unified keys to find keys used in multiple accounting periods ---
-    let df_groupby_cnpj = lazyframe
+    let mut df_groupby_cnpj = lazyframe
         .clone()
         .select(&selected)
         .filter(col(periodo_de_apuracao).is_not_null())
@@ -826,25 +829,9 @@ fn analisar_situacao06b(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
         return Ok(lazyframe);
     }
 
-    // Imprimir todas as linhas do DataFrame
-    unsafe {
-        env::set_var("POLARS_FMT_MAX_ROWS", number_of_rows.to_string()); // maximum number of rows shown when formatting DataFrames.
-    }
-    println!(
-        "Documentos Fiscais utilizados em Períodos de Apuração distintos: {df_groupby_cnpj}\n"
-    );
-
-    // Criar e escrever DataFrame para um arquivo .txt
-    let filename = "dataframe_situacao06b.txt";
-    let mut file = File::create(filename)?;
-    file.write_all(df_groupby_cnpj.to_string().as_bytes())?; // Escreve os bytes da string no arquivo
-    println!("DataFrame salvo em '{filename}'");
-
-    configure_the_environment(); // Retornar à configuração padrão.
-
     // --- Step 2: Join the analysis results back to the original LazyFrame ---
     let lz_unificado: LazyFrame = lazyframe.clone().join(
-        df_groupby_cnpj.lazy(),
+        df_groupby_cnpj.clone().lazy(),
         vec![col(cnpj_particip), col(num_doc)], // Left join key
         vec![col(cnpj_particip), col(num_doc)], // Right join key
         JoinType::Left.into(),
@@ -883,6 +870,25 @@ fn analisar_situacao06b(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
 
     // Remove all temporary columns created during this analysis
     let lf_result = lf_result.lazy().drop_columns(&colunas_temporarias)?;
+
+    // Remover a coluna periodos_formatados de DataFrame
+    df_groupby_cnpj.drop_in_place(periodos_formatados)?;
+
+    // Imprimir todas as linhas do DataFrame
+    unsafe {
+        env::set_var("POLARS_FMT_MAX_ROWS", number_of_rows.to_string()); // maximum number of rows shown when formatting DataFrames.
+    }
+    println!(
+        "Documentos Fiscais utilizados em Períodos de Apuração distintos: {df_groupby_cnpj}\n"
+    );
+
+    // Criar e escrever DataFrame para um arquivo .txt
+    let filename = "dataframe_situacao06b.txt";
+    let mut file = File::create(filename)?;
+    file.write_all(df_groupby_cnpj.to_string().as_bytes())?; // Escreve os bytes da string no arquivo
+    println!("DataFrame salvo em '{filename}'\n");
+
+    configure_the_environment(); // Retornar à configuração padrão.    
 
     Ok(lf_result)
 }
