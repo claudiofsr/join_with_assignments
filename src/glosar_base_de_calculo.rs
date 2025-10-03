@@ -742,6 +742,7 @@ fn analisar_situacao06a(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
 fn analisar_situacao06b(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     let glosar: &str = coluna(Middle, "glosar");
     let periodo_de_apuracao: &str = coluna(Left, "pa"); // "Período de Apuração",
+    let registro: &str = coluna(Left, "registro");
     let cnpj_particip: &str = coluna(Left, "cnpj_particip");
     let num_doc: &str = coluna(Left, "num_doc");
 
@@ -762,16 +763,22 @@ fn analisar_situacao06b(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     ];
 
     // Selecionar colunas nesta ordem
-    let selected: [Expr; 3] = [col(periodo_de_apuracao), col(cnpj_particip), col(num_doc)];
+    let selected: [Expr; 4] = [
+        col(periodo_de_apuracao),
+        col(registro),
+        col(cnpj_particip),
+        col(num_doc),
+    ];
 
     // --- Step 1: Group by unified keys to find keys used in multiple accounting periods ---
     let mut df_groupby_cnpj = lazyframe
         .clone()
         .select(&selected)
         .filter(col(periodo_de_apuracao).is_not_null())
+        .filter(col(registro).is_not_null())
         .filter(col(cnpj_particip).is_not_null())
         .filter(col(num_doc).is_not_null())
-        .group_by([col(cnpj_particip), col(num_doc)])
+        .group_by([col(registro), col(cnpj_particip), col(num_doc)])
         .agg([
             // Collect all unique accounting periods for each key, sorted
             col(periodo_de_apuracao)
@@ -832,8 +839,8 @@ fn analisar_situacao06b(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     // --- Step 2: Join the analysis results back to the original LazyFrame ---
     let lz_unificado: LazyFrame = lazyframe.clone().join(
         df_groupby_cnpj.clone().lazy(),
-        vec![col(cnpj_particip), col(num_doc)], // Left join key
-        vec![col(cnpj_particip), col(num_doc)], // Right join key
+        vec![col(registro), col(cnpj_particip), col(num_doc)], // Left join key
+        vec![col(registro), col(cnpj_particip), col(num_doc)], // Right join key
         JoinType::Left.into(),
     );
 
@@ -855,6 +862,8 @@ fn analisar_situacao06b(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
             col(cnpj_particip),
             lit("de número"),
             col(num_doc),
+            lit("registrado em"),
+            col(registro),
             lit("pertence a"),
             col(period_count),
             lit("Períodos de Apuração distintos: ["),
