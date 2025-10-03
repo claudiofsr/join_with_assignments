@@ -1,4 +1,4 @@
-use std::env;
+use std::{env, fs::File, io::Write};
 
 use crate::{
     Arguments, DataFrameExtension, MyResult,
@@ -671,19 +671,26 @@ fn analisar_situacao06a(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
         .collect()?;
 
     // Early exit if no duplicate keys across periods are found
-    let number_of_rows = df_groupby_chaves.height().min(10000);
+    let number_of_rows = df_groupby_chaves.height();
     if number_of_rows == 0 {
         let lazyframe = lazyframe.drop_columns(&colunas_temporarias)?;
         return Ok(lazyframe);
     }
 
-    // Imprimir até as 10.000 primeiras linhas do DataFrame
+    // Imprimir todas as linhas do DataFrame
     unsafe {
         env::set_var("POLARS_FMT_MAX_ROWS", number_of_rows.to_string()); // maximum number of rows shown when formatting DataFrames.
     }
     println!(
         "Documentos Fiscais utilizados em Períodos de Apuração distintos: {df_groupby_chaves}\n"
     );
+
+    // Criar e escrever DataFrame para um arquivo .txt
+    let filename = "dataframe_situacao06a.txt";
+    let mut file = File::create(filename)?;
+    file.write_all(df_groupby_chaves.to_string().as_bytes())?; // Escreve os bytes da string no arquivo
+    println!("DataFrame salvo em '{filename}'");
+
     configure_the_environment(); // Retornar à configuração padrão.
 
     // --- Step 3: Join the analysis results back to the original LazyFrame ---
@@ -813,19 +820,26 @@ fn analisar_situacao06b(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
         .collect()?;
 
     // Early exit if no duplicate keys across periods are found
-    let number_of_rows = df_groupby_cnpj.height().min(10000);
+    let number_of_rows = df_groupby_cnpj.height();
     if number_of_rows == 0 {
         let lazyframe = lazyframe.drop_columns(&colunas_temporarias)?;
         return Ok(lazyframe);
     }
 
-    // Imprimir até as 10.000 primeiras linhas do DataFrame
+    // Imprimir todas as linhas do DataFrame
     unsafe {
         env::set_var("POLARS_FMT_MAX_ROWS", number_of_rows.to_string()); // maximum number of rows shown when formatting DataFrames.
     }
     println!(
         "Documentos Fiscais utilizados em Períodos de Apuração distintos: {df_groupby_cnpj}\n"
     );
+
+    // Criar e escrever DataFrame para um arquivo .txt
+    let filename = "dataframe_situacao06b.txt";
+    let mut file = File::create(filename)?;
+    file.write_all(df_groupby_cnpj.to_string().as_bytes())?; // Escreve os bytes da string no arquivo
+    println!("DataFrame salvo em '{filename}'");
+
     configure_the_environment(); // Retornar à configuração padrão.
 
     // --- Step 2: Join the analysis results back to the original LazyFrame ---
