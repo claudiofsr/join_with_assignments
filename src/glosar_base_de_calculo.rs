@@ -229,7 +229,7 @@ pub fn glosar_bc(dataframe: &DataFrame, args: &Arguments) -> MyResult<DataFrame>
     let lazyframe: LazyFrame = analisar_situacao03(lazyframe)?;
     let lazyframe: LazyFrame = analisar_situacao04(lazyframe)?;
     // let lazyframe: LazyFrame = analisar_situacao05(lazyframe)?;
-    let lazyframe: LazyFrame = analisar_situacao06(lazyframe)?;
+    let lazyframe: LazyFrame = analisar_situacao06a(lazyframe)?;
     let lazyframe: LazyFrame = analisar_situacao06b(lazyframe)?;
     let lazyframe: LazyFrame = analisar_situacao07(lazyframe)?;
     let lazyframe: LazyFrame = analisar_situacao08(lazyframe)?;
@@ -564,7 +564,7 @@ fn analisar_situacao05(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     Ok(lf_result)
 }
 
-fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
+fn analisar_situacao06a(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     let glosar: &str = coluna(Middle, "glosar");
     let periodo_de_apuracao: &str = coluna(Left, "pa"); // "Período de Apuração",
     let chave_efd: &str = coluna(Left, "chave");
@@ -681,7 +681,9 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     unsafe {
         env::set_var("POLARS_FMT_MAX_ROWS", number_of_rows.to_string()); // maximum number of rows shown when formatting DataFrames.
     }
-    println!("Chaves utilizadas em Períodos de Apuração distintos: {df_groupby_chaves}\n");
+    println!(
+        "Documentos Fiscais utilizados em Períodos de Apuração distintos: {df_groupby_chaves}\n"
+    );
     configure_the_environment(); // Retornar à configuração padrão.
 
     // --- Step 3: Join the analysis results back to the original LazyFrame ---
@@ -693,19 +695,19 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     );
 
     // --- Step 4: Define 'Situation 06' condition and generate 'glosa' message ---
-    let situacao_06: Expr = operacoes_de_credito()?
+    let situacao_06a: Expr = operacoes_de_credito()?
         .and(col(period_count).is_not_null())
         .and(col(period_count).gt(1)) // Multipla utilização de Docs Fiscais
         .and(col(periodo_de_apuracao).neq(col(periodo_valido)));
 
-    println!("situacao_06: {situacao_06:?}\n");
+    println!("situacao_06a: {situacao_06a:?}\n");
     // std::process::exit(1);
 
     let mensagem: Expr = concat_str(
         [
             col(glosar),
             lit("Situação 06:"),
-            lit("Chave utilizada em Períodos de Apuração distintos."),
+            lit("Documento Fiscal utilizado em Períodos de Apuração distintos."),
             lit("A chave"),
             col(chaves_unificadas),
             lit("pertence a"),
@@ -719,7 +721,7 @@ fn analisar_situacao06(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
         true,
     );
 
-    let lf_result: LazyFrame = aplicar_situacao(lz_unificado, situacao_06, mensagem, lit(0))?;
+    let lf_result: LazyFrame = aplicar_situacao(lz_unificado, situacao_06a, mensagem, lit(0))?;
 
     // Remove all temporary columns created during this analysis
     let lf_result = lf_result.drop_columns(&colunas_temporarias)?;
@@ -753,7 +755,7 @@ fn analisar_situacao06b(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     let selected: [Expr; 3] = [col(periodo_de_apuracao), col(cnpj_particip), col(num_doc)];
 
     // --- Step 1: Group by unified keys to find keys used in multiple accounting periods ---
-    let df_groupby_chaves = lazyframe
+    let df_groupby_cnpj = lazyframe
         .clone()
         .select(&selected)
         .filter(col(periodo_de_apuracao).is_not_null())
@@ -811,7 +813,7 @@ fn analisar_situacao06b(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
         .collect()?;
 
     // Early exit if no duplicate keys across periods are found
-    let number_of_rows = df_groupby_chaves.height().min(10000);
+    let number_of_rows = df_groupby_cnpj.height().min(10000);
     if number_of_rows == 0 {
         let lazyframe = lazyframe.drop_columns(&colunas_temporarias)?;
         return Ok(lazyframe);
@@ -821,12 +823,14 @@ fn analisar_situacao06b(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     unsafe {
         env::set_var("POLARS_FMT_MAX_ROWS", number_of_rows.to_string()); // maximum number of rows shown when formatting DataFrames.
     }
-    println!("Chaves utilizadas em Períodos de Apuração distintos: {df_groupby_chaves}\n");
+    println!(
+        "Documentos Fiscais utilizados em Períodos de Apuração distintos: {df_groupby_cnpj}\n"
+    );
     configure_the_environment(); // Retornar à configuração padrão.
 
     // --- Step 2: Join the analysis results back to the original LazyFrame ---
     let lz_unificado: LazyFrame = lazyframe.clone().join(
-        df_groupby_chaves.lazy(),
+        df_groupby_cnpj.lazy(),
         vec![col(cnpj_particip), col(num_doc)], // Left join key
         vec![col(cnpj_particip), col(num_doc)], // Right join key
         JoinType::Left.into(),
@@ -844,11 +848,11 @@ fn analisar_situacao06b(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     let mensagem: Expr = concat_str(
         [
             col(glosar),
-            lit("Situação 06b:"),
+            lit("Situação 06:"),
             lit("Documento Fiscal utilizado em Períodos de Apuração distintos."),
-            lit("O Documento Fiscal do CNPJ: "),
+            lit("O Documento Fiscal de CNPJ"),
             col(cnpj_particip),
-            lit("de número: "),
+            lit("de número"),
             col(num_doc),
             lit("pertence a"),
             col(period_count),
