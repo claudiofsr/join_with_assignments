@@ -202,7 +202,7 @@ impl DataFrameExtension for DataFrame {
         // Filter the canonical column list to include only those present in the DataFrame.
         // Then extract just the names in the desired order.
         let columns_to_select: Vec<&str> = MyColumn::get_columns()
-            .into_iter()
+            .iter()
             // Keep only columns from the canonical list that actually exist in the DataFrame
             .filter(|col| current_columns.contains(col.name))
             //.filter(|col| self.column(col.name).is_ok())
@@ -317,7 +317,7 @@ pub fn conditionally_remove_null_columns(
 ///
 /// # Returns
 /// An `Option<Series>` containing a Series of u64 assignments if successful, otherwise `None`.
-pub fn get_option_assignments(series_efd: Series, series_nfe: Series) -> Option<Series> {
+pub fn get_option_assignments(series_efd: &Series, series_nfe: &Series) -> Option<Series> {
     // Attempt to downcast the Series to a ChunkedArray of Float64Type.
     let result_chunkedarray_f64_efd: Result<&ChunkedArray<Float64Type>, PolarsError> =
         series_efd.f64();
@@ -327,12 +327,12 @@ pub fn get_option_assignments(series_efd: Series, series_nfe: Series) -> Option<
     match (result_chunkedarray_f64_efd, result_chunkedarray_f64_nfe) {
         (Ok(chunkedarray_f64_efd), Ok(chunkedarray_f64_nfe)) => {
             let vec_float64_efd: Vec<f64> = chunkedarray_f64_efd
-                .into_iter()
+                .iter()
                 .filter_map(verbose_option) //.map_while(verbose_option)
                 .collect();
 
             let vec_float64_nfe: Vec<f64> = chunkedarray_f64_nfe
-                .into_iter()
+                .iter()
                 .filter_map(verbose_option)
                 .collect();
 
@@ -397,17 +397,17 @@ pub fn get_opt_vectuples(
     ) {
         (Ok(chunkedarray_u64_efd), Ok(chunkedarray_u64_nfe), Ok(chunkedarray_u64_asg)) => {
             let vec_u64_efd: Vec<u64> = chunkedarray_u64_efd
-                .into_iter()
+                .iter()
                 .filter_map(verbose_option)
                 .collect();
 
             let vec_u64_nfe: Vec<u64> = chunkedarray_u64_nfe
-                .into_iter()
+                .iter()
                 .filter_map(verbose_option)
                 .collect();
 
             let vec_u64_asg: Vec<u64> = chunkedarray_u64_asg
-                .into_iter()
+                .iter()
                 .filter_map(verbose_option)
                 .collect();
 
@@ -869,7 +869,7 @@ pub fn get_cnpj_base(col: Column) -> PolarsResult<Column> {
 fn cnpj_base(col: Column) -> PolarsResult<Column> {
     let new_col: Column = col
         .str()?
-        .into_iter()
+        .iter()
         .map(|option_str: Option<&str>| {
             option_str.and_then(|text| {
                 let mut cnpjs: Vec<String> = extract_cnpjs(text);
@@ -914,7 +914,7 @@ pub fn add_leading_zeros(series: Series, fill: usize) -> PolarsResult<Option<Ser
 fn leading_zeros(series: Series, fill: usize) -> PolarsResult<Option<Series>> {
     let new_series: Series = series
         .i64()?
-        .into_iter()
+        .iter()
         .map(|option_i64: Option<i64>| option_i64.map(|int64| format!("{int64:0fill$}")))
         .collect::<StringChunked>()
         .into_series();
@@ -926,7 +926,7 @@ fn leading_zeros(series: Series, fill: usize) -> PolarsResult<Option<Series>> {
 pub fn formatar_ncm(col: Column) -> PolarsResult<Column> {
     let new_col: Column = col
         .str()?
-        .into_iter()
+        .iter()
         .map(|option_str| option_str.map(extract_ncm))
         .collect::<StringChunked>()
         .into_column();
@@ -951,7 +951,7 @@ pub fn formatar_chave_eletronica(col: Column) -> PolarsResult<Column> {
 fn format_digits(col: Column) -> PolarsResult<Column> {
     let new_col: Column = col
         .str()?
-        .into_iter()
+        .iter()
         .map(retain_only_digits)
         .collect::<StringChunked>()
         .into_column();
@@ -1235,11 +1235,7 @@ mod tests_functions {
         let lf = lf.drop_columns(columns_to_remove)?;
         let df = lf.collect()?;
 
-        let col_names: Vec<&str> = df
-            .get_column_names()
-            .into_iter()
-            .map(|c| c.as_str())
-            .collect();
+        let col_names: Vec<&str> = df.get_column_names().iter().map(|c| c.as_str()).collect();
 
         // Assert that only existing temporary columns are removed
         assert!(!col_names.contains(&"col_c_temp"));
@@ -1398,7 +1394,7 @@ mod tests_functions {
         let series = Series::new("a".into(), 0..10i32);
         println!("series: {series}");
 
-        let vec_opt_i32: Vec<Option<i32>> = series.i32()?.into_iter().collect();
+        let vec_opt_i32: Vec<Option<i32>> = series.i32()?.iter().collect();
         println!("vec_opt_i32: {vec_opt_i32:?}");
 
         // if we are certain we don't have missing values
@@ -1439,9 +1435,9 @@ mod tests_functions {
 
             // fn get_option_assignments(series_efd: Series, series_nfe: Series) -> Option<Series>
 
-            if let Some(assignments) = get_option_assignments(series_efd, series_nfe) {
+            if let Some(assignments) = get_option_assignments(&series_efd, &series_nfe) {
                 // println!("assignments: {assignments}");
-                let result: Vec<u64> = assignments.u64()?.into_iter().flatten().collect();
+                let result: Vec<u64> = assignments.u64()?.iter().flatten().collect();
                 results.push(result);
             }
 

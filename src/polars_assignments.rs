@@ -207,35 +207,55 @@ fn groupby_fazyframe_b(lazyframe: LazyFrame) -> PolarsResult<LazyFrame> {
 /// # Returns
 /// A `Result` containing the joined and processed DataFrame or a `PolarsError` if any operation fails.
 fn join_lazyframes(lazyframe_a: LazyFrame, lazyframe_b: LazyFrame) -> PolarsResult<DataFrame> {
+    let chave_efd: &str = coluna(Left, "chave");
+    let chave_nfe: &str = coluna(Right, "chave");
+
     let dataframe: DataFrame = lazyframe_a
         .join(
             lazyframe_b,
-            [col(coluna(Left, "chave"))], // Join key from the left DataFrame
-            [col(coluna(Right, "chave"))], // Join key from the right DataFrame
+            [col(chave_efd)], // Join key from the left DataFrame
+            [col(chave_nfe)], // Join key from the right DataFrame
             JoinType::Inner.into(),
         )
-        // An inner join produces a DataFrame that contains only the rows where the join key exists in both DataFrames.
-        // https://pola-rs.github.io/polars-book/user-guide/expressions/user-defined-functions/#combining-multiple-column-values
-        .with_column(
-            // pack to struct to get access to multiple fields in a custom `apply/map`
-            // polars-plan-0.26.1/src/dsl/functions.rs ; features = ["dtype-struct"]
-            as_struct(
-                [
-                    col("Valores dos Itens da Nota Fiscal EFD"),
-                    col("Valores dos Itens da Nota Fiscal NFE"),
-                ]
-                .to_vec(),
-            )
+        .with_column(apply_munkres_assignments(
+            "Valores dos Itens da Nota Fiscal EFD",
+            "Valores dos Itens da Nota Fiscal NFE",
+            "Munkres Assignments",
+        )?)
+        .collect()?;
+
+    println!(
+        "dataframe_joinned = lazyframe_a.join(lazyframe_b, [...], JoinType::Inner)\n{dataframe}\n"
+    );
+
+    Ok(dataframe)
+}
+
+/// Aplica a lógica de "Munkres Assignments" entre duas colunas de Series List.
+/// Retorna uma expressão que pode ser usada em `with_column`.
+fn apply_munkres_assignments(
+    column_name_efd: &str,
+    column_name_nfe: &str,
+    output_alias: &str,
+) -> PolarsResult<Expr> {
+    // Clone as strings para que a closure possa possuí-las.
+    // Isso garante que elas estarão disponíveis quando a closure for executada,
+    // mesmo que 'apply_munkres_assignments' já tenha retornado.
+    let col_efd_owned = column_name_efd.to_string();
+    let col_nfe_owned = column_name_nfe.to_string();
+    let output_alias_owned = output_alias.to_string();
+
+    Ok(
+        as_struct([col(column_name_efd), col(column_name_nfe)].to_vec())
             .apply(
-                move |s| {
+                // Use 'move' para transferir a posse das strings clonadas para a closure.
+                move |col: Column| -> PolarsResult<Column> {
                     // Downcast to struct
-                    let struct_chunked: &StructChunked = s.struct_()?;
+                    let struct_chunked: &StructChunked = col.struct_()?;
 
                     // Get the individual Series (columns) from the struct by their names.
-                    let ser_list_efd: &Series =
-                        &struct_chunked.field_by_name("Valores dos Itens da Nota Fiscal EFD")?;
-                    let ser_list_nfe: &Series =
-                        &struct_chunked.field_by_name("Valores dos Itens da Nota Fiscal NFE")?;
+                    let ser_list_efd: Series = struct_chunked.field_by_name(&col_efd_owned)?;
+                    let ser_list_nfe: Series = struct_chunked.field_by_name(&col_nfe_owned)?;
 
                     // Get columns with into_iter()
                     let vec_opt_ser_efd: Vec<Option<Series>> =
@@ -251,7 +271,7 @@ fn join_lazyframes(lazyframe_a: LazyFrame, lazyframe_b: LazyFrame) -> PolarsResu
                             |(opt_ser_efd, opt_ser_nfe)| match (opt_ser_efd, opt_ser_nfe) {
                                 (Some(ser_efd), Some(ser_nfe)) => {
                                     // If both Series are present, calculate Munkres assignments.
-                                    get_option_assignments(ser_efd, ser_nfe)
+                                    get_option_assignments(&ser_efd, &ser_nfe)
                                 }
                                 _ => None,
                             },
@@ -260,22 +280,14 @@ fn join_lazyframes(lazyframe_a: LazyFrame, lazyframe_b: LazyFrame) -> PolarsResu
 
                     // Create a new Series from the calculated Munkres assignments.
                     let new_series = Series::new("New".into(), vec_series);
-
-                    Ok(new_series.into())
+                    Ok(new_series.into_column())
                 },
                 // Define the output data type for the new column.
                 // GetOutput::from_type(DataType::UInt64),
                 get_output_as_uint64,
             )
-            .alias("Munkres Assignments"),
-        )
-        .collect()?;
-
-    println!(
-        "dataframe_joinned = lazyframe_a.join(lazyframe_b, [...], JoinType::Inner)\n{dataframe}\n"
-    );
-
-    Ok(dataframe)
+            .alias(&output_alias_owned),
+    )
 }
 
 fn get_vec_from_assignments(dataframe: DataFrame) -> PolarsResult<Vec<Option<VecTuples>>> {
