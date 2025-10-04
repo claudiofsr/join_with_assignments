@@ -3,10 +3,10 @@ use std::ops::Neg;
 
 use crate::{
     MyResult, Side::Left, cfop_de_exportacao, coluna, cst_50_a_66, cst_de_receita_bruta, csts,
-    csts_nao_tributados, desprezar_pequenos_valores, entrada_de_credito, get_cnpj_base,
-    get_output_as_string, get_output_same_type, glosar_base_de_calculo::LazyFrameExtension,
-    operacoes_de_ajustes_ou_descontos, operacoes_de_saida, receita_bruta_cumulativa,
-    receita_bruta_nao_cumulativa, receita_nao_nula, round_float64_columns, saida_de_receita_bruta,
+    csts_nao_tributados, entrada_de_credito, get_cnpj_base, get_output_as_string,
+    glosar_base_de_calculo::LazyFrameExtension, operacoes_de_ajustes_ou_descontos,
+    operacoes_de_saida, receita_bruta_cumulativa, receita_bruta_nao_cumulativa, receita_nao_nula,
+    saida_de_receita_bruta,
 };
 
 const SMALL_VALUE: f64 = 0.009; // menor que um centavo
@@ -79,7 +79,6 @@ fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame, _auditar: bool) -> MyRe
     // 1: Entrada; 2: Saída; 3: Ajuste de Acréscimo; 4: Ajuste de Redução;
     // 5: Desconto da Contribuição Apurada no Próprio Período;
     // 6: Desconto Efetuado em Período Posterior; 7: Detalhamento.
-    //let excluir_cst_49: Expr = col(cst).is_not_null().and(col(cst).neq(lit(49)));
     let operacoes_desejadas: Expr = col(top).is_not_null().and(col(top).neq(lit(7)));
 
     // Natureza: '01 - Aquisição de Bens para Revenda' and CST neq 50
@@ -118,9 +117,10 @@ fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame, _auditar: bool) -> MyRe
     ];
 
     let lazy_filtered: LazyFrame = lazyframe
+        .filter(col(cst).is_not_null()) // Remover descontos de anos anteriores ao Período de Apuração da EFD
         //.filter(col("Ano do Período de Apuração").eq(lit(2022)))
         //.filter(col("Mês do Período de Apuração").eq(lit(6)))
-        //.filter(excluir_cst_49)
+        //.filter(col(cst).neq(lit(49))) // excluir CST 49
         .filter(operacoes_desejadas)
         .filter(
             entrada_de_credito()?
@@ -1075,9 +1075,9 @@ fn formatar_valores(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     let aliq_cof = coluna(Left, "aliq_cof"); // "Alíquota de COFINS (em percentual)"
     let valor_bc = coluna(Left, "valor_bc"); // "Valor da Base de Cálculo das Contribuições"
 
-    let aliquotas = [aliq_pis, aliq_cof];
-
-    let valores = [
+    let aliquotas_e_valores = [
+        aliq_pis,
+        aliq_cof,
         valor_bc,
         "RBNC_Tributada",
         "RBNC_NTributada",
@@ -1087,27 +1087,23 @@ fn formatar_valores(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
         "ReceitaBrutaTotal",
     ];
 
-    let colunas_float64 = [&aliquotas[..], &valores[..]].concat();
-
     let lazy_formated: LazyFrame = lazyframe
-        .with_columns([when(operacoes_de_saida()?)
-            .then(
-                cols(valores)
-                    .as_expr()
-                    .apply(|col| round_float64_columns(col, 4), get_output_same_type),
-            )
-            .otherwise(
-                cols(valores)
-                    .as_expr()
-                    .apply(|col| round_float64_columns(col, 4), get_output_same_type),
-            )])
-        .with_columns([cols(aliquotas)
+        .with_columns([cols(aliquotas_e_valores)
             .as_expr()
-            .apply(|col| round_float64_columns(col, 4), get_output_same_type)])
-        .with_columns([cols(colunas_float64).as_expr().apply(
-            |col| desprezar_pequenos_valores(col, SMALL_VALUE),
-            get_output_same_type,
-        )]);
+            .round(4, RoundMode::HalfAwayFromZero)])
+        .with_columns(
+            aliquotas_e_valores
+                .iter()
+                .map(|&col_name| {
+                    let column_expr: Expr = col(col_name);
+                    // Desprezar pequenos valores
+                    when(column_expr.clone().abs().gt(lit(SMALL_VALUE)))
+                        .then(column_expr) // If abs(value) > threshold, keep the original value
+                        .otherwise(lit(NULL)) // Otherwise, set to NULL
+                        .alias(col_name) // Ensure the column name is preserved
+                })
+                .collect::<Vec<Expr>>(),
+        );
 
     Ok(lazy_formated)
 }

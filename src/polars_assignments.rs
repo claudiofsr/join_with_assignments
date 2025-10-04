@@ -7,9 +7,8 @@ use crate::{
     VecTuples,
     args::Arguments,
     coluna, formatar_chave_eletronica, formatar_ncm, get_lazyframe_from_csv, get_opt_vectuples,
-    get_option_assignments, get_output_as_float64, get_output_as_string, get_output_as_uint64,
+    get_option_assignments, get_output_as_string, get_output_as_uint64,
     glosar_base_de_calculo::LazyFrameExtension,
-    round_column,
 };
 
 /// Use Polars to get dataframe after Munkres assignments
@@ -91,11 +90,9 @@ fn format_fazyframe_a(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
             // GetOutput::from_type(DataType::String)
             get_output_as_string,
         ))
-        .with_columns([cols(columns_with_float64).as_expr().map(
-            |series| round_column(series, 2),
-            // GetOutput::from_type(DataType::Float64),
-            get_output_as_float64,
-        )]);
+        .with_columns([cols(columns_with_float64)
+            .as_expr()
+            .round(2, RoundMode::HalfAwayFromZero)]);
 
     // Lazy operations don’t execute until we call .collect()?.
     Ok(lz.collect()?.lazy())
@@ -142,14 +139,9 @@ fn format_fazyframe_b(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
             // GetOutput::from_type(DataType::String)
             get_output_as_string,
         ))
-        .with_columns([
-            cols(columns_with_float64).as_expr().map(
-                |series| round_column(series, 2),
-                // GetOutput::from_type(DataType::Float64),
-                get_output_as_float64,
-            ), //all()
-               //.map(|series| round_float64_columns(series, 2), get_output_same_type)
-        ]);
+        .with_columns([cols(columns_with_float64)
+            .as_expr()
+            .round(2, RoundMode::HalfAwayFromZero)]);
 
     // Lazy operations don’t execute until we call .collect()?.
     Ok(lz.collect()?.lazy())
@@ -445,8 +437,8 @@ fn check_correlation_between_dataframes(lazyframe: LazyFrame) -> PolarsResult<Da
 mod test_assignments {
     use super::*;
     use crate::{
-        Side, apply_custom_schema_rules, configure_the_environment, get_output_same_type,
-        glosar_base_de_calculo::LazyFrameExtension, round_float64_columns,
+        Side, apply_custom_schema_rules, configure_the_environment,
+        glosar_base_de_calculo::LazyFrameExtension,
     };
     use std::{collections::HashMap, env};
 
@@ -683,10 +675,7 @@ mod test_assignments {
 
         let lazyframe: LazyFrame = dataframe01.lazy().with_columns([
             //cols(selected)
-            all().as_expr().map(
-                |series| round_float64_columns(series, 2),
-                get_output_same_type,
-            ),
+            all().as_expr().round(2, RoundMode::HalfAwayFromZero),
         ]);
 
         let dataframe02: DataFrame = lazyframe.clone().collect()?;

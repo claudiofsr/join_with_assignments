@@ -6,8 +6,7 @@ use crate::{
     adicionar_coluna_de_aliquota_zero, adicionar_coluna_de_credito_presumido,
     adicionar_coluna_de_incidencia_monofasica,
     adicionar_coluna_periodo_de_apuracao_inicial_e_final, coluna, configure_the_environment,
-    cst_50_a_56, equal, get_cnpj_base, get_output_as_float64, get_output_as_string,
-    operacoes_de_credito, round_column, unequal,
+    cst_50_a_56, equal, get_cnpj_base, get_output_as_string, operacoes_de_credito, unequal,
 };
 use polars::prelude::*;
 
@@ -123,11 +122,7 @@ impl LazyFrameExtension for LazyFrame {
         let valor_bc: &str = coluna(Left, "valor_bc");
 
         self.with_columns([
-            col(valor_bc).apply(
-                |series| round_column(series, 2),
-                // GetOutput::from_type(DataType::Float64),
-                get_output_as_float64,
-            ),
+            col(valor_bc).round(2, RoundMode::HalfAwayFromZero),
             col(glosar)
                 // Substituir multiple_whitespaces " " por apenas um " "
                 .str()
@@ -487,23 +482,11 @@ fn analisar_situacao04(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
                 "[CNPJ Base do Remetente] e [CNPJ Base do Destinatário] e [Valor Total de Documentos Vinculados].",
             ),
             lit("Valor da Base de Cálculo = "),
-            col(valor_bc).apply(
-                |col| round_column(col, 2),
-                // GetOutput::from_type(DataType::Float64),
-                get_output_as_float64,
-            ),
+            col(valor_bc).round(2, RoundMode::HalfAwayFromZero),
             lit("-"),
-            col(valor_cte_vinculado).apply(
-                |col| round_column(col, 2),
-                // GetOutput::from_type(DataType::Float64),
-                get_output_as_float64,
-            ),
+            col(valor_cte_vinculado).round(2, RoundMode::HalfAwayFromZero),
             lit("="),
-            valor_justo.clone().apply(
-                |col| round_column(col, 2),
-                // GetOutput::from_type(DataType::Float64),
-                get_output_as_float64,
-            ),
+            valor_justo.clone().round(2, RoundMode::HalfAwayFromZero),
             lit("&"),
         ],
         " ",
@@ -542,17 +525,9 @@ fn analisar_situacao05(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
                 "Excluir valor do ICMS destacado em Nota Fiscal da Base de Cálculo das Contribuições.",
             ),
             lit("O valor da Base de Cálculo foi alterado de"),
-            col(valor_bc).apply(
-                |col| round_column(col, 2),
-                // GetOutput::from_type(DataType::Float64),
-                get_output_as_float64,
-            ),
+            col(valor_bc).round(2, RoundMode::HalfAwayFromZero),
             lit("para"),
-            delta.clone().apply(
-                |col| round_column(col, 2),
-                // GetOutput::from_type(DataType::Float64),
-                get_output_as_float64,
-            ),
+            delta.clone().round(2, RoundMode::HalfAwayFromZero),
             lit("&"),
         ],
         " ",

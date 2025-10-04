@@ -51,7 +51,6 @@ pub use self::{
 };
 
 use chrono::NaiveDate;
-use claudiofsr_lib::RoundFloat;
 use polars::prelude::*;
 use regex::Regex;
 use std::{
@@ -60,9 +59,7 @@ use std::{
     env,
     fmt::Write,
     fs::File,
-    num::ParseFloatError,
     path::PathBuf,
-    process,
     sync::LazyLock as Lazy,
 };
 use sysinfo::System;
@@ -896,20 +893,6 @@ fn cnpj_base(col: Column) -> PolarsResult<Column> {
     Ok(new_col)
 }
 
-pub fn desprezar_pequenos_valores(col: Column, delta: f64) -> PolarsResult<Column> {
-    let new_col: Column = col
-        .f64()?
-        .into_iter()
-        .map(|opt_f64: Option<f64>| match opt_f64 {
-            Some(value) if value.abs() > delta => Some(value),
-            _ => None,
-        })
-        .collect::<Float64Chunked>()
-        .into_column();
-
-    Ok(new_col)
-}
-
 pub fn add_leading_zeros(series: Series, fill: usize) -> PolarsResult<Option<Series>> {
     match series.dtype() {
         DataType::Int64 => leading_zeros(series, fill),
@@ -937,85 +920,6 @@ fn leading_zeros(series: Series, fill: usize) -> PolarsResult<Option<Series>> {
         .into_series();
 
     Ok(Some(new_series))
-}
-
-/// Filtra colunas do tipo float64.
-///
-/// Posteriormente, arredonda os valores da coluna
-pub fn round_float64_columns(col: Column, decimals: u32) -> PolarsResult<Column> {
-    let series = match col.as_series() {
-        Some(s) => s,
-        None => return Ok(col),
-    };
-
-    match series.dtype() {
-        DataType::Float64 => Ok(series.round(decimals, RoundMode::HalfAwayFromZero)?.into()),
-        _ => Ok(col),
-    }
-}
-
-pub fn round_column(col: Column, decimals: u32) -> PolarsResult<Column> {
-    match col.dtype() {
-        // DataType::Float64 => Ok(Some(series.round(decimals)?)), <-- Bug panicking::panic_fmt
-        DataType::Float64 => round_column_f64(col, decimals),
-        DataType::String => round_column_str(col, decimals),
-        _ => {
-            eprintln!("fn round_series()");
-            eprintln!("Column: {col:?}");
-            eprintln!("Decimals: {decimals}");
-            Err(PolarsError::InvalidOperation(
-                format!("Not supported for Series with DataType {:?}", col.dtype()).into(),
-            ))
-        }
-    }
-}
-
-fn round_column_f64(col: Column, decimals: u32) -> PolarsResult<Column> {
-    let new_col: Column = col
-        .f64()?
-        .into_iter()
-        .map(|opt_f64: Option<f64>| opt_f64.map(|float64| float64.round_float(decimals)))
-        .collect::<Float64Chunked>()
-        .into_column();
-
-    Ok(new_col)
-}
-
-fn round_column_str(col: Column, decimals: u32) -> PolarsResult<Column> {
-    let new_col: Column = col
-        .str()?
-        .into_iter()
-        .map(|opt_str: Option<&str>| get_opt_from_str(opt_str, &col, decimals))
-        .collect::<Float64Chunked>()
-        .into_column();
-
-    Ok(new_col)
-}
-
-fn get_opt_from_str(opt_str: Option<&str>, col: &Column, decimals: u32) -> Option<f64> {
-    let opt_float64: Option<f64> = match opt_str {
-        Some(str) => {
-            let result: Result<f64, ParseFloatError> =
-                str.trim().replace('.', "").replace(',', ".").parse::<f64>();
-
-            match result {
-                Ok(float) => Some(float.round_float(decimals)),
-                Err(why) => {
-                    eprintln!("fn get_opt_from_str()");
-                    eprintln!("Error parse f64: {why}");
-                    process::exit(1)
-                }
-            }
-        }
-        None => {
-            eprintln!("fn get_opt_from_str()");
-            eprintln!("Found None value in column:");
-            eprintln!("col: {col:?}\n");
-            None
-        }
-    };
-
-    opt_float64
 }
 
 /// NCM format: "12345678" --> "1234.56.78"
@@ -1484,121 +1388,6 @@ mod tests_functions {
         println!("result: {result}");
 
         assert_eq!(valid, result);
-    }
-
-    #[test]
-    /// `cargo test -- --show-output test_round_f64`
-    fn test_round_f64() {
-        let decimals: u32 = 2;
-
-        let numbers: Vec<f64> = vec![0.025, 4.354999, 4.365, 0.01499999999999];
-
-        let result: Vec<f64> = vec![0.03, 4.35, 4.37, 0.01];
-
-        let mut rounded_number: Vec<f64> = Vec::new();
-
-        for number in &numbers {
-            let decimals_usize = decimals as usize;
-            let num = number.round_float(decimals);
-            println!("round_f64: {num} ; println: {number:.decimals_usize$}");
-            rounded_number.push(num);
-        }
-
-        assert_eq!(rounded_number, result);
-    }
-
-    #[test]
-    /// `cargo test -- --show-output function_returning_multiple_values`
-    fn function_returning_multiple_values() -> Result<(), Box<dyn Error>> {
-        // https://stackoverflow.com/questions/70959170/is-there-a-way-to-apply-a-udf-function-returning-multiple-values-in-rust-polars
-
-        let df = df![
-            "a" => [1.0, 2.0, 3.0],
-            "b" => [1.0, 2.0, 3.0]
-        ]?;
-
-        let df: DataFrame = df
-            .lazy()
-            .select([map_multiple(
-                |columns| {
-                    Ok(columns[0]
-                        .f64()?
-                        .into_no_null_iter()
-                        .zip(columns[1].f64()?.into_no_null_iter())
-                        .map(|(a, b)| {
-                            let out = black_box(a, b);
-                            Series::new("".into(), [out.0, out.1, out.2])
-                        })
-                        .collect::<ChunkedArray<ListType>>()
-                        .into_column())
-                },
-                [col("a"), col("b")],
-                // GetOutput::from_type(DataType::Float64),
-                |_, f| Ok(Field::new(f[0].name().clone(), DataType::Float64)),
-            )
-            .alias("Multiple Values")])
-            .collect()?;
-
-        //dbg!(df);
-        println!("{df}");
-
-        /*
-        shape: (3, 1)
-        ┌─────────────────┐
-        │ Multiple Values │
-        │ ---             │
-        │ list[f64]       │
-        ╞═════════════════╡
-        │ [2.0, 3.3, 1.0] │
-        │ [4.0, 6.6, 4.0] │
-        │ [6.0, 9.9, 9.0] │
-        └─────────────────┘
-        */
-
-        let column_multiple_values = df.column("Multiple Values")?;
-        let vec_opt_lines_efd: Vec<Option<Series>> =
-            column_multiple_values.list()?.into_iter().collect();
-
-        // É necessário formatar o número de casas decimais
-        let col_formatted: Vec<Column> = vec_opt_lines_efd
-            .into_iter()
-            .flat_map(|opt_series| {
-                opt_series.and_then(|series| round_column(series.into(), 1).ok())
-            })
-            .collect();
-
-        let vec_lines: Result<Vec<Vec<f64>>, Box<dyn Error>> = col_formatted
-            .iter()
-            .map(|col| {
-                let chunkedarray_f64: &ChunkedArray<Float64Type> = col.f64()?;
-
-                let vec_float64: Vec<f64> = chunkedarray_f64
-                    .into_iter()
-                    .filter_map(verbose_option)
-                    .collect();
-
-                Ok(vec_float64)
-            })
-            .collect();
-
-        let first_list = vec![2.0, 3.3, 1.0];
-
-        assert!(
-            first_list
-                .into_iter()
-                .zip(vec_lines?[0].clone())
-                .all(|(a, b)| {
-                    println!("a: {a:>3} ; b: {b:>3}");
-                    a == b
-                })
-        );
-
-        Ok(())
-    }
-
-    /// Your function that takes 2 argument and returns 3
-    fn black_box(a: f64, b: f64) -> (f64, f64, f64) {
-        (a + b, 5.4 * a - 2.1 * b, a * b)
     }
 
     #[test]
