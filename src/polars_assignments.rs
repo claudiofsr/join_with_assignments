@@ -151,17 +151,21 @@ fn groupby_fazyframe_a(lazyframe: LazyFrame) -> PolarsResult<LazyFrame> {
     let count_lines = coluna(Left, "count_lines");
     let chave = coluna(Left, "chave");
     let valor_item = coluna(Left, "valor_item");
+    let periodo_de_apuracao: &str = coluna(Left, "pa");
 
     let lf_groupby: LazyFrame = lazyframe
-        .filter(col(chave).is_not_null().and(col(valor_item).is_not_null()))
-        .group_by([col(chave)])
+        .filter(col(chave).is_not_null())
+        .filter(col(valor_item).is_not_null())
+        .filter(col(periodo_de_apuracao).is_not_null())
+        // Escrituração na EFD da mesma chave em múltiplos períodos
+        .group_by([col(periodo_de_apuracao), col(chave)])
         .agg([
-            //count(),
             col(count_lines),
             col(valor_item).alias("Valores dos Itens da Nota Fiscal EFD"),
-        ]);
+        ])
+        .drop_columns(&[periodo_de_apuracao])?;
 
-    println!("Group information according to column '{chave}'");
+    println!("Group information according to column '{periodo_de_apuracao}' and '{chave}'");
     println!("groupby_fazyframe_a:\n{}\n", lf_groupby.clone().collect()?);
 
     Ok(lf_groupby)
@@ -174,7 +178,8 @@ fn groupby_fazyframe_b(lazyframe: LazyFrame) -> PolarsResult<LazyFrame> {
     let origem = coluna(Right, "origem");
 
     let lf_groupby: LazyFrame = lazyframe
-        .filter(col(chave).is_not_null().and(col(valor_item).is_not_null()))
+        .filter(col(chave).is_not_null())
+        .filter(col(valor_item).is_not_null())
         .filter(
             when(col(origem).eq(lit("NFe")))
                 .then(col(valor_item).gt(0))
@@ -182,7 +187,6 @@ fn groupby_fazyframe_b(lazyframe: LazyFrame) -> PolarsResult<LazyFrame> {
         )
         .group_by([col(chave)])
         .agg([
-            //count(),
             col(count_lines),
             col(valor_item).alias("Valores dos Itens da Nota Fiscal NFE"),
         ]);
