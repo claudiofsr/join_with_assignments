@@ -2,7 +2,7 @@ use polars::prelude::*;
 use rayon::prelude::*;
 
 use crate::{
-    DataFrameExtension, MyResult,
+    DataFrameExtension, ExprExtension, MyResult,
     Side::{Left, Middle, Right},
     VecTuples,
     args::Arguments,
@@ -90,9 +90,7 @@ fn format_fazyframe_a(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
             // GetOutput::from_type(DataType::String)
             get_output_as_string,
         ))
-        .with_columns([cols(columns_with_float64)
-            .as_expr()
-            .round(2, RoundMode::HalfAwayFromZero)]);
+        .with_columns([cols(columns_with_float64).as_expr().round_expr(2)]);
 
     // Lazy operations don’t execute until we call .collect()?.
     Ok(lz.collect()?.lazy())
@@ -139,9 +137,7 @@ fn format_fazyframe_b(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
             // GetOutput::from_type(DataType::String)
             get_output_as_string,
         ))
-        .with_columns([cols(columns_with_float64)
-            .as_expr()
-            .round(2, RoundMode::HalfAwayFromZero)]);
+        .with_columns([cols(columns_with_float64).as_expr().round_expr(2)]);
 
     // Lazy operations don’t execute until we call .collect()?.
     Ok(lz.collect()?.lazy())
@@ -453,7 +449,7 @@ fn check_correlation_between_dataframes(lazyframe: LazyFrame) -> PolarsResult<Da
 mod test_assignments {
     use super::*;
     use crate::{
-        Side, apply_custom_schema_rules, configure_the_environment,
+        ExprExtension, Side, apply_custom_schema_rules, configure_the_environment,
         glosar_base_de_calculo::LazyFrameExtension,
     };
     use std::{collections::HashMap, env};
@@ -691,7 +687,7 @@ mod test_assignments {
 
         let lazyframe: LazyFrame = dataframe01.lazy().with_columns([
             //cols(selected)
-            all().as_expr().round(2, RoundMode::HalfAwayFromZero),
+            all().as_expr().round_expr(2),
         ]);
 
         let dataframe02: DataFrame = lazyframe.clone().collect()?;

@@ -2,11 +2,11 @@ use polars::{datatypes::DataType, prelude::*};
 use std::ops::Neg;
 
 use crate::{
-    MyResult, Side::Left, cfop_de_exportacao, coluna, cst_50_a_66, cst_de_receita_bruta, csts,
-    csts_nao_tributados, entrada_de_credito, get_cnpj_base, get_output_as_string,
-    glosar_base_de_calculo::LazyFrameExtension, operacoes_de_ajustes_ou_descontos,
-    operacoes_de_saida, receita_bruta_cumulativa, receita_bruta_nao_cumulativa, receita_nao_nula,
-    saida_de_receita_bruta,
+    ExprExtension, MyResult, Side::Left, cfop_de_exportacao, coluna, cst_50_a_66,
+    cst_de_receita_bruta, csts, csts_nao_tributados, entrada_de_credito, get_cnpj_base,
+    get_output_as_string, glosar_base_de_calculo::LazyFrameExtension,
+    operacoes_de_ajustes_ou_descontos, operacoes_de_saida, receita_bruta_cumulativa,
+    receita_bruta_nao_cumulativa, receita_nao_nula, saida_de_receita_bruta,
 };
 
 const SMALL_VALUE: f64 = 0.009; // menor que um centavo
@@ -1088,9 +1088,7 @@ fn formatar_valores(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     ];
 
     let lazy_formated: LazyFrame = lazyframe
-        .with_columns([cols(aliquotas_e_valores)
-            .as_expr()
-            .round(4, RoundMode::HalfAwayFromZero)])
+        .with_columns([cols(aliquotas_e_valores).as_expr().round_expr(4)])
         .with_columns(
             aliquotas_e_valores
                 .iter()

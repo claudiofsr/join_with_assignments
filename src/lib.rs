@@ -11,6 +11,7 @@ mod legislacao_credito_presumido;
 mod legislacao_incidencia_monofasica;
 mod munkres;
 mod polars_assignments;
+mod traits;
 
 /// A module that exports the `ExcelWriter` struct which implements the Polars
 /// `SerWriter` trait to serialize a dataframe to an Excel Xlsx file.
@@ -46,6 +47,7 @@ pub use self::{
     legislacao_incidencia_monofasica::adicionar_coluna_de_incidencia_monofasica,
     munkres::{FloatIterExt, munkres_assignments, try_convert},
     polars_assignments::get_dataframe_after_assignments,
+    traits::ExprExtension,
     write::ExcelWriter,
     xlsx_writer::PolarsXlsxWriter,
 };
