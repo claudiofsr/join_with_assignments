@@ -908,48 +908,27 @@ pub fn formatar_ncm(col: Column) -> PolarsResult<Column> {
     Ok(new_col)
 }
 
-pub fn formatar_chave_eletronica(col: Column) -> PolarsResult<Column> {
-    match col.dtype() {
-        DataType::String => format_digits(col),
-        _ => {
-            eprintln!("fn formatar_chave_eletronica()");
-            eprintln!("Column: {col:?}");
-            Err(PolarsError::InvalidOperation(
-                format!("Not supported for Series with DataType {:?}", col.dtype()).into(),
-            ))
-        }
-    }
-}
-
-// https://docs.rs/polars/latest/polars/prelude/string/struct.StringNameSpace.html#
-fn format_digits(col: Column) -> PolarsResult<Column> {
-    let new_col: Column = col
-        .str()?
-        .iter()
-        .map(retain_only_digits)
-        .collect::<StringChunked>()
-        .into_column();
-
-    Ok(new_col)
-}
-
-/// We use the as_ref method to get a reference to the optional string (opt_str).
+/// Creates an expression to retain only digits from a specified column.
 ///
-/// Then, we use the map method to transform the optional string into an optional string
-/// containing only the ASCII digit characters.
-fn retain_only_digits(opt_str: Option<&str>) -> Option<String> {
-    opt_str.as_ref().and_then(|string| {
-        let digits: String = string
-            .chars()
-            .filter(|c| c.is_ascii_digit())
-            .collect::<String>();
+/// This function generates a Polars expression that replaces all non-digit characters
+/// in the target column with an empty string, effectively retaining only numeric characters.
+/// The resulting column will keep its original name.
+///
+/// Arguments:
+/// * `column_name`: The name of the column to process.
+///
+/// Returns:
+/// A Polars expression that, when applied, will clean the specified column.
+pub fn retain_only_digits(column_name: &str) -> Expr {
+    // Regex expression to remove non-numeric characters
+    // [^0-9] will match any character that is not a digit (0-9)
+    let pattern: Expr = lit(r"[^0-9]"); // Regex to match non-numeric characters
 
-        if !digits.is_empty() {
-            Some(digits)
-        } else {
-            None
-        }
-    })
+    col(column_name)
+        .str()
+        .replace_all(pattern, lit(""), false)
+        .name()
+        .keep() // Keep the original column name
 }
 
 /**
