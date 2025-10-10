@@ -922,13 +922,14 @@ pub fn formatar_ncm(col: Column) -> PolarsResult<Column> {
 pub fn retain_only_digits(column_name: &str) -> Expr {
     // Regex expression to remove non-numeric characters
     // [^0-9] will match any character that is not a digit (0-9)
-    let pattern: Expr = lit(r"[^0-9]"); // Regex to match non-numeric characters
+    // \D means "match any character that is NOT a digit".
+    let pattern: Expr = lit(r"\D"); // Regex to match non-numeric characters
 
     col(column_name)
         .str()
         .replace_all(pattern, lit(""), false)
-        .name()
-        .keep() // Keep the original column name
+        //.name().keep() // Keep the original column name
+        .alias(column_name) // Use alias to explicitly keep the original column name
 }
 
 /**
@@ -1590,6 +1591,54 @@ mod tests_replace_values_with_null {
             df_expected.schema(),
             "DataFrame mismatch schema"
         );
+
+        Ok(())
+    }
+
+    #[test]
+    /// Run tests with:
+    /// `cargo test -- --show-output test_retain_only_digits`
+    fn test_retain_only_digits() -> PolarsResult<()> {
+        let df: DataFrame = df!(
+            "text_col"  => &[
+                Some("abc123def456"),
+                Some("789xyz0"),
+                Some(""),   // empty_string ""
+                None,       // with null
+                Some("0"),
+                Some("  "), // empty_string "  "
+                None,       // with null
+                Some("!@#"),
+                Some("123"),
+                Some("abc")
+            ],
+        )?;
+
+        println!("df: {df}");
+
+        let cleaned_df = df
+            .lazy()
+            .with_column(retain_only_digits("text_col"))
+            .collect()?;
+
+        let expected_df: DataFrame = df!(
+            "text_col"  => &[
+                Some("123456"), // abc123def456
+                Some("7890"),   // 789xyz0
+                Some(""),       // empty_string ""
+                None,           // with null
+                Some("0"),      // 0
+                Some(""),       // empty_string "  "
+                None,           // with null
+                Some(""),       // !@#
+                Some("123"),    // 123
+                Some("")        // abc
+            ],
+        )?;
+
+        println!("expected_df: {expected_df}");
+
+        assert_eq!(cleaned_df, expected_df);
 
         Ok(())
     }
