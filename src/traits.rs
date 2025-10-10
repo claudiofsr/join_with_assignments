@@ -133,6 +133,12 @@ impl LazyFrameExtension for LazyFrame {
         let pattern: Expr = lit(r"(?i)valor total = (.*)"); // regex
 
         self.with_columns([
+            /*
+            // Add 3 columns containing CNPJ Base, using the new expression
+            get_cnpj_base_expr(columns[0]).alias(columns[1]),
+            get_cnpj_base_expr(columns[2]).alias(columns[3]),
+            get_cnpj_base_expr(columns[4]).alias(columns[5]),
+            */
             // Adicionar 3 colunas contendo CNPJ Base
             col(columns[0])
                 .apply(

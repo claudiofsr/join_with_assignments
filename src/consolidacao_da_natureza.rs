@@ -210,6 +210,9 @@ fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame, _auditar: bool) -> MyRe
         )
         */
         .with_column(
+            /*
+            get_cnpj_base_expr(contribuinte_cnpj).alias("CNPJ Base"),
+            */
             col(contribuinte_cnpj)
                 .apply(
                     get_cnpj_base,

@@ -815,38 +815,12 @@ pub fn write_pqt(df: &DataFrame, basename: &str) -> PolarsResult<()> {
 }
 
 /// Polars expression to extract and format the base CNPJ (XX.XXX.XXX).
-///
-/// This function creates a Polars expression that:
-/// 1. Uses a regex to find a full CNPJ pattern within the column's string values.
-/// 2. Captures the first three digit groups (base CNPJ).
-/// 3. Formats these captured groups into "G1.G2.G3".
-/// 4. Handles potential multiple CNPJs by taking the first valid match.
-///
-/// Obter CNPJ Base
-///
-/// Exemplos com CNPJs fictícios:
-///
-/// `12.345.678/0009-23` -> `12.345.678`
-///
-/// `<N/D> [Info do CT-e: 12.345.678/0009-23] [Info do CT-e: <N/D>] [Info do CT-e: 12.345.678/0009-23]` -> `12.345.678`
-///
-/// Arguments:
-/// * `column_name`: The name of the column containing CNPJ strings.
-///
-/// Returns:
-/// A Polars expression that, when applied, will return the formatted base CNPJ.
 pub fn get_cnpj_base_expr(column_name: &str) -> Expr {
-    // Extract capture groups for CNPJ base: G1.G2.G3
-    // This regex extracts the base part directly in the desired format,
-    // assuming we want the first match that looks like a CNPJ base.
-    // If a full CNPJ like "12.345.678/0001-99" exists, this will capture "12", "345", "678".
-    // We then combine them.
-
     let pattern: Expr = lit(r"(?x)
-        (?:\A|\W)
-        (\w{2}\.?\w{3}\.?\w{3})
-        (?:/?\w{4}-?\d{2})?
-        (?:\z|\W)
+        (?:\A|\W)               # Non-capturing: beginning of text or non-word boundary
+        (\w{2}\.?\w{3}\.?\w{3}) # Capture Group 1: The entire base part (e.g., 12.345.678)
+        (?:/?\w{4}-?\d{2})?     # Non-capturing: Optional (branch/filial) and checksum part
+        (?:\z|\W)               # Non-capturing: end of text or non-word boundary
     ");
 
     col(column_name)
@@ -907,6 +881,37 @@ fn cnpj_base(col: Column) -> PolarsResult<Column> {
         .into_column();
 
     Ok(new_col)
+}
+
+/// Extracts all base CNPJs (format XX.XXX.XXX) found in the input string.
+///
+/// This function uses a regular expression to find all occurrences of a CNPJ pattern
+/// within the `input` string.
+///
+/// For each match, it extracts the first three captured digit groups,
+/// formats them as "G1.G2.G3", and collects them into a vector of strings.
+pub fn extract_cnpjs(input: &str) -> Vec<String> {
+    /*
+    CNPJ_REGEX
+        .captures_iter(input)
+        .map(|caps| caps.extract())
+        .map(|(_full, [a, b, c])| [a, ".", b, ".", c].concat())
+        .collect()
+    */
+
+    CNPJ_REGEX
+        .captures_iter(input)
+        .filter_map(|caps| {
+            // Extract the captured groups.
+            // Using ? for early return if any capture fails.
+            let part1 = caps.get(1)?.as_str();
+            let part2 = caps.get(2)?.as_str();
+            let part3 = caps.get(3)?.as_str();
+
+            // Construct the CNPJ base string.
+            Some(format!("{part1}.{part2}.{part3}"))
+        })
+        .collect()
 }
 
 pub fn add_leading_zeros(series: Series, fill: usize) -> PolarsResult<Option<Series>> {
@@ -1043,37 +1048,6 @@ pub static NCM_REGEX: Lazy<Regex> = Lazy::new(|| {
     .expect("fn extract_ncm()\nFailed to compile NCM regex") // Panic if regex compilation fails.
 });
 
-/// Extracts all base CNPJs (format XX.XXX.XXX) found in the input string.
-///
-/// This function uses a regular expression to find all occurrences of a CNPJ pattern
-/// within the `input` string.
-///
-/// For each match, it extracts the first three captured digit groups,
-/// formats them as "G1.G2.G3", and collects them into a vector of strings.
-pub fn extract_cnpjs(input: &str) -> Vec<String> {
-    /*
-    CNPJ_REGEX
-        .captures_iter(input)
-        .map(|caps| caps.extract())
-        .map(|(_full, [a, b, c])| [a, ".", b, ".", c].concat())
-        .collect()
-    */
-
-    CNPJ_REGEX
-        .captures_iter(input)
-        .filter_map(|caps| {
-            // Extract the captured groups.
-            // Using ? for early return if any capture fails.
-            let part1 = caps.get(1)?.as_str();
-            let part2 = caps.get(2)?.as_str();
-            let part3 = caps.get(3)?.as_str();
-
-            // Construct the CNPJ base string.
-            Some(format!("{part1}.{part2}.{part3}"))
-        })
-        .collect()
-}
-
 /// Extracts the first NCM (Nomenclatura Comum do Mercosul) code found in a given string.
 /// If no valid NCM is found, returns the original input string.
 ///
@@ -1166,15 +1140,24 @@ mod tests_functions {
 
         // Exemplo com CNPJ fictício
 
-        let text_0 = "12.345.678/0009-23";
+        let text_1 = "12.345.678/0009-23";
 
-        let text_1 = "<N/D> [Info do CT-e: 12.ABC.678/0009-23] [Info do CT-e: <N/D>] [Info do CT-e: 12.ABC.679/0009-66] [Info do CT-e: 12.ABC.678/0009-23]";
+        let text_2 = "<N/D> [Info do CT-e: 12.ABC.678/0009-23] [Info do CT-e: <N/D>] [Info do CT-e: 12.ABC.679/0009-66] [Info do CT-e: 12.ABC.678/0009-23]";
 
-        let text_2 = "<N/D> [Info do CT-e: 12.345.CDE/0009-23] [Info do CT-e: <N/D>] [Info do CT-e: 12345CDE/1234-88] [Info do CT-e: 12345CDE901234] 12345CDE9012345";
+        let text_3 = "<N/D> [Info do CT-e: 12.345.CDE/0009-23] [Info do CT-e: <N/D>] [Info do CT-e: 12345CDE/1234-88] [Info do CT-e: 12345CDE901234] 12345CDE9012345";
 
-        let text_3 = "02.345.678/12345-12 123456781234123 foo 012.345.678/1234-23";
+        let text_4 = "02.345.678/12345-12 123456781234123 foo 012.345.678/1234-23";
 
-        let option_strs = [Some(text_0), Some(text_1), Some(text_2), Some(text_3), None];
+        let text_5 = "12345678123412 foo 012.345.678/1234-23";
+
+        let option_strs = [
+            Some(text_1),
+            Some(text_2),
+            Some(text_3),
+            Some(text_4),
+            Some(text_5),
+            None,
+        ];
 
         for (index, option_str) in option_strs.iter().enumerate() {
             println!("text_{index}: {option_str:?}");
@@ -1209,6 +1192,7 @@ mod tests_functions {
             None,
             Some("12.345.CDE".to_string()),
             None,
+            Some("12.345.678".to_string()),
             None,
         ];
 
@@ -1248,7 +1232,6 @@ mod tests_functions {
                 Some(text_2),
                 Some(text_3),
                 Some(text_4),
-                None,
                 Some(text_5),
                 None
             ],
@@ -1263,13 +1246,12 @@ mod tests_functions {
 
         let expected_df: DataFrame = df!(
             "text_col"  => &[
-                Some("12.345.678"),
-                Some("12.ABC.678"),
-                Some("12.345.CDE"),
-                Some("02.345.678"),
-                None,
-                Some("12345678"),
-                None,
+            Some("12.345.678"),
+            Some("12.ABC.678"),
+            Some("12.345.CDE"),
+            Some("02.345.678"),
+            Some("12345678"),
+            None,
             ],
         )?;
 
