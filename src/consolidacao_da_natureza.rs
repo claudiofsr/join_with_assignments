@@ -74,6 +74,7 @@ fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame, _auditar: bool) -> MyRe
     let reg: &str = coluna(Left, "registro"); // "Registro"
     let top: &str = coluna(Left, "tipo_operacao"); // "Tipo de Operação"
     let val: &str = coluna(Left, "valor_item"); // "Valor Total do Item"
+    let contribuinte_cnpj: &str = coluna(Left, "contribuinte_cnpj"); // "CNPJ dos Estabelecimentos do Contribuinte"
 
     // Tipo de Operação: 1 a 7, tal que:
     // 1: Entrada; 2: Saída; 3: Ajuste de Acréscimo; 4: Ajuste de Redução;
@@ -209,7 +210,7 @@ fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame, _auditar: bool) -> MyRe
         )
         */
         .with_column(
-            col("CNPJ dos Estabelecimentos do Contribuinte")
+            col(contribuinte_cnpj)
                 .apply(
                     get_cnpj_base,
                     // GetOutput::from_type(DataType::String)

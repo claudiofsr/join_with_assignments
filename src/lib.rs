@@ -62,7 +62,6 @@ use std::{
     any,
     collections::{HashMap, HashSet},
     env,
-    fmt::Write,
     fs::File,
     path::PathBuf,
     sync::LazyLock as Lazy,
@@ -815,6 +814,49 @@ pub fn write_pqt(df: &DataFrame, basename: &str) -> PolarsResult<()> {
     Ok(())
 }
 
+/// Polars expression to extract and format the base CNPJ (XX.XXX.XXX).
+///
+/// This function creates a Polars expression that:
+/// 1. Uses a regex to find a full CNPJ pattern within the column's string values.
+/// 2. Captures the first three digit groups (base CNPJ).
+/// 3. Formats these captured groups into "G1.G2.G3".
+/// 4. Handles potential multiple CNPJs by taking the first valid match.
+///
+/// Obter CNPJ Base
+///
+/// Exemplos com CNPJs fictícios:
+///
+/// `12.345.678/0009-23` -> `12.345.678`
+///
+/// `<N/D> [Info do CT-e: 12.345.678/0009-23] [Info do CT-e: <N/D>] [Info do CT-e: 12.345.678/0009-23]` -> `12.345.678`
+///
+/// Arguments:
+/// * `column_name`: The name of the column containing CNPJ strings.
+///
+/// Returns:
+/// A Polars expression that, when applied, will return the formatted base CNPJ.
+pub fn get_cnpj_base_expr(column_name: &str) -> Expr {
+    // Extract capture groups for CNPJ base: G1.G2.G3
+    // This regex extracts the base part directly in the desired format,
+    // assuming we want the first match that looks like a CNPJ base.
+    // If a full CNPJ like "12.345.678/0001-99" exists, this will capture "12", "345", "678".
+    // We then combine them.
+
+    let pattern: Expr = lit(r"(?x)
+        (?:\A|\W)
+        (\w{2}\.?\w{3}\.?\w{3})
+        (?:/?\w{4}-?\d{2})?
+        (?:\z|\W)
+    ");
+
+    col(column_name)
+        .str()
+        .extract(
+            pattern, 1, // Capture the first group (the base CNPJ)
+        )
+        .alias(column_name) // Keep original column name for the output
+}
+
 /// Obter o CNPJ Base a partir do CNPJ.
 ///
 /// #### Exemplo fictício:
@@ -932,7 +974,19 @@ pub fn retain_only_digits(column_name: &str) -> Expr {
         .alias(column_name) // Use alias to explicitly keep the original column name
 }
 
+// Regex definitions (using Lazy for one-time compilation)
+// Note: These regexes are optimized for Polars' .str.extract usage,
+// where we typically want to capture specific groups directly.
+
 /**
+Defines the regex pattern for a Brazilian CNPJ.
+
+This regex captures the three main parts of the CNPJ (XX.XXX.XXX)
+and matches the full format (XX.XXX.XXX/YYYY-ZZ).
+It ensures the match is preceded/followed by a non-word character or text boundary.
+
+Define a static Regex to avoid recompiling the regex on every call.
+
 Regex:
 
 ^     the beginning of text (or start-of-line with multi-line mode)
@@ -954,36 +1008,58 @@ $     the end of text (or end-of-line with multi-line mode)
 (?:exp) non-capturing group
 
 */
-pub fn extract_cnpjs(input: &str) -> Vec<String> {
-    // Define a static Regex to avoid recompiling the regex on every call.
-    static FIND_CNPJS: Lazy<Regex> = Lazy::new(|| {
-        Regex::new(
-            r"(?x)
-            (?:\A|\W) # beginning of text or not word ; or (?:^|\W)
-            (\w{2})   # capture 2 alphanumeric
-            \.?
-            (\w{3})   # capture 3 alphanumeric
-            \.?
-            (\w{3})   # capture 3 alphanumeric
-            \/?
-            \w{4}     # check 4 alphanumeric
-            -?
-            \d{2}     # check 2 digits
-            (?:\z|\W) # end of text or not word ; or (?:$|\W)
-        ",
-        )
-        .expect("fn extract_cnpjs()\nFailed to compile regex") // Panic if regex compilation fails.
-    });
+pub static CNPJ_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
+        r"(?x)
+        (?:\A|\W) # Non-capturing: beginning of text or not word ; or (?:^|\W)
+        (\w{2})   # Capture Group 1: 2 alphanumeric (first part)
+        \.?       # Optional dot
+        (\w{3})   # Capture Group 2: 3 alphanumeric (second part)
+        \.?       # Optional dot
+        (\w{3})   # Capture Group 3: 3 alphanumeric (third part)
+        \/?       # Optional slash
+        \w{4}     # 4 alphanumeric (branch/filial)
+        -?        # Optional hyphen
+        \d{2}     # check 2 digits (checksum)
+        (?:\z|\W) # Non-capturing: end of text or not word ; or (?:$|\W)
+    ",
+    )
+    .expect("Failed to compile CNPJ regex") // Panic if regex compilation fails.
+});
 
+// Define a static Regex to avoid recompiling the regex on every call.
+pub static NCM_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
+        r"(?x)
+        (?:\A|\D) # Non-capturing: beginning of text or not digit; Ensures the match is not preceded by a digit.
+        (\d{3,4}) # Capture Group 1: 3 or 4 digits (first part of NCM)
+        \.?       # optional dot
+        (\d{2})   # Capture Group 2: 2 digits (second part of NCM)
+        \.?       # optional dot
+        (\d{2})   # Capture Group 3: 2 digits (third part of NCM)
+        (?:\z|\D) # Non-capturing: end of text or not digit; Ensures the match is not followed by a digit.
+    ",
+    )
+    .expect("fn extract_ncm()\nFailed to compile NCM regex") // Panic if regex compilation fails.
+});
+
+/// Extracts all base CNPJs (format XX.XXX.XXX) found in the input string.
+///
+/// This function uses a regular expression to find all occurrences of a CNPJ pattern
+/// within the `input` string.
+///
+/// For each match, it extracts the first three captured digit groups,
+/// formats them as "G1.G2.G3", and collects them into a vector of strings.
+pub fn extract_cnpjs(input: &str) -> Vec<String> {
     /*
-    FIND_CNPJS
+    CNPJ_REGEX
         .captures_iter(input)
         .map(|caps| caps.extract())
         .map(|(_full, [a, b, c])| [a, ".", b, ".", c].concat())
         .collect()
     */
 
-    FIND_CNPJS
+    CNPJ_REGEX
         .captures_iter(input)
         .filter_map(|caps| {
             // Extract the captured groups.
@@ -992,10 +1068,8 @@ pub fn extract_cnpjs(input: &str) -> Vec<String> {
             let part2 = caps.get(2)?.as_str();
             let part3 = caps.get(3)?.as_str();
 
-            // Construct the CNPJ string.
-            let mut cnpj = String::new();
-            write!(&mut cnpj, "{part1}.{part2}.{part3}").ok()?;
-            Some(cnpj) // Return the constructed CNPJ.
+            // Construct the CNPJ base string.
+            Some(format!("{part1}.{part2}.{part3}"))
         })
         .collect()
 }
@@ -1014,23 +1088,7 @@ pub fn extract_cnpjs(input: &str) -> Vec<String> {
 ///
 /// A string containing the extracted NCM code, or the original input string if no NCM is found.
 pub fn extract_ncm(input: &str) -> String {
-    // Define a static Regex to avoid recompiling the regex on every call.
-    static FIND_NCM: Lazy<Regex> = Lazy::new(|| {
-        Regex::new(
-            r"(?x)
-            (?:\A|\D) # beginning of text or not digit; Ensures the match is not preceded by a digit.
-            (\d{3,4}) # capture 3 or 4 digits (first part of NCM)
-            \.?       # optional dot
-            (\d{2})   # capture 2 digits (second part of NCM)
-            \.?       # optional dot
-            (\d{2})   # capture 2 digits (third part of NCM)
-            (?:\z|\D) # end of text or not digit; Ensures the match is not followed by a digit.
-        ",
-        )
-        .expect("fn extract_ncm()\nFailed to compile regex") // Panic if regex compilation fails.
-    });
-
-    FIND_NCM
+    NCM_REGEX
         .captures_iter(input)
         .filter_map(|caps| {
             // Extract the captured groups.
@@ -1039,16 +1097,13 @@ pub fn extract_ncm(input: &str) -> String {
             let part2 = caps.get(2)?.as_str();
             let part3 = caps.get(3)?.as_str();
 
-            // Construct the NCM string.
-            let mut ncm = String::new();
             if part1.len() == 3 {
                 // Add a leading zero if the first part has 3 digits.
-                write!(&mut ncm, "0{part1}.{part2}.{part3}").ok()?;
+                Some(format!("0{part1}.{part2}.{part3}"))
             } else {
                 // Otherwise, use the first part as is.
-                write!(&mut ncm, "{part1}.{part2}.{part3}").ok()?;
+                Some(format!("{part1}.{part2}.{part3}"))
             }
-            Some(ncm) // Return the constructed NCM.
         })
         .next() // Take only the first match.
         .unwrap_or_else(|| input.to_string()) // Return the original input if no match is found.
@@ -1168,6 +1223,59 @@ mod tests_functions {
         println!("column: {col:?}\n");
 
         assert_eq!(Column::new("".into(), &valid), col);
+
+        Ok(())
+    }
+
+    #[test]
+    /// `cargo test -- --show-output test_get_cnpj_base_expr`
+    fn test_get_cnpj_base_expr() -> PolarsResult<()> {
+        // Exemplo com CNPJ fictício
+
+        let text_1 = "12.345.678/0009-23";
+
+        let text_2 = "<N/D> [Info do CT-e: 12.ABC.678/0009-23] [Info do CT-e: <N/D>] [Info do CT-e: 12.ABC.679/0009-66] [Info do CT-e: 12.ABC.678/0009-23]";
+
+        let text_3 = "<N/D> [Info do CT-e: 12.345.CDE/0009-23] [Info do CT-e: <N/D>] [Info do CT-e: 12345CDE/1234-88] [Info do CT-e: 12345CDE901234] 12345CDE9012345";
+
+        let text_4 = "02.345.678/12345-12 123456781234123 foo 012.345.678/1234-23";
+
+        let text_5 = "12345678123412 foo 012.345.678/1234-23";
+
+        let df: DataFrame = df!(
+            "text_col"  => &[
+                Some(text_1),
+                Some(text_2),
+                Some(text_3),
+                Some(text_4),
+                None,
+                Some(text_5),
+                None
+            ],
+        )?;
+
+        println!("df: {df}");
+
+        let cleaned_df = df
+            .lazy()
+            .with_column(get_cnpj_base_expr("text_col"))
+            .collect()?;
+
+        let expected_df: DataFrame = df!(
+            "text_col"  => &[
+                Some("12.345.678"),
+                Some("12.ABC.678"),
+                Some("12.345.CDE"),
+                Some("02.345.678"),
+                None,
+                Some("12345678"),
+                None,
+            ],
+        )?;
+
+        println!("expected_df: {expected_df}");
+
+        assert_eq!(cleaned_df, expected_df);
 
         Ok(())
     }
