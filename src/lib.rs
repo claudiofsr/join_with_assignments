@@ -828,7 +828,202 @@ pub fn get_cnpj_base_expr(column_name: &str) -> Expr {
         .extract(
             pattern, 1, // Capture the first group (the base CNPJ)
         )
+        .str()
+        .replace_all(lit(r"^(\w{2})(\w{3})(\w{3}).*$"), lit("$1.$2.$3"), false) // Format as "XX.XXX.XXX"
         .alias(column_name) // Keep original column name for the output
+}
+
+/*
+/// Polars expression to extract and format the base CNPJ (XX.XXX.XXX).
+///
+/// This function extracts and returns the base CNPJ (first 8 digits, e.g., "12.345.678")
+/// from a string column. It handles cases where multiple CNPJs might be present,
+/// or where the CNPJ is embedded in other text.
+///
+/// The logic is as follows:
+/// 1. Extracts all potential CNPJ base patterns (XX.XXX.XXX) from the input string.
+/// 2. Cleans these extracted patterns to be "XXXXXXXX" (removing dots).
+/// 3. Filters to keep only unique 8-digit CNPJ bases.
+/// 4. If exactly one unique 8-digit CNPJ base is found, it is formatted as "XX.XXX.XXX" and returned.
+/// 5. Otherwise (zero, or multiple unique 8-digit CNPJ bases), `None` is returned.
+///
+/// This implementation uses only Polars expressions, avoiding `map()` or `apply()` for performance.
+///
+/// #### Exemplo fictício:
+///
+/// Se CNPJ: `12.345.678/0009-23`, então CNPJ Base: `12.345.678`.
+/// Se CNPJ: `<N/D> [Info do CT-e: 12.345.678/0009-23] [Info do CT-e: <N/D>] [Info do CT-e: 12.345.678/0009-23]` -> `12.345.678`
+/// Se CNPJ: `12.345.678/0001-00 and 98.765.432/0001-00` -> `None` (multiple unique bases)
+/// Se CNPJ: `abc` -> `None` (no CNPJ found)
+///
+/// ### Arguments
+///
+/// * `column_name` - The name of the column containing the CNPJ strings.
+///
+/// ### Returns
+///
+/// An `Expr` representing the CNPJ Base column, with `DataType::String`.
+pub fn get_cnpj_base_expr(column_name: &str) -> Expr {
+    // 1. Cast the input column to String type.
+    let string_col = col(column_name).cast(DataType::String);
+
+    // This regex pattern specifically captures the three parts of the CNPJ base.
+    // Group 1: first 2 digits, Group 2: next 3 digits, Group 3: last 3 digits.
+    // It is robust to optional dots and the /xxxx-xx suffix.
+    let cnpj_base_capture_regex = lit(r"(?x)
+        (?:\A|\W) # Non-capturing: beginning of text or not word ; or (?:^|\W)
+        (\w{2})   # Capture Group 1: 2 alphanumeric (first part)
+        \.?       # Optional dot
+        (\w{3})   # Capture Group 2: 3 alphanumeric (second part)
+        \.?       # Optional dot
+        (\w{3})   # Capture Group 3: 3 alphanumeric (third part)
+        (?:       # Non-capturing
+            \/?       # Optional slash
+            \w{4}     # 4 alphanumeric (branch/filial)
+            -?        # Optional hyphen
+            \d{2}     # check 2 digits (checksum)
+        )?
+        (?:\z|\W) # Non-capturing: end of text or not word ; or (?:$|\W)
+    ");
+
+    // 2. Extract all matches for the CNPJ base regex.
+    // `str.extract_all` returns a List[String] for each row.
+    let all_extracted_bases = string_col
+        .str()
+        .extract_all(cnpj_base_capture_regex)
+        .alias("all_extracted_bases_temp");
+
+    // 3. Clean and format each extracted base into "XX.XXX.XXX" format.
+    // This step operates on the list of extracted strings.
+    let formatted_bases_list = all_extracted_bases
+        .list()
+        .eval(
+            // For each item in the list, re-extract and format.
+            // We use `col("")` to refer to the current string within the list.
+            col("")
+                .str()
+                .replace_all(lit(r"[\s\.]"), lit(""), false) // Remove all non-digits (e.g., "12.345.678" -> "12345678")
+                .str()
+                .replace_all(lit(r"^(\w{2})(\w{3})(\w{3}).*$"), lit("$1.$2.$3"), false) // Format as "XX.XXX.XXX"
+                .alias("formatted_base_item"),
+        )
+        .alias("formatted_bases_list_temp");
+
+    // 4. Get unique CNPJ bases and check the count.
+    let unique_bases_list = formatted_bases_list
+        .list()
+        .unique()
+        .alias("unique_bases_list_temp");
+
+    let unique_count = unique_bases_list
+        .clone()
+        .list()
+        .len()
+        .alias("unique_count_temp");
+
+    // 5. Conditionally return the unique CNPJ base if count is 1, otherwise None.
+    when(unique_count.eq(lit(1)))
+        .then(unique_bases_list.list().first())      // If exactly one unique, take the first (and only) element
+        .otherwise(lit(NULL).cast(DataType::String)) // Otherwise, return NULL as String
+        .alias(column_name)
+}
+*/
+
+/// Formats an NCM (Nomenclatura Comum do Mercosul) code from a string column.
+/// This function is designed to extract and format only the *first* valid NCM
+/// found within a string, adhering to patterns like "1234.56.78", "12345678",
+/// or "1234567" (which becomes "0123.45.67").
+///
+/// This function processes a column of strings, integers, or other types convertible to string,
+/// and formats NCM codes according to the specified rules:
+/// - "12345678" -> "1234.56.78"
+/// - "1234.56.78" -> "1234.56.78"
+/// - "1234567" -> "0123.45.67"
+/// - "abc" -> "abc" (original string if no valid NCM is found)
+///
+/// The implementation avoids `map()` or `apply()` for performance,
+/// leveraging Polars' native string expressions.
+///
+/// If no valid NCM is found, the original input string is returned.
+///
+/// ### Arguments
+///
+/// * `column_name` - The name of the column containing the NCM codes.
+///
+/// ### Returns
+///
+/// An `Expr` representing the formatted NCM column.
+pub fn formatar_ncm_expr(column_name: &str) -> Expr {
+    // Cast the input column to String type. This handles various input types like i64.
+    let string_col = col(column_name).cast(DataType::String);
+
+    // This regex pattern is designed to capture the *first* potential NCM sequence.
+    // It looks for:
+    // - A non-digit boundary `(?:\A|\D)` to ensure we're starting a new NCM.
+    // - Followed by 7 digits
+    // The main NCM parts are captured in groups (1, 2, 3).
+    let ncm_extraction_regex = lit(r"(?x)
+        (?:\A|\D)        # Non-capturing: beginning of text or not digit; Ensures the match is not preceded by a digit.
+        [\d\s\.\-]{7,20} # Capture Group 1: 7 to 20 digits, spaces, dots, or hyphens (the potential NCM)
+        (?:\z|\D)        # Non-capturing: end of text or not digit; Ensures the match is not followed by a digit.
+    ");
+
+    // Extract the first match.
+    // `extract_all` returns a list, `list().first()` gets the first element.
+    // If no match, it will be None.
+    let extracted_ncm_candidate = string_col
+        .clone()
+        .str()
+        .extract_all(ncm_extraction_regex)
+        .list()
+        .first() // Get the first extracted NCM candidate string
+        .alias("extracted_ncm_candidate_temp");
+
+    // Regex pattern to remove all non-digit characters.
+    // This will clean inputs like "1234.56.78" or "abc12345678def" into "12345678".
+    let non_digit_pattern = lit(r"\D");
+
+    // Step 1: Clean the extracted NCM by removing any non-digits (dots, etc.)
+    // E.g., "1234.56.78" -> "12345678", "0123.45.67" -> "01234567"
+    let cleaned_digits = extracted_ncm_candidate
+        .clone() // Clone for later use
+        .str()
+        .replace_all(non_digit_pattern, lit(""), false) // `false` indicates `pat` is a regex
+        .alias("cleaned_digits_temp");
+
+    // Regex to check if the cleaned string is an NCM-like digit sequence (7 or 8 digits).
+    let is_ncm_like_pattern = lit(r"^\d{7,8}$");
+
+    // Check if the string contains only digits and has a length that makes sense for NCM (e.g., 7 or 8).
+    let is_ncm_like = cleaned_digits
+        .clone()
+        .str()
+        .contains(is_ncm_like_pattern, false);
+
+    // Step 2: Conditionally apply zfill(8).
+    // Conditionally apply zfill(8) only if the cleaned string is 7 or 8 digits long.
+    // Otherwise, keep the original string value (before cleaning).
+    // Fill with leading zeros to ensure a length of 8, but only if it's purely numeric.
+    // We need to use `when().then().otherwise()` to apply zfill conditionally.
+    let zfilled_ncm = when(is_ncm_like)
+        .then(cleaned_digits.clone().str().zfill(lit(8)))
+        .otherwise(string_col) // If not NCM-like, revert to the original string_col
+        .alias("zfilled_ncm_temp");
+
+    // Define the regex pattern for the final NCM format "XXXX.XX.XX".
+    // This expects an exactly 8-digit string after zfill.
+    let ncm_format_pattern = lit(r"^(\d{4})(\d{2})(\d{2})$");
+
+    // Step 3: Apply the final formatting.
+    // `replace_all` will transform "12345678" into "1234.56.78".
+    // If `zfilled_ncm` (which is either z-filled NCM or the original string_col)
+    // does NOT match `ncm_format_pattern`, `replace_all` will simply return `zfilled_ncm` unchanged.
+    // This implicitly handles the cases where we reverted to `string_col` in the previous step,
+    // as well as cases like "abc" which would not match `ncm_format_pattern`.
+    zfilled_ncm
+        .str()
+        .replace_all(ncm_format_pattern, lit("$1.$2.$3"), false) // `false` indicates `ncm_format_pattern` is a regex
+        .alias(column_name) // Alias back to the original column name.
 }
 
 /// Obter o CNPJ Base a partir do CNPJ.
@@ -943,18 +1138,6 @@ fn leading_zeros(series: Series, fill: usize) -> PolarsResult<Option<Series>> {
     Ok(Some(new_series))
 }
 
-/// NCM format: "12345678" --> "1234.56.78"
-pub fn formatar_ncm(col: Column) -> PolarsResult<Column> {
-    let new_col: Column = col
-        .str()?
-        .iter()
-        .map(|option_str| option_str.map(extract_ncm))
-        .collect::<StringChunked>()
-        .into_column();
-
-    Ok(new_col)
-}
-
 /// Creates an expression to retain only digits from a specified column.
 ///
 /// This function generates a Polars expression that replaces all non-digit characters
@@ -1031,57 +1214,6 @@ pub static CNPJ_REGEX: Lazy<Regex> = Lazy::new(|| {
     )
     .expect("Failed to compile CNPJ regex") // Panic if regex compilation fails.
 });
-
-// Define a static Regex to avoid recompiling the regex on every call.
-pub static NCM_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(
-        r"(?x)
-        (?:\A|\D) # Non-capturing: beginning of text or not digit; Ensures the match is not preceded by a digit.
-        (\d{3,4}) # Capture Group 1: 3 or 4 digits (first part of NCM)
-        \.?       # optional dot
-        (\d{2})   # Capture Group 2: 2 digits (second part of NCM)
-        \.?       # optional dot
-        (\d{2})   # Capture Group 3: 2 digits (third part of NCM)
-        (?:\z|\D) # Non-capturing: end of text or not digit; Ensures the match is not followed by a digit.
-    ",
-    )
-    .expect("fn extract_ncm()\nFailed to compile NCM regex") // Panic if regex compilation fails.
-});
-
-/// Extracts the first NCM (Nomenclatura Comum do Mercosul) code found in a given string.
-/// If no valid NCM is found, returns the original input string.
-///
-/// The function searches for an NCM code using a regular expression and returns it
-/// as a string. If no NCM code is found, it returns the original input string.
-///
-/// ### Arguments
-///
-/// * `input` - The string to search for the NCM code.
-///
-/// ### Returns
-///
-/// A string containing the extracted NCM code, or the original input string if no NCM is found.
-pub fn extract_ncm(input: &str) -> String {
-    NCM_REGEX
-        .captures_iter(input)
-        .filter_map(|caps| {
-            // Extract the captured groups.
-            // Using ? for early return if any capture fails.
-            let part1 = caps.get(1)?.as_str();
-            let part2 = caps.get(2)?.as_str();
-            let part3 = caps.get(3)?.as_str();
-
-            if part1.len() == 3 {
-                // Add a leading zero if the first part has 3 digits.
-                Some(format!("0{part1}.{part2}.{part3}"))
-            } else {
-                // Otherwise, use the first part as is.
-                Some(format!("{part1}.{part2}.{part3}"))
-            }
-        })
-        .next() // Take only the first match.
-        .unwrap_or_else(|| input.to_string()) // Return the original input if no match is found.
-}
 
 pub fn formatar_lista_de_datas(coluna: Column) -> PolarsResult<Column> {
     // println!("coluna: {coluna:?}");
@@ -1250,7 +1382,7 @@ mod tests_functions {
             Some("12.ABC.678"),
             Some("12.345.CDE"),
             Some("02.345.678"),
-            Some("12345678"),
+            Some("12.345.678"),
             None,
             ],
         )?;
@@ -1356,26 +1488,6 @@ mod tests_functions {
         assert_eq!(df_formatado_map["Períodos Formatados"], coluna_formatada);
 
         Ok(())
-    }
-
-    #[test]
-    /// `cargo test -- --show-output test_extract_ncm`
-    fn test_extract_ncm() {
-        let text1 = "1234.56.78";
-        let text2 = "1234567";
-        let text3 = "123456"; // return the original input
-        let text4 = "NCM 0912.3456";
-        let text5 = "Invalid: 23.45.67"; // return the original input
-        let text6 = "Multiple: 1234.5678 and 9012.34.56";
-        let text7 = "<N/D>"; // return the original input
-
-        assert_eq!(extract_ncm(text1), "1234.56.78");
-        assert_eq!(extract_ncm(text2), "0123.45.67");
-        assert_eq!(extract_ncm(text3), text3);
-        assert_eq!(extract_ncm(text4), "0912.34.56");
-        assert_eq!(extract_ncm(text5), text5);
-        assert_eq!(extract_ncm(text6), "1234.56.78"); // Only the *first* NCM is extracted.
-        assert_eq!(extract_ncm(text7), text7);
     }
 
     #[test]
@@ -1733,3 +1845,282 @@ mod tests_replace_values_with_null {
         Ok(())
     }
 }
+
+#[cfg(test)]
+/// Run tests with:
+/// `cargo test -- --show-output ncm_tests`
+mod ncm_tests {
+    use super::*;
+
+    /// Formats a column containing NCM (Nomenclatura Comum do Mercosul) codes.
+    ///
+    /// This function processes a column of strings, integers, or other types convertible to string,
+    /// and formats NCM codes according to the specified rules:
+    /// - "12345678" -> "1234.56.78"
+    /// - "1234.56.78" -> "1234.56.78"
+    /// - "1234567"  -> "0123.45.67"
+    /// - "abc"      -> "abc" (original string if no valid NCM is found)
+    #[test]
+    fn test_formatar_ncm_expr() -> PolarsResult<()> {
+        let df = df!(
+            "ncm_col" => &[
+                Some("12345678"),
+                Some("1234.56.78"),
+                Some("1234567"),
+                Some("abc"),
+                Some("def.12345678.ghi"), // NCM embedded
+                Some("1234"), // Too short
+                Some("123456789"), // Too long after cleaning
+                Some(""), // Empty string
+                None, // Null value
+                Some("12.34.56.78"), // Already malformed but contains digits
+                Some("123.45.67"), // 7 digits, needs zero-padding
+                Some("12345678 and some text"), // NCM at start
+                Some("text and 12345678"), // NCM at end
+                Some("1 2 3 4 5 6 7 8"), // Spaces
+                Some("1-2-3-4-5-6-7-8"), // Dashes
+                Some("NCM 0912.3456"),
+                Some("Invalid: 23.45.67"), // return the original input
+                Some("Multiple: 1234.5678 and 90.12.3456"),
+                Some("<N/D>"), // return the original input
+            ]
+        )?;
+
+        println!("df: {df}");
+
+        let expected_df = df!(
+            "ncm_col" => &[
+                Some("1234.56.78"),
+                Some("1234.56.78"),
+                Some("0123.45.67"),
+                Some("abc"),
+                Some("1234.56.78"), // Correctly extracts and formats
+                Some("1234"), // Remains too short
+                Some("123456789"), // Remains too long after cleaning
+                Some(""),
+                None,
+                Some("1234.56.78"), // Correctly extracts and formats
+                Some("0123.45.67"), // Correctly z-fills and formats (123.45.67 -> 1234567 -> 01234567)
+                Some("1234.56.78"), // Correctly extracts and formats
+                Some("1234.56.78"), // Correctly extracts and formats
+                Some("1234.56.78"), // Cleans spaces and formats
+                Some("1234.56.78"), // Cleans dashes and formats
+                Some("0912.34.56"),
+                Some("Invalid: 23.45.67"), // return the original input
+                Some("1234.56.78"),        // Only the *first* NCM is extracted
+                Some("<N/D>"),             // return the original input
+            ]
+        )?;
+
+        println!("expected_df: {expected_df}");
+
+        let result_df = df
+            .lazy()
+            .select(&[formatar_ncm_expr("ncm_col")])
+            .collect()?;
+
+        println!("result_df: {result_df}");
+
+        assert_eq!(result_df, expected_df);
+        Ok(())
+    }
+
+    #[test]
+    fn test_formatar_ncm_expr_integer_input() -> PolarsResult<()> {
+        let df = df!(
+            "ncm_col_i64" => &[
+                Some(12345678i64),
+                Some(1234567i64),
+                Some(98765432i64),
+                None,
+                Some(123i64), // Too short
+            ]
+        )?;
+
+        println!("df: {df}");
+
+        let expected_df = df!(
+            "ncm_col_str" => &[
+                Some("1234.56.78"),
+                Some("0123.45.67"),
+                Some("9876.54.32"),
+                None,
+                Some("123"), // Remains as is after cast to string and cleaning
+            ]
+        )?;
+
+        println!("expected_df: {expected_df}");
+
+        let result_df = df
+            .lazy()
+            .select(&[formatar_ncm_expr("ncm_col_i64")])
+            .collect()?;
+
+        println!("result_df: {result_df}");
+
+        assert_eq!(result_df, expected_df);
+        Ok(())
+    }
+
+    #[test]
+    fn test_formatar_ncm_expr_empty_dataframe() -> PolarsResult<()> {
+        let df = df!("ncm_col" => &Vec::<String>::new())?;
+        let expected_df = df!("ncm_col" => &Vec::<String>::new())?;
+
+        let result_df = df
+            .lazy()
+            .select(&[formatar_ncm_expr("ncm_col")])
+            .collect()?;
+
+        assert_eq!(result_df, expected_df);
+        Ok(())
+    }
+
+    #[test]
+    fn test_formatar_ncm_expr_mixed_valid_invalid_formats() -> PolarsResult<()> {
+        let df = df!(
+            "ncm_col" => &[
+                Some("abc12345678def"),  // Embedded NCM
+                Some("987.65.43"),       // 7 digits, already dotted
+                Some("invalid_ncm"),     // Completely invalid
+                Some("00000000"),        // All zeros
+                Some("0"),               // one zero
+                Some("1.2.3.4.5.6.7.8"), // Too many dots, results in "12345678"
+            ]
+        )?;
+
+        let expected_df = df!(
+            "ncm_col" => &[
+                Some("1234.56.78"),  // Extracts and formats the 8-digit part
+                Some("0987.65.43"),  // Cleans (987.65.43 -> 9876543), z-fills to 09876543, then formats to 0987.65.43
+                Some("invalid_ncm"), // Remains unchanged
+                Some("0000.00.00"),  // Formats correctly
+                Some("0"),           // Remains unchanged
+                Some("1234.56.78"),  // Cleans (1.2.3.4.5.6.7.8 -> 12345678), then formats
+            ]
+        )?;
+
+        let result_df = df
+            .lazy()
+            .select(&[formatar_ncm_expr("ncm_col")])
+            .collect()?;
+
+        assert_eq!(result_df, expected_df);
+        Ok(())
+    }
+}
+
+/*
+#[cfg(test)]
+/// Run tests with:
+/// `cargo test -- --show-output cnpj_tests`
+mod cnpj_tests {
+    use super::*;
+    use polars::df;
+
+    #[test]
+    fn test_get_cnpj_base_expr() -> PolarsResult<()> {
+        let df = df!(
+            "cnpj_col" => &[
+                Some("12.345.FGH/0009-23"), // Standard dotted CNPJ
+                Some("12345678000199"),     // Undotted CNPJ
+                Some("abc 12.345.678/0001-00 def"), // Embedded CNPJ
+                Some("foo 12.345.678/0001-00 bar 12345678/0002-00 baz"), // Same base, different branch
+                Some("12.345.678/0001-00 and 98.765.432/0001-00"), // Multiple unique bases
+                Some("<N/D> [Info do CT-e: 12.345.678/0009-23] [Info do CT-e: 12345678] [Info do CT-e: 12345678/000923]"), // Embedded multiple times, same base
+                Some("no cnpj here"),   // No CNPJ
+                Some("1234567"),        // Too short
+                Some("123456789"),      // Too long (not matching base pattern)
+                None, // Null input
+                Some("123.456.789-01"), // Malformed base (9 digits for the last part) - should not match
+                Some("12.abc.678"),     // Base only
+                Some("12345678"),       // Base only, undotted
+                Some("12.345.678/0009-23"),
+                Some("<N/D> [Info do CT-e: 12.ABC.678/0009-23] [Info do CT-e: <N/D>] [Info do CT-e: 12.ABC.679/0009-66] [Info do CT-e: 12.ABC.678/0009-23]"),
+                Some("<N/D> [Info do CT-e: 12.345.CDE/0009-23] [Info do CT-e: <N/D>] [Info do CT-e: 12345CDE/1234-88] [Info do CT-e: 12345CDE901234] 12345CDE9012345"),
+                Some("02345678/12345-12 123456781234123 foo 012.345.678/1234-23"),
+                Some("12345678123412 foo 012.345.678/1234-23"),
+        ])?;
+
+        println!("df: {df}");
+
+        let expected_df = df!(
+            "cnpj_col" => &[
+                Some("12.345.FGH"),
+                Some("12.345.678"),
+                Some("12.345.678"), // Same base, different branch
+                Some("12.345.678"), // Unique base found
+                None,               // Multiple unique bases
+                Some("12.345.678"), // Unique base found
+                None, // No CNPJ
+                None, // Too short
+                None, // Too long
+                None, // Null input
+                None, // Malformed base
+                Some("12.abc.678"), // Base only
+                Some("12.345.678"), // Base only, undotted
+                Some("12.345.678"),
+                None,
+                Some("12.345.CDE"),
+                Some("02.345.678"),
+                Some("12.345.678"),
+            ]
+        )?;
+
+        println!("expected_df: {expected_df}");
+
+        let result_df = df
+            .lazy()
+            .select(&[get_cnpj_base_expr("cnpj_col")])
+            .collect()?;
+
+        println!("result_df: {result_df}");
+
+        assert_eq!(result_df, expected_df);
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_cnpj_base_expr_empty_dataframe() -> PolarsResult<()> {
+        let df = df!("cnpj_col" => &Vec::<String>::new())?;
+        let expected_df = df!("cnpj_col" => &Vec::<String>::new())?;
+
+        let result_df = df
+            .lazy()
+            .select(&[get_cnpj_base_expr("cnpj_col")])
+            .collect()?;
+
+        assert_eq!(result_df, expected_df);
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_cnpj_base_expr_integer_input() -> PolarsResult<()> {
+        let df = df!(
+            "cnpj_col_i64" => &[
+                Some(12345678000123i64),
+                Some(99887766000210i64),
+                None,
+                Some(123i64),
+            ]
+        )?;
+
+        let expected_df = df!(
+            "cnpj_col_i64" => &[
+                Some("12.345.678"),
+                Some("99.887.766"),
+                None,
+                None, // 123 is too short to be a CNPJ base
+            ]
+        )?;
+
+        let result_df = df
+            .lazy()
+            .select(&[get_cnpj_base_expr("cnpj_col_i64")])
+            .collect()?;
+
+        assert_eq!(result_df, expected_df);
+        Ok(())
+    }
+}
+*/

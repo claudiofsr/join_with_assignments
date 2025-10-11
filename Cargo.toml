@@ -62,13 +62,16 @@ features = [
     "concat_str", # Concat string data in linear time
     "csv",
     "dtype-array",
-    "dtype-i128",
-    "dtype-date",
-    "dtype-struct",
-    "dtype-datetime",
-    "dtype-duration",
     "dtype-categorical",
-    "dtype-i16",    # fix: "unsupported data type when reading CSV: i16 when reading CSV"
+    "dtype-date",     # Convert a String column into a Date column.
+    "dtype-datetime", # Convert a String column into a Datetime column.
+    "dtype-decimal",  # Convert a String column into a Decimal column.
+    "dtype-duration",
+    "dtype-i16",      # fix: "unsupported data type when reading CSV: i16 when reading CSV"
+    "dtype-i128",
+    "dtype-struct",
+    "extract_groups", # Extract all captures groups from a regex pattern as a struct
+    "find_many",
     "is_in",        # Check for membership in Series
     "lazy",         # Lazy API
     "list_any_all",
@@ -86,6 +89,7 @@ features = [
     "serde-lazy",   # Support for serde serialization and deserialization.
     "strings",      # Extra string utilities for Utf8Chunked
     "string_pad",   # Pad the start of the string until it reaches the given length.
+    "string_normalize",
     "temporal",     # Automatically try to parse dates/datetimes and time.
     "timezones",
 ]

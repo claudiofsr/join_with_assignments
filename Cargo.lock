@@ -2175,6 +2175,7 @@ version = "0.51.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "acf6062173fdc9ba05775548beb66e76643a148d9aeadc9984ed712bc4babd76"
 dependencies = [
+ "aho-corasick",
  "argminmax",
  "base64",
  "bytemuck",

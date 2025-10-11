@@ -5,8 +5,8 @@ use crate::{
     AllCorrelations, DataFrameExtension, ExprExtension, LazyFrameExtension, MyResult,
     Side::{Left, Middle, Right},
     args::Arguments,
-    coluna, formatar_ncm, get_lazyframe_from_csv, get_opt_vectuples, get_option_assignments,
-    get_output_as_string, get_output_as_uint64, retain_only_digits,
+    coluna, formatar_ncm_expr, get_lazyframe_from_csv, get_opt_vectuples, get_option_assignments,
+    get_output_as_uint64, retain_only_digits,
 };
 
 /// Use Polars to get dataframe after Munkres assignments
@@ -84,11 +84,7 @@ fn format_fazyframe_a(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     let lz = lazyframe // Formatar colunas
         .with_column(col(count_lines).cast(DataType::UInt64))
         .with_column(retain_only_digits(chave))
-        .with_column(col(ncm).map(
-            formatar_ncm,
-            // GetOutput::from_type(DataType::String)
-            get_output_as_string,
-        ))
+        .with_column(formatar_ncm_expr(ncm))
         .with_columns([cols(columns_with_float64).as_expr().round_expr(2)]);
 
     // Lazy operations don’t execute until we call .collect()?.
@@ -127,11 +123,7 @@ fn format_fazyframe_b(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     let lz = lazyframe // Formatar colunas
         .with_column(col(count_lines).cast(DataType::UInt64))
         .with_column(retain_only_digits(chave))
-        .with_column(col(ncm).map(
-            formatar_ncm,
-            // GetOutput::from_type(DataType::String)
-            get_output_as_string,
-        ))
+        .with_column(formatar_ncm_expr(ncm))
         .with_columns([cols(columns_with_float64).as_expr().round_expr(2)]);
 
     // Lazy operations don’t execute until we call .collect()?.
