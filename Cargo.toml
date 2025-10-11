@@ -35,7 +35,7 @@ confy = "1.0"
 execution-time = "0.3"
 pathfinding = "4.14"
 rayon = "1.11"
-regex = "1.11"
+regex = "1.12"
 serde = { version = "1.0", features = [ "derive" ] }
 sysinfo = "0.37"
 tabled = { version = "0.20", features = ["ansi"] }
