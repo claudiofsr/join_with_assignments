@@ -159,7 +159,10 @@ where
 /**
 Get series from array
 ```
-    use join_with_assignments::get_series;
+use polars::error::PolarsResult;
+use join_with_assignments::get_series;
+
+fn main() -> PolarsResult<()> {
 
     let array: [u32; 4] = [1, 5, 8, 9];
     let series = get_series(array);
@@ -169,8 +172,7 @@ Get series from array
     // vec.into_iter().flatten().collect()
 
     let values: Vec<u32> = series
-        .u32()
-        .unwrap()
+        .u32()?
         .into_iter()
         .flatten()
         .collect();
@@ -179,6 +181,9 @@ Get series from array
         values,
         vec![1, 5, 8, 9]
     );
+
+    Ok(())
+}
 ```
 */
 pub fn get_series<T>(range: impl IntoIterator<Item = T>) -> Series
