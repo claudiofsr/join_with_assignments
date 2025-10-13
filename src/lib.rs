@@ -55,7 +55,6 @@ pub use self::{
     xlsx_writer::PolarsXlsxWriter,
 };
 
-use chrono::NaiveDate;
 use polars::prelude::*;
 use std::{
     any,
@@ -1030,6 +1029,32 @@ pub fn formatar_ncm_expr(column_name: &str) -> Expr {
         .alias(column_name) // Alias back to the original column name.
 }
 
+/// Formats a `List<Date>` column into a string representation like "[DD/MM/YYYY, DD/MM/YYYY]".
+///
+/// This function processes a column containing lists of dates. For each row, it formats
+/// the individual dates within the list to "DD/MM/YYYY" strings, joins them with ", ",
+/// and then encloses the entire string in square brackets.
+///
+/// If the input column contains nulls for a list, the output for that row will also be null
+/// due to Polars' automatic null propagation in string operations.
+///
+/// # Arguments
+///
+/// * `column_name` - The name of the `List<Date>` column to format.
+///
+/// # Returns
+///
+/// A Polars `Expr` that, when applied, will transform the specified column.
+pub fn format_list_dates(column_name: &str) -> Expr {
+    lit("[")
+    + col(column_name)
+        .list()
+        .eval(col("").dt().strftime("%d/%m/%Y")) // Format inner dates
+        .list()
+        .join(lit(", "), true) // Join formatted dates
+    + lit("]")
+}
+
 pub fn add_leading_zeros(series: Series, fill: usize) -> PolarsResult<Option<Series>> {
     match series.dtype() {
         DataType::Int64 => leading_zeros(series, fill),
@@ -1083,37 +1108,6 @@ pub fn retain_only_digits(column_name: &str) -> Expr {
         .alias(column_name) // Use alias to explicitly keep the original column name
 }
 
-pub fn formatar_lista_de_datas(coluna: Column) -> PolarsResult<Column> {
-    // println!("coluna: {coluna:?}");
-
-    // Crie um iterador e aplique a formatação
-    let str_date: PolarsResult<Vec<Option<String>>> = coluna
-        .list()?
-        .into_iter()
-        .map(|opt_series| {
-            match opt_series {
-                Some(list_series) => {
-                    // Se a lista não é nula, formate cada data e junte com um espaço
-                    let dates_as_strings: Vec<String> = list_series
-                        .date()? // Retorna um PolarsResult<DateChunked>
-                        .as_date_iter() // Retorna um iterator de Option<NaiveDate>
-                        .flatten() // Remove os Nones do iterador, deixando apenas NaiveDate
-                        .map(|date: NaiveDate| date.format("%d/%m/%Y").to_string())
-                        .collect();
-                    let string = format!("[{}]", dates_as_strings.join(", "));
-                    Ok(Some(string)) // Retorna Some(String) para esta linha
-                }
-                None => Ok(None), // Se a Series original era null, a nova Series também será null
-            }
-        })
-        .collect();
-
-    let new_col = Column::new("new".into(), str_date?);
-    // println!("new_col: {new_col:?}");
-
-    Ok(new_col)
-}
-
 pub fn quit() {
     std::process::exit(0);
 }
@@ -1127,6 +1121,7 @@ pub fn quit() {
 #[cfg(test)]
 mod tests_functions {
     use super::*;
+    use chrono::NaiveDate;
     use std::error::Error;
 
     // cargo test -- --help
@@ -1134,97 +1129,40 @@ mod tests_functions {
     // cargo test -- --show-output multiple_values
 
     #[test]
-    /// `cargo test -- --show-output formatar_datas`
-    fn formatar_datas() -> PolarsResult<()> {
+    /// `cargo test -- --show-output format_list_dates`
+    fn test_format_list_dates() -> PolarsResult<()> {
         let datas1 = vec![
             NaiveDate::from_ymd_opt(2023, 1, 1).unwrap(),
             NaiveDate::from_ymd_opt(2023, 5, 10).unwrap(),
         ];
         let datas2 = vec![NaiveDate::from_ymd_opt(2024, 9, 15).unwrap()];
 
+        // Create the inner Series first
         let series_datas1 = Series::new("row1".into(), datas1);
         let series_datas2 = Series::new("row2".into(), datas2);
 
-        // 1. Crie o conteúdo da Series como uma estrutura serializável.
-        let datas = vec![Some(series_datas1), Some(series_datas2), None];
-
-        // 2. Crie a Series explicitamente, com um nome e o conteúdo.
-        let series_list_dates = Series::new("Períodos de Apuração".into(), datas);
-
-        // 3. Crie o DataFrame usando a Series criada.
-        // let df = DataFrame::new(vec![series_list_dates.into()])?;
-        let df = df! { "Períodos de Apuração" => series_list_dates }?;
+        let df = df! { "Períodos de Apuração" => &[
+            Some(series_datas1),
+            Some(series_datas2),
+            None
+        ]}?;
 
         println!("DataFrame Original:\n{}", df);
 
-        // use .eval()
-        let df_formatado_eval = df
-            .clone()
+        // Using the expression directly for the first case.
+        // Polars automatically handles null propagation for string operations.
+        let df_formatado = df
+            .clone() // Clone for the first case if you need the original df for subsequent operations
             .lazy()
-            /*
-            .with_column(
-                col("Períodos de Apuração")
-                    .list()
-                    .eval(col("").dt().strftime("%d/%m/%Y"))
-                    .list()
-                    .join(lit(", "), true)
-                    .map(
-                        |col| {
-                            let strings: Vec<Option<String>> = col
-                                .str()?
-                                .iter()
-                                .map(|opt_str| opt_str.map(|s| format!("[{s}]")))
-                                .collect();
-                            Ok(Column::new("".into(), strings))
-                        },
-                        get_output_as_string,
-                    )
-                    .alias("Períodos Formatados"),
-            )
-            */
-            .with_column(
-                when(col("Períodos de Apuração").is_null()) // Condição: Se a coluna original é null
-                    .then(lit(NULL)) // Então, a saída é NULL
-                    .otherwise(
-                        // Caso contrário (se não é null), execute toda a lógica de formatação
-                        concat_str(
-                            [
-                                lit("["),
-                                col("Períodos de Apuração")
-                                    .list()
-                                    .eval(col("").dt().strftime("%d/%m/%Y"))
-                                    .list()
-                                    .join(lit(", "), true)
-                                    .alias("Períodos Formatados"),
-                                lit("]"),
-                            ],
-                            "",
-                            true,
-                        ),
-                    )
-                    .alias("Períodos Formatados"),
-            )
+            .with_column(format_list_dates("Períodos de Apuração").alias("Períodos Formatados"))
             .collect()?;
 
-        println!("\nDataFrame Formatado com eval:\n{}", df_formatado_eval);
-
-        // use .map()
-        let df_formatado_map = df
-            .lazy()
-            .with_column(
-                col("Períodos de Apuração")
-                    .map(formatar_lista_de_datas, get_output_as_date)
-                    .alias("Períodos Formatados"),
-            )
-            .collect()?;
-
-        println!("\nDataFrame Formatado com map:\n{}", df_formatado_map);
+        println!("\nDataFrame Formatado com concat_str:\n{}", df_formatado);
 
         let datas = vec![Some("[01/01/2023, 10/05/2023]"), Some("[15/09/2024]"), None];
         let coluna_formatada = Column::new("fmt".into(), datas);
 
-        assert_eq!(df_formatado_eval["Períodos Formatados"], coluna_formatada);
-        assert_eq!(df_formatado_map["Períodos Formatados"], coluna_formatada);
+        assert_eq!(df_formatado["Períodos Formatados"], coluna_formatada);
 
         Ok(())
     }

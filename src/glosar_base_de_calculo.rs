@@ -6,7 +6,7 @@ use crate::{
     adicionar_coluna_de_aliquota_zero, adicionar_coluna_de_credito_presumido,
     adicionar_coluna_de_incidencia_monofasica,
     adicionar_coluna_periodo_de_apuracao_inicial_e_final, coluna, configure_the_environment,
-    cst_50_a_56, equal, operacoes_de_credito, unequal,
+    cst_50_a_56, equal, format_list_dates, operacoes_de_credito, unequal,
 };
 use polars::prelude::*;
 
@@ -454,22 +454,8 @@ fn analisar_situacao06a(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
                 .slice(lit(1), col(period_count) - lit(1)) // Exclude the first period
                 .alias(periodos_invalidos),
         )
-        /*
-        .with_column(
-            col(periodos)
-                .map(formatar_lista_de_datas, get_output_as_date)
-                .alias(periodos_formatados),
-        )
-        */
         // Add a column with all unique periods formatted as a comma-separated string
-        .with_column(
-            col(periodos)
-                .list()
-                .eval(col("").dt().strftime("%d/%m/%Y"))
-                .list()
-                .join(lit(", "), true)
-                .alias(periodos_formatados),
-        )
+        .with_column(format_list_dates(periodos).alias(periodos_formatados))
         .sort_by_exprs(
             vec![col(periodo_valido), col(chaves_unificadas)],
             // https://github.com/pola-rs/polars/pull/15590
@@ -522,9 +508,8 @@ fn analisar_situacao06a(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
             col(chaves_unificadas),
             lit("pertence a"),
             col(period_count),
-            lit("Períodos de Apuração distintos: ["),
+            lit("Períodos de Apuração distintos:"),
             col(periodos_formatados),
-            lit("]"),
             lit("&"),
         ],
         " ",
@@ -639,14 +624,7 @@ fn analisar_situacao06b(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
                 .alias(periodos_invalidos),
         )
         // Add a column with all unique periods formatted as a comma-separated string
-        .with_column(
-            col(periodos)
-                .list()
-                .eval(col("").dt().strftime("%d/%m/%Y"))
-                .list()
-                .join(lit(", "), true)
-                .alias(periodos_formatados),
-        )
+        .with_column(format_list_dates(periodos).alias(periodos_formatados))
         .sort_by_exprs(
             vec![col(periodo_valido), col(cnpj_particip), col(num_doc)],
             // https://github.com/pola-rs/polars/pull/15590
@@ -711,9 +689,8 @@ fn analisar_situacao06b(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
             col(registro),
             lit("pertence a"),
             col(period_count),
-            lit("Períodos de Apuração distintos: ["),
+            lit("Períodos de Apuração distintos:"),
             col(periodos_formatados),
-            lit("]"),
             lit("&"),
         ],
         " ",
