@@ -1029,7 +1029,7 @@ pub fn formatar_ncm_expr(column_name: &str) -> Expr {
         .alias(column_name) // Alias back to the original column name.
 }
 
-/// Formats a `List<Date>` column into a string representation like "[DD/MM/YYYY, DD/MM/YYYY]".
+/// Formats a `List<Date>` column into a string representation like `[DD/MM/YYYY, DD/MM/YYYY]`.
 ///
 /// This function processes a column containing lists of dates. For each row, it formats
 /// the individual dates within the list to "DD/MM/YYYY" strings, joins them with ", ",
