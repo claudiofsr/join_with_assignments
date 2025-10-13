@@ -822,8 +822,9 @@ and formats them with dots.
 
 ### Example of usage:
 ```
-# use polars::prelude::*;
-# use join_with_assignments::get_cnpj_base_expr;
+use polars::prelude::*;
+use join_with_assignments::get_cnpj_base_expr;
+
 fn main() -> PolarsResult<()> {
 
     let df: DataFrame = df!(
@@ -852,8 +853,7 @@ fn main() -> PolarsResult<()> {
     )?;
 
     assert_eq!(result_df, expected_df);
-
-Ok(())
+    Ok(())
 }
 ```
 */
@@ -880,11 +880,13 @@ pub fn get_cnpj_base_expr(column_name: &str) -> Expr {
     // Regex to format the extracted 8-character CNPJ base.
     // This will take a base like "12CDE678" or "12.CDE.678" and format it as "12.CDE.678".
     let cnpj_format_pattern: Expr = lit(r"(?x)
+        ^
         ([\dA-Z]{2})  # Capture Group 1: Matches and captures the first 2 alphanumeric characters.
         \.?           # Matches an optional literal dot.
         ([\dA-Z]{3})  # Capture Group 2: Matches and captures the next 3 alphanumeric characters.
         \.?           # Matches an optional literal dot.
         ([\dA-Z]{3})  # Capture Group 3: Matches and captures the last 3 alphanumeric characters.
+        $
     ");
 
     col(column_name)
@@ -894,35 +896,73 @@ pub fn get_cnpj_base_expr(column_name: &str) -> Expr {
         .str()
         // This regex specifically captures the three parts of the 8-char base
         // and replaces the entire matched string with the formatted version.
-        .replace(cnpj_format_pattern, lit("$1.$2.$3"), false)
+        .replace(cnpj_format_pattern, lit("$1.$2.$3"), false) // `false` indicates `cnpj_format_pattern` is a regex
         .alias(column_name) // Keep original column name for the output
 }
 
-//*/
-/// Formats an NCM (Nomenclatura Comum do Mercosul) code from a string column.
-/// This function is designed to extract and format only the *first* valid NCM
-/// found within a string, adhering to patterns like "1234.56.78", "12345678",
-/// or "1234567" (which becomes "0123.45.67").
-///
-/// This function processes a column of strings, integers, or other types convertible to string,
-/// and formats NCM codes according to the specified rules:
-/// - "12345678" -> "1234.56.78"
-/// - "1234.56.78" -> "1234.56.78"
-/// - "1234567" -> "0123.45.67"
-/// - "abc" -> "abc" (original string if no valid NCM is found)
-///
-/// The implementation avoids `map()` or `apply()` for performance,
-/// leveraging Polars' native string expressions.
-///
-/// If no valid NCM is found, the original input string is returned.
-///
-/// ### Arguments
-///
-/// * `column_name` - The name of the column containing the NCM codes.
-///
-/// ### Returns
-///
-/// An `Expr` representing the formatted NCM column.
+/**
+Formats an NCM (Nomenclatura Comum do Mercosul) code from a string column.
+
+This function is designed to extract the *first* potential NCM code from a string,
+clean it, pad it with leading zeros if it's a 7-digit NCM, and then format it
+into the "XXXX.XX.XX" standard pattern. If no valid NCM-like sequence (7 or 8 digits)
+is found, the original string value is preserved.
+
+Examples:
+- "12345678"     -> "1234.56.78"
+- "1234-56.78"   -> "1234.56.78"
+- "1234567"      -> "0123.45.67" (padded with a leading zero)
+- "NCM: 12345678" -> "1234.56.78"
+- "Invalid NCM 12345" -> "Invalid NCM 12345" (original string if not NCM-like)
+- "Multiple: 1234.5678 and 90.12.3456" -> "1234.56.78" (only the first is extracted)
+
+### Arguments:
+- `column_name`: The name of the string column to process.
+
+### Returns:
+An `Expr` that, when applied to a DataFrame, will attempt to extract and format NCM codes.
+
+### Example of usage:
+```
+use polars::prelude::*;
+use join_with_assignments::formatar_ncm_expr;
+
+fn main() -> PolarsResult<()> {
+
+    let df: DataFrame = df!(
+        "text_col"  => &[
+            Some("12345678"),
+            Some("1234-56.78"),
+            Some("NCM 1234567"), // 7-digit NCM
+            Some("Invalid NCM 12345"),
+            Some("Multiple: 1234.5678 and 90.12.3456"),
+            None,
+            Some("abc"),
+        ],
+    )?;
+
+    let result_df = df
+        .lazy()
+        .with_column(formatar_ncm_expr("text_col"))
+        .collect()?;
+
+    let expected_df = df!(
+        "cnpj_col" => &[
+            Some("1234.56.78"),
+            Some("1234.56.78"),
+            Some("0123.45.67"), // 7-digit NCM padded
+            Some("Invalid NCM 12345"),
+            Some("1234.56.78"),
+            None,
+            Some("abc"),
+        ]
+    )?;
+
+    assert_eq!(result_df, expected_df);
+    Ok(())
+}
+```
+*/
 pub fn formatar_ncm_expr(column_name: &str) -> Expr {
     // Cast the input column to String type. This handles various input types like i64.
     let string_col = col(column_name).cast(DataType::String);
@@ -930,33 +970,27 @@ pub fn formatar_ncm_expr(column_name: &str) -> Expr {
     // This regex pattern is designed to capture the *first* potential NCM sequence.
     // It looks for:
     // - A non-digit boundary `(?:\A|\D)` to ensure we're starting a new NCM.
-    // - Followed by 7 digits
-    // The main NCM parts are captured in groups (1, 2, 3).
     let ncm_extraction_regex = lit(r"(?x)
-        (?:\A|\D)        # Non-capturing: beginning of text or not digit; Ensures the match is not preceded by a digit.
-        [\d\s\.\-]{7,20} # Capture Group 1: 7 to 20 digits, spaces, dots, or hyphens (the potential NCM)
-        (?:\z|\D)        # Non-capturing: end of text or not digit; Ensures the match is not followed by a digit.
+        (?:\A|\D) # Non-capturing: beginning of text or not digit; Ensures the match is not preceded by a digit.
+        (              # Start Capture Group
+            [\d]{3,4}  # Matches exactly 3 or 4 digits (first part)
+            [\.\-]?    # Optional dot or hyphen
+            [\d]{2}    # Matches exactly 2 digits (second part)
+            [\.\-]?    # Optional dot or hyphen
+            [\d]{2}    # Matches exactly 2 digits (third part)
+        )
+        (?:\z|\D) # Non-capturing: end of text or not digit; Ensures the match is not followed by a digit.
     ");
-
-    // Extract the first match.
-    // `extract_all` returns a list, `list().first()` gets the first element.
-    // If no match, it will be None.
-    let extracted_ncm_candidate = string_col
-        .clone()
-        .str()
-        .extract_all(ncm_extraction_regex)
-        .list()
-        .first() // Get the first extracted NCM candidate string
-        .alias("extracted_ncm_candidate_temp");
 
     // Regex pattern to remove all non-digit characters.
     // This will clean inputs like "1234.56.78" or "abc12345678def" into "12345678".
     let non_digit_pattern = lit(r"\D");
 
-    // Step 1: Clean the extracted NCM by removing any non-digits (dots, etc.)
-    // E.g., "1234.56.78" -> "12345678", "0123.45.67" -> "01234567"
-    let cleaned_digits = extracted_ncm_candidate
-        .clone() // Clone for later use
+    // Step 1: Extract the first match and clean the extracted NCM candidate by removing non-digit characters.
+    let cleaned_digits = string_col
+        .clone()
+        .str()
+        .extract(ncm_extraction_regex, 1)
         .str()
         .replace_all(non_digit_pattern, lit(""), false) // `false` indicates `pat` is a regex
         .alias("cleaned_digits_temp");
@@ -985,14 +1019,14 @@ pub fn formatar_ncm_expr(column_name: &str) -> Expr {
     let ncm_format_pattern = lit(r"^(\d{4})(\d{2})(\d{2})$");
 
     // Step 3: Apply the final formatting.
-    // `replace_all` will transform "12345678" into "1234.56.78".
+    // `replace` will transform "12345678" into "1234.56.78".
     // If `zfilled_ncm` (which is either z-filled NCM or the original string_col)
-    // does NOT match `ncm_format_pattern`, `replace_all` will simply return `zfilled_ncm` unchanged.
+    // does NOT match `ncm_format_pattern`, `replace` will simply return `zfilled_ncm` unchanged.
     // This implicitly handles the cases where we reverted to `string_col` in the previous step,
     // as well as cases like "abc" which would not match `ncm_format_pattern`.
     zfilled_ncm
         .str()
-        .replace_all(ncm_format_pattern, lit("$1.$2.$3"), false) // `false` indicates `ncm_format_pattern` is a regex
+        .replace(ncm_format_pattern, lit("$1.$2.$3"), false) // `false` indicates `ncm_format_pattern` is a regex
         .alias(column_name) // Alias back to the original column name.
 }
 
@@ -1557,14 +1591,6 @@ mod tests_replace_values_with_null {
 mod ncm_tests {
     use super::*;
 
-    /// Formats a column containing NCM (Nomenclatura Comum do Mercosul) codes.
-    ///
-    /// This function processes a column of strings, integers, or other types convertible to string,
-    /// and formats NCM codes according to the specified rules:
-    /// - "12345678" -> "1234.56.78"
-    /// - "1234.56.78" -> "1234.56.78"
-    /// - "1234567"  -> "0123.45.67"
-    /// - "abc"      -> "abc" (original string if no valid NCM is found)
     #[test]
     fn test_formatar_ncm_expr() -> PolarsResult<()> {
         let df = df!(
@@ -1574,16 +1600,16 @@ mod ncm_tests {
                 Some("1234567"),
                 Some("abc"),
                 Some("def.12345678.ghi"), // NCM embedded
-                Some("1234"), // Too short
-                Some("123456789"), // Too long after cleaning
+                Some("1234"),             // Too short
+                Some("123456789"),        // Too long after cleaning
                 Some(""), // Empty string
-                None, // Null value
+                None,     // Null value
                 Some("12.34.56.78"), // Already malformed but contains digits
-                Some("123.45.67"), // 7 digits, needs zero-padding
+                Some("123.45.67"),   // 7 digits, needs zero-padding
                 Some("12345678 and some text"), // NCM at start
                 Some("text and 12345678"), // NCM at end
-                Some("1 2 3 4 5 6 7 8"), // Spaces
-                Some("1-2-3-4-5-6-7-8"), // Dashes
+                Some("1 2 3 4 5 6 7 8"),   // Spaces
+                Some("1-2-3-4-5-6-7-8"),   // Dashes
                 Some("NCM 0912.3456"),
                 Some("Invalid: 23.45.67"), // return the original input
                 Some("Multiple: 1234.5678 and 90.12.3456"),
@@ -1599,17 +1625,17 @@ mod ncm_tests {
                 Some("1234.56.78"),
                 Some("0123.45.67"),
                 Some("abc"),
-                Some("1234.56.78"), // Correctly extracts and formats
-                Some("1234"), // Remains too short
-                Some("123456789"), // Remains too long after cleaning
+                Some("1234.56.78"), // NCM embedded
+                Some("1234"),       // Remains too short
+                Some("123456789"),  // Remains too long after cleaning
                 Some(""),
                 None,
-                Some("1234.56.78"), // Correctly extracts and formats
-                Some("0123.45.67"), // Correctly z-fills and formats (123.45.67 -> 1234567 -> 01234567)
-                Some("1234.56.78"), // Correctly extracts and formats
-                Some("1234.56.78"), // Correctly extracts and formats
-                Some("1234.56.78"), // Cleans spaces and formats
-                Some("1234.56.78"), // Cleans dashes and formats
+                Some("12.34.56.78"), // return the original input
+                Some("0123.45.67"),  // Correctly z-fills and formats (123.45.67 -> 1234567 -> 01234567)
+                Some("1234.56.78"),  // Correctly extracts and formats
+                Some("1234.56.78"),  // Correctly extracts and formats
+                Some("1 2 3 4 5 6 7 8"),   // Spaces: return the original input
+                Some("1-2-3-4-5-6-7-8"),   // Dashes: return the original input
                 Some("0912.34.56"),
                 Some("Invalid: 23.45.67"), // return the original input
                 Some("1234.56.78"),        // Only the *first* NCM is extracted
@@ -1690,7 +1716,7 @@ mod ncm_tests {
                 Some("invalid_ncm"),     // Completely invalid
                 Some("00000000"),        // All zeros
                 Some("0"),               // one zero
-                Some("1.2.3.4.5.6.7.8"), // Too many dots, results in "12345678"
+                Some("1.2.3.4.5.6.7.8"), // Too many dots
             ]
         )?;
 
@@ -1700,8 +1726,8 @@ mod ncm_tests {
                 Some("0987.65.43"),  // Cleans (987.65.43 -> 9876543), z-fills to 09876543, then formats to 0987.65.43
                 Some("invalid_ncm"), // Remains unchanged
                 Some("0000.00.00"),  // Formats correctly
-                Some("0"),           // Remains unchanged
-                Some("1234.56.78"),  // Cleans (1.2.3.4.5.6.7.8 -> 12345678), then formats
+                Some("0"),                // Remains unchanged
+                Some("1.2.3.4.5.6.7.8"),  // Remains unchanged
             ]
         )?;
 
