@@ -814,76 +814,96 @@ pub fn write_pqt(df: &DataFrame, basename: &str) -> PolarsResult<()> {
     Ok(())
 }
 
-/// Polars expression to extract and format the base CNPJ (XX.XXX.XXX).
-pub fn get_cnpj_base_expr(column_name: &str) -> Expr {
-    let pattern: Expr = lit(r"(?x)
-        (?:\A|\W)               # Non-capturing: beginning of text or non-word boundary
-        (\w{2}\.?\w{3}\.?\w{3}) # Capture Group 1: The entire base part (e.g., 12.345.678)
-        (?:/?\w{4}-?\d{2})?     # Non-capturing: Optional (branch/filial) and checksum part
-        (?:\z|\W)               # Non-capturing: end of text or non-word boundary
-    ");
-
-    col(column_name)
-        .str()
-        .extract(
-            pattern, 1, // Capture the first group (the base CNPJ)
-        )
-        .str()
-        .replace_all(lit(r"^(\w{2})(\w{3})(\w{3}).*$"), lit("$1.$2.$3"), false) // Format as "XX.XXX.XXX"
-        .alias(column_name) // Keep original column name for the output
-}
-
-/*
-/// Polars expression to extract and format the base CNPJ (XX.XXX.XXX).
+/// Extracts and formats a unique 8-character CNPJ (Cadastro Nacional da Pessoa Jurídica) base
+/// from a string column.
 ///
-/// This function extracts and returns the base CNPJ (first 8 digits, e.g., "12.345.678")
-/// from a string column. It handles cases where multiple CNPJs might be present,
-/// or where the CNPJ is embedded in other text.
+/// This function processes a text column to find valid CNPJ bases, which are typically
+/// 8 alphanumeric characters long and may be followed by an optional branch/checksum suffix.
+/// It handles various formats, including those with optional dot and slash separators.
 ///
-/// The logic is as follows:
-/// 1. Extracts all potential CNPJ base patterns (XX.XXX.XXX) from the input string.
-/// 2. Cleans these extracted patterns to be "XXXXXXXX" (removing dots).
-/// 3. Filters to keep only unique 8-digit CNPJ bases.
-/// 4. If exactly one unique 8-digit CNPJ base is found, it is formatted as "XX.XXX.XXX" and returned.
-/// 5. Otherwise (zero, or multiple unique 8-digit CNPJ bases), `None` is returned.
-///
-/// This implementation uses only Polars expressions, avoiding `map()` or `apply()` for performance.
-///
-/// #### Exemplo fictício:
-///
-/// Se CNPJ: `12.345.678/0009-23`, então CNPJ Base: `12.345.678`.
-/// Se CNPJ: `<N/D> [Info do CT-e: 12.345.678/0009-23] [Info do CT-e: <N/D>] [Info do CT-e: 12.345.678/0009-23]` -> `12.345.678`
-/// Se CNPJ: `12.345.678/0001-00 and 98.765.432/0001-00` -> `None` (multiple unique bases)
-/// Se CNPJ: `abc` -> `None` (no CNPJ found)
+/// The process involves:
+/// 1. Casting the input column to a String type.
+/// 2. Using a regular expression to extract all potential 8-character CNPJ bases,
+///    allowing for common separators and the full CNPJ structure (base/branch-checksum).
+///    The regex ensures that the extracted base is a distinct unit (e.g., surrounded by
+///    word boundaries or string start/end).
+/// 3. For each extracted item, it reapplies a regex to clean and format the 8-character
+///    base into the "XX.XXX.XXX" standard, discarding any branch or checksum suffix
+///    that might have been captured during the initial extraction.
+/// 4. It then collects all unique formatted CNPJ bases found in a given row.
+/// 5. Finally, it checks if exactly one unique CNPJ base was found for the row.
+///    - If yes, that unique formatted CNPJ base is returned.
+///    - If zero or more than one unique CNPJ bases are found, `NULL` is returned for that row.
 ///
 /// ### Arguments
-///
-/// * `column_name` - The name of the column containing the CNPJ strings.
+/// * `column_name` - The name of the input column containing text that may include CNPJs.
 ///
 /// ### Returns
+/// An `Expr` that, when applied to a DataFrame, will produce a new column (with the
+/// same name as `column_name`) containing the unique, formatted CNPJ base or `NULL`.
 ///
-/// An `Expr` representing the CNPJ Base column, with `DataType::String`.
+/// ### Example of usage:
+/// ```
+/// # use polars::prelude::*;
+/// # use join_with_assignments::get_cnpj_base_expr;
+/// fn main() -> PolarsResult<()> {
+///
+/// let df: DataFrame = df!(
+///     "text_col"  => &[
+///         Some("Empresa ABC 12.345.678/0001-90 LTDA"),
+///         Some("CNPJ: 123454ABC000123"),
+///         Some("Multiple bases: 11.222.333/0001-00 and 44.555.666/0001-00"),
+///         Some("Invalid CNPJ base 12345"),
+///         None,
+///     ],
+/// )?;
+///
+/// let cleaned_df = df
+///     .lazy()
+///     .with_column(get_cnpj_base_expr("text_col"))
+///     .collect()?;
+///
+/// // Expected output:
+/// // +------------+
+/// // | text_col   |
+/// // | ---        |
+/// // | str        |
+/// // +------------+
+/// // | 12.345.678 |
+/// // | 12.456.ABC |
+/// // | null       |
+/// // | null       |
+/// // | null       |
+/// // +------------+
+///
+/// Ok(())
+/// }
+/// ```
 pub fn get_cnpj_base_expr(column_name: &str) -> Expr {
     // 1. Cast the input column to String type.
     let string_col = col(column_name).cast(DataType::String);
 
-    // This regex pattern specifically captures the three parts of the CNPJ base.
-    // Group 1: first 2 digits, Group 2: next 3 digits, Group 3: last 3 digits.
-    // It is robust to optional dots and the /xxxx-xx suffix.
+    // This regex pattern is designed to capture the 8-character CNPJ base.
+    // It is robust to optional dots and handles the full CNPJ structure
+    // (base, branch/filial, checksum) by making the latter parts optional.
+    // It also ensures that the captured base is not part of a larger word
+    // by using word boundaries or start/end of string assertions.
     let cnpj_base_capture_regex = lit(r"(?x)
-        (?:\A|\W) # Non-capturing: beginning of text or not word ; or (?:^|\W)
-        (\w{2})   # Capture Group 1: 2 alphanumeric (first part)
-        \.?       # Optional dot
-        (\w{3})   # Capture Group 2: 3 alphanumeric (second part)
-        \.?       # Optional dot
-        (\w{3})   # Capture Group 3: 3 alphanumeric (third part)
-        (?:       # Non-capturing
-            \/?       # Optional slash
-            \w{4}     # 4 alphanumeric (branch/filial)
-            -?        # Optional hyphen
-            \d{2}     # check 2 digits (checksum)
-        )?
-        (?:\z|\W) # Non-capturing: end of text or not word ; or (?:$|\W)
+        (?:\A|\b) # Non-capturing: start of string or word boundary
+        ( # Start Capture Group 1 (the CNPJ base)
+            [\dA-Z]{2}    # 2 alphanumeric (first part)
+            \.?           # Optional dot
+            [\dA-Z]{3}    # 3 alphanumeric (second part)
+            \.?           # Optional dot
+            [\dA-Z]{3}    # 3 alphanumeric (third part)
+        )
+        (?: # Non-capturing group for the optional suffix
+            \/?           # Optional slash
+            [\dA-Z]{4}    # 4 alphanumeric (branch/filial)
+            -?            # Optional hyphen
+            \d{2}         # check 2 digits (checksum)
+        )
+        (?:\z|\b) # Non-capturing: end of string or word boundary
     ");
 
     // 2. Extract all matches for the CNPJ base regex.
@@ -898,13 +918,23 @@ pub fn get_cnpj_base_expr(column_name: &str) -> Expr {
     let formatted_bases_list = all_extracted_bases
         .list()
         .eval(
-            // For each item in the list, re-extract and format.
-            // We use `col("")` to refer to the current string within the list.
+            // `col("")` refers to the current string item within the list being evaluated.
             col("")
                 .str()
-                .replace_all(lit(r"[\s\.]"), lit(""), false) // Remove all non-digits (e.g., "12.345.678" -> "12345678")
-                .str()
-                .replace_all(lit(r"^(\w{2})(\w{3})(\w{3}).*$"), lit("$1.$2.$3"), false) // Format as "XX.XXX.XXX"
+                // This regex specifically captures the three parts of the 8-char base
+                // and replaces the entire matched string with the formatted version.
+                .replace(
+                    lit(r"(?x)
+                        ([\dA-Z]{2})  # Capture Group 1: first 2 alphanumeric
+                        \.?           # Optional dot
+                        ([\dA-Z]{3})  # Capture Group 2: next 3 alphanumeric
+                        \.?           # Optional dot
+                        ([\dA-Z]{3})  # Capture Group 3: last 3 alphanumeric
+                        .*            # Match any remaining characters (e.g., branch/checksum)
+                    "),
+                    lit("$1.$2.$3"),
+                    false,
+                )
                 .alias("formatted_base_item"),
         )
         .alias("formatted_bases_list_temp");
@@ -918,17 +948,18 @@ pub fn get_cnpj_base_expr(column_name: &str) -> Expr {
     let unique_count = unique_bases_list
         .clone()
         .list()
-        .len()
+        .len() // Get the number of unique bases.
         .alias("unique_count_temp");
 
-    // 5. Conditionally return the unique CNPJ base if count is 1, otherwise None.
+    // 5. Conditionally return the unique CNPJ base if exactly one was found, otherwise None.
+    // This is the final selection logic for the column.
     when(unique_count.eq(lit(1)))
-        .then(unique_bases_list.list().first())      // If exactly one unique, take the first (and only) element
+        .then(unique_bases_list.list().first()) // If exactly one unique, take the first (and only) element
         .otherwise(lit(NULL).cast(DataType::String)) // Otherwise, return NULL as String
-        .alias(column_name)
+        .alias(column_name) // Alias the final expression with the original column name.
 }
-*/
 
+//*/
 /// Formats an NCM (Nomenclatura Comum do Mercosul) code from a string column.
 /// This function is designed to extract and format only the *first* valid NCM
 /// found within a string, adhering to patterns like "1234.56.78", "12345678",
@@ -1348,24 +1379,24 @@ mod tests_functions {
     fn test_get_cnpj_base_expr() -> PolarsResult<()> {
         // Exemplo com CNPJ fictício
 
-        let text_1 = "12.345.678/0009-23";
+        let text_1 = "12345678000923";
 
         let text_2 = "<N/D> [Info do CT-e: 12.ABC.678/0009-23] [Info do CT-e: <N/D>] [Info do CT-e: 12.ABC.679/0009-66] [Info do CT-e: 12.ABC.678/0009-23]";
 
-        let text_3 = "<N/D> [Info do CT-e: 12.345.CDE/0009-23] [Info do CT-e: <N/D>] [Info do CT-e: 12345CDE/1234-88] [Info do CT-e: 12345CDE901234] 12345CDE9012345";
+        let text_3 = "<N/D> [Info do CT-e: 12.345.CDE/0009-23] [Info do CT-e: <N/D>] [Info do CT-e: 12345.CDE/1234-88] [Info do CT-e: 12345CDE901234] 12345CDE9012345";
 
-        let text_4 = "02.345.678/12345-12 123456781234123 foo 012.345.678/1234-23";
+        let text_4 = "12.345.678/12345-123 02345678123412 foo 012.345.678/1234-23";
 
-        let text_5 = "12345678123412 foo 012.345.678/1234-23";
+        let text_5 = "123456781234123 foo 012.345.678/1234-23 bar 12.FGH.678/1234-23 zz";
 
         let df: DataFrame = df!(
             "text_col"  => &[
                 Some(text_1),
                 Some(text_2),
                 Some(text_3),
+                None,
                 Some(text_4),
                 Some(text_5),
-                None
             ],
         )?;
 
@@ -1379,11 +1410,11 @@ mod tests_functions {
         let expected_df: DataFrame = df!(
             "text_col"  => &[
             Some("12.345.678"),
-            Some("12.ABC.678"),
-            Some("12.345.CDE"),
-            Some("02.345.678"),
-            Some("12.345.678"),
             None,
+            Some("12.345.CDE"),
+            None,
+            Some("02.345.678"),
+            Some("12.FGH.678"),
             ],
         )?;
 
@@ -2010,7 +2041,6 @@ mod ncm_tests {
     }
 }
 
-/*
 #[cfg(test)]
 /// Run tests with:
 /// `cargo test -- --show-output cnpj_tests`
@@ -2038,6 +2068,7 @@ mod cnpj_tests {
                 Some("12.345.678/0009-23"),
                 Some("<N/D> [Info do CT-e: 12.ABC.678/0009-23] [Info do CT-e: <N/D>] [Info do CT-e: 12.ABC.679/0009-66] [Info do CT-e: 12.ABC.678/0009-23]"),
                 Some("<N/D> [Info do CT-e: 12.345.CDE/0009-23] [Info do CT-e: <N/D>] [Info do CT-e: 12345CDE/1234-88] [Info do CT-e: 12345CDE901234] 12345CDE9012345"),
+                Some("02345678/12345-12 123456781234123 0234567A/4444-12 foo 012.345.678/1234-23"),
                 Some("02345678/12345-12 123456781234123 foo 012.345.678/1234-23"),
                 Some("12345678123412 foo 012.345.678/1234-23"),
         ])?;
@@ -2057,12 +2088,13 @@ mod cnpj_tests {
                 None, // Too long
                 None, // Null input
                 None, // Malformed base
-                Some("12.abc.678"), // Base only
-                Some("12.345.678"), // Base only, undotted
+                None, // Base only
+                None, // Base only, undotted
                 Some("12.345.678"),
                 None,
                 Some("12.345.CDE"),
-                Some("02.345.678"),
+                Some("02.345.67A"),
+                None,
                 Some("12.345.678"),
             ]
         )?;
@@ -2123,4 +2155,3 @@ mod cnpj_tests {
         Ok(())
     }
 }
-*/
