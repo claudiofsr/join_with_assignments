@@ -4,7 +4,7 @@ use std::ops::Neg;
 use crate::{
     ExprExtension, LazyFrameExtension, MyResult, Side::Left, cfop_de_exportacao, coluna,
     cst_50_a_66, cst_de_receita_bruta, csts, csts_nao_tributados, entrada_de_credito,
-    get_cnpj_base, get_output_as_string, operacoes_de_ajustes_ou_descontos, operacoes_de_saida,
+    get_cnpj_base_expr, operacoes_de_ajustes_ou_descontos, operacoes_de_saida,
     receita_bruta_cumulativa, receita_bruta_nao_cumulativa, receita_nao_nula,
     saida_de_receita_bruta,
 };
@@ -209,18 +209,7 @@ fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame, _auditar: bool) -> MyRe
                 .alias(cod),
         )
         */
-        .with_column(
-            /*
-            get_cnpj_base_expr(contribuinte_cnpj).alias("CNPJ Base"),
-            */
-            col(contribuinte_cnpj)
-                .apply(
-                    get_cnpj_base,
-                    // GetOutput::from_type(DataType::String)
-                    get_output_as_string,
-                )
-                .alias("CNPJ Base"),
-        )
+        .with_column(get_cnpj_base_expr(contribuinte_cnpj).alias("CNPJ Base"))
         .select(&selected)
         .collect()?
         .lazy();

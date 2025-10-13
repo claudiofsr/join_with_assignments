@@ -5,7 +5,7 @@ use polars::prelude::*;
 use crate::{
     MyColumn,
     Side::{Left, Middle, Right},
-    coluna, get_cnpj_base, get_output_as_string,
+    coluna, get_cnpj_base_expr,
 };
 
 pub trait ExprExtension {
@@ -133,34 +133,10 @@ impl LazyFrameExtension for LazyFrame {
         let pattern: Expr = lit(r"(?i)valor total = (.*)"); // regex
 
         self.with_columns([
-            /*
-            // Add 3 columns containing CNPJ Base, using the new expression
+            // Add 3 columns containing CNPJ Base
             get_cnpj_base_expr(columns[0]).alias(columns[1]),
             get_cnpj_base_expr(columns[2]).alias(columns[3]),
             get_cnpj_base_expr(columns[4]).alias(columns[5]),
-            */
-            // Adicionar 3 colunas contendo CNPJ Base
-            col(columns[0])
-                .apply(
-                    get_cnpj_base,
-                    // GetOutput::from_type(DataType::String)
-                    get_output_as_string,
-                )
-                .alias(columns[1]), // Coluna auxiliar
-            col(columns[2])
-                .apply(
-                    get_cnpj_base,
-                    // GetOutput::from_type(DataType::String)
-                    get_output_as_string,
-                )
-                .alias(columns[3]), // Coluna auxiliar
-            col(columns[4])
-                .apply(
-                    get_cnpj_base,
-                    // GetOutput::from_type(DataType::String)
-                    get_output_as_string,
-                )
-                .alias(columns[5]), // Coluna auxiliar
             col(columns[6])
                 .str()
                 .extract(pattern, 1)
