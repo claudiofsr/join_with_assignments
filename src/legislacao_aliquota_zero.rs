@@ -1,5 +1,4 @@
 use polars::{prelude::*, series::Series};
-use rayon::prelude::*;
 use regex::Regex;
 use std::sync::LazyLock as Lazy;
 
@@ -86,30 +85,31 @@ fn analisar_colunas_selecionadas(col: &Column) -> Result<Column, PolarsError> {
     let ser_codigoncm: &Series = &struct_chunked.fields_as_series()[0];
     let ser_descricao: &Series = &struct_chunked.fields_as_series()[1];
 
-    // Get columns with into_iter()
-    let vec_opt_str_ncm: Vec<Option<&str>> = ser_codigoncm.str()?.into_iter().collect();
-    let vec_opt_str_dsc: Vec<Option<&str>> = ser_descricao.str()?.into_iter().collect();
+    // Get ChunkedArray<StringType>
+    let ca_str_ncm = ser_codigoncm.str()?;
+    let ca_str_dsc = ser_descricao.str()?;
 
-    // https://docs.rs/rayon/latest/rayon/iter/struct.MultiZip.html
-    // MultiZip is an iterator that zips up a tuple of parallel iterators to produce tuples of their items.
-    let col: Column = (vec_opt_str_ncm, vec_opt_str_dsc)
-        .into_par_iter() // rayon: parallel iterator
+    let vec_series: StringChunked = ca_str_ncm
+        .into_iter()
+        .zip(ca_str_dsc)
         .map(
-            |(opt_str_ncm, opt_str_dsc)| match (opt_str_ncm, opt_str_dsc) {
-                (Some(str_ncm), Some(str_dsc)) => {
-                    let codigo_ncm = str_ncm.replace('.', "");
+            |(opt_ncm_str, opt_desc_str)| match (opt_ncm_str, opt_desc_str) {
+                (Some(ncm_str), Some(desc_str)) => {
+                    let codigo_ncm = ncm_str.replace('.', "");
                     match codigo_ncm.parse::<u64>() {
-                        Ok(ncm) => base_legal(ncm, str_dsc),
+                        Ok(ncm) => base_legal(ncm, desc_str),
                         Err(_) => None,
                     }
                 }
                 _ => None,
             },
         )
-        .collect::<StringChunked>()
-        .into_column();
+        .collect();
 
-    Ok(col)
+    // Create a new Series from the calculated Munkres assignments.
+    let new_series = Series::new("New".into(), vec_series);
+
+    Ok(new_series.into_column())
 }
 
 /// Base Legal conforme código NCM e descrição do item.
