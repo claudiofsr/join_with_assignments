@@ -11,6 +11,7 @@ mod legislacao_credito_presumido;
 mod legislacao_incidencia_monofasica;
 mod munkres;
 mod polars_assignments;
+mod regime_fiscal;
 mod traits;
 
 /// A module that exports the `ExcelWriter` struct which implements the Polars
@@ -47,6 +48,7 @@ pub use self::{
     legislacao_incidencia_monofasica::adicionar_coluna_de_incidencia_monofasica,
     munkres::{munkres_assignments, try_convert},
     polars_assignments::get_dataframe_after_assignments,
+    regime_fiscal::adicionar_coluna_de_regime_fiscal,
     traits::{
         DataFrameExtension, ExprExtension, FloatIterExtension, LazyFrameExtension,
         ToLiteralListExpr,

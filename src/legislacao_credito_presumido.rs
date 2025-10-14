@@ -1,118 +1,19 @@
-use polars::{prelude::*, series::Series};
+use polars::prelude::*;
 use regex::Regex;
 use std::sync::LazyLock as Lazy;
 
-use crate::{
-    LazyFrameExtension, MyResult,
-    Side::{Left, Right},
-    coluna, get_output_same_type, operacoes_de_entrada_ou_saida,
-};
+use crate::{MyResult, adicionar_coluna_de_regime_fiscal};
 
-/// Analisar legislação vigente das Contribuições conforme código NCM e descrição dos itens.
-///
-/// Ou seja, a legislação é resultado da função: fn(NCM, Descrição dos Itens).
-///
-/// O resultado é uma nova coluna com informações sobre a incidência das Contribuições.
-///
-/// Nome da nova coluna: `Crédito Presumido`
 pub fn adicionar_coluna_de_credito_presumido(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
-    let credito_presumido: &str = "Crédito Presumido";
-
-    let ncm_col_a: &str = coluna(Left, "ncm"); // "Código NCM";
-    let desc_col_a: &str = coluna(Left, "item_desc"); // "Descrição do Item";
-    let temp_col_a: &str = "Coluna Temporária A";
-
-    let ncm_col_b: &str = coluna(Right, "ncm"); // "Código NCM : NF Item (Todos)";
-    let desc_col_b: &str = coluna(Right, "descricao_mercadoria"); // "Descrição da Mercadoria/Serviço : NF Item (Todos)";
-    let temp_col_b: &str = "Coluna Temporária B";
-
-    let boolean_a: Expr = operacoes_de_entrada_ou_saida()?.and(col(temp_col_a).is_not_null());
-    let boolean_b: Expr = operacoes_de_entrada_ou_saida()?.and(col(temp_col_b).is_not_null());
-
-    // Exemplo: 'NCM 2207.10.90 : Crédito Presumido - Lei xxx.'
-    let exp_a: Expr = concat_str(
-        [lit("NCM"), col(ncm_col_a), lit(":"), col(temp_col_a)],
-        " ",
-        true,
-    );
-    let exp_b: Expr = concat_str(
-        [lit("NCM"), col(ncm_col_b), lit(":"), col(temp_col_b)],
-        " ",
-        true,
-    );
-
-    let lazyframe: LazyFrame = lazyframe
-        .with_columns([
-            // Adicionar 2 colunas temporárias
-            as_struct([col(ncm_col_a).cast(DataType::String), col(desc_col_a)].to_vec())
-                .apply(
-                    |col: Column| analisar_colunas_selecionadas(&col),
-                    get_output_same_type,
-                ) // GetOutput::from_type(DataType::String)
-                .alias(temp_col_a),
-            as_struct([col(ncm_col_b).cast(DataType::String), col(desc_col_b)].to_vec())
-                .apply(
-                    |col: Column| analisar_colunas_selecionadas(&col),
-                    get_output_same_type,
-                ) // GetOutput::from_type(DataType::String)
-                .alias(temp_col_b),
-        ])
-        .with_column(
-            // Adicionar 1 coluna que concentra as informações das 2 colunas temporárias
-            when(boolean_a)
-                .then(exp_a)
-                .when(boolean_b)
-                .then(exp_b)
-                .otherwise(lit(NULL))
-                .alias(credito_presumido),
-        )
-        // Remover 2 colunas temporárias
-        .drop_columns(&[temp_col_a, temp_col_b])?;
-
-    Ok(lazyframe)
-}
-
-/// Analyzes selected columns (NCM code and description) to determine legal basis.
-///
-/// Expects a StructColumn with two fields: NCM (String) and Description (String).
-fn analisar_colunas_selecionadas(col: &Column) -> Result<Column, PolarsError> {
-    // Add feature "dtype-struct"
-    // Cast the input column to StructChunked
-    let struct_chunked: &StructChunked = col.struct_()?;
-
-    // Get the fields as Series
-    let ser_codigoncm: &Series = &struct_chunked.fields_as_series()[0];
-    let ser_descricao: &Series = &struct_chunked.fields_as_series()[1];
-
-    // Get ChunkedArray<StringType> for NCM and description
-    let ca_str_ncm = ser_codigoncm.str()?;
-    let ca_str_dsc = ser_descricao.str()?;
-
-    // Iterate over NCM and description, apply base_legal function
-    let new_col: Column = ca_str_ncm
-        .into_iter()
-        .zip(ca_str_dsc)
-        .map(
-            |(opt_ncm_str, opt_desc_str)| match (opt_ncm_str, opt_desc_str) {
-                (Some(ncm_str), Some(desc_str)) => {
-                    // Remove dots from NCM string and parse as u64
-                    let codigo_ncm = ncm_str.replace('.', "");
-                    match codigo_ncm.parse::<u64>() {
-                        Ok(ncm) => base_legal(ncm, desc_str),
-                        Err(_) => None, // Handle parsing errors by returning None
-                    }
-                }
-                _ => None, // Handle missing NCM or description by returning None
-            },
-        )
-        .collect::<StringChunked>()
-        .into_column();
-
-    Ok(new_col)
+    adicionar_coluna_de_regime_fiscal(
+        lazyframe,
+        base_legal_de_credito_presumido,
+        "Crédito Presumido",
+    )
 }
 
 /// Base Legal conforme código NCM e descrição do item.
-fn base_legal(codigo_ncm: u64, descricao: &str) -> Option<&'static str> {
+fn base_legal_de_credito_presumido(codigo_ncm: u64, descricao: &str) -> Option<&'static str> {
     let especificos: [u64; 1] = [
         3029000, // lei_10925_art01_inciso20a()
     ];
