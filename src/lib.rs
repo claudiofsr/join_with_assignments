@@ -1119,7 +1119,8 @@ pub fn quit() {
 //----------------------------------------------------------------------------//
 
 /// Run tests with:
-/// cargo test -- --show-output tests_functions
+///
+/// `cargo test -- --show-output tests_functions`
 #[cfg(test)]
 mod tests_functions {
     use super::*;

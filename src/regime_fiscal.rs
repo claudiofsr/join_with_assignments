@@ -112,6 +112,7 @@ where
                 (Some(ncm_str), Some(desc_str)) => {
                     // Remove dots from NCM string and parse as u64
                     let codigo_ncm = ncm_str.replace('.', "");
+                    // println!("{ncm_str} -> {codigo_ncm}");
                     match codigo_ncm.parse::<u64>() {
                         Ok(ncm) => base_legal(ncm, desc_str),
                         Err(_) => None, // Handle parsing errors by returning None
@@ -124,4 +125,214 @@ where
         .into_column();
 
     Ok(new_col)
+}
+
+//----------------------------------------------------------------------------//
+//                                   Tests                                    //
+//----------------------------------------------------------------------------//
+
+/// Run tests with:
+///
+/// `cargo test -- --show-output regime_fiscal_tests`
+#[cfg(test)]
+mod regime_fiscal_tests {
+    use super::*; // Import everything from the parent module
+    use crate::{
+        MyResult, adicionar_coluna_de_aliquota_zero, adicionar_coluna_de_credito_presumido,
+        adicionar_coluna_de_incidencia_monofasica,
+    };
+
+    // Helper function to create a basic LazyFrame for testing
+    fn create_test_dataframe() -> PolarsResult<DataFrame> {
+        df! {
+            "Código NCM" => &["3100.00.00", "12011000", "50000000", "00000000", "22071000", "1030000"],
+            "Descrição do Item" => &["FERTILIZANTE UREIA", "Semente de Soja", "CADEIRA", "PRODUTO GENERICO", "Álcool", "Produto Crédito"],
+            "Código NCM : NF Item (Todos)" => &["31000000", "12011000", "50000000", "00000000", "22071000", "1000000"],
+            "Descrição da Mercadoria/Serviço : NF Item (Todos)" => &["UREIA AGRÍCOLA", "Muda de Milho", "MESA", "OUTRO PRODUTO", "Álcool Carburante", "Produto com Crédito"],
+            "Tipo de Operação" => &[1, 1, 1, 2, 2, 1], // operacoes_de_entrada_ou_saida
+        }
+    }
+
+    #[test]
+    fn test_adicionar_coluna_de_aliquota_zero() -> MyResult<()> {
+        let df = create_test_dataframe()?;
+
+        // Assert that the new column not exists
+        assert!(df.column("Alíquota Zero").is_err());
+
+        let result_lf = adicionar_coluna_de_aliquota_zero(df.lazy());
+        let df = result_lf?.collect()?;
+
+        println!("df: {df}");
+
+        // Assert that the new column exists
+        assert!(df.column("Alíquota Zero").is_ok());
+
+        // Assert the values in the new column
+        let aliquota_zero_col = df.column("Alíquota Zero")?.str()?;
+
+        assert_eq!(
+            aliquota_zero_col.get(0),
+            Some(
+                "NCM 3100.00.00 : Alíquota Zero - Lei 10.925/2004, Art. 1º, Inciso I (Adubos ou Fertilizantes)."
+            )
+        );
+        assert_eq!(
+            aliquota_zero_col.get(1),
+            Some(
+                "NCM 12011000 : Alíquota Zero - Lei 10.925/2004, Art. 1º, Inciso III (Sementes e Mudas destinadas à semeadura e plantio)."
+            )
+        );
+        assert_eq!(aliquota_zero_col.get(2), None); // No match
+        assert_eq!(aliquota_zero_col.get(3), None); // No match
+        assert_eq!(aliquota_zero_col.get(4), None); // Match, but not for this regime
+        assert_eq!(aliquota_zero_col.get(5), None); // Match, but not for this regime
+
+        // Ensure temporary columns are dropped
+        assert!(df.column("Coluna Temporária A").is_err());
+        assert!(df.column("Coluna Temporária B").is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_adicionar_coluna_de_credito_presumido() -> MyResult<()> {
+        let df = create_test_dataframe()?;
+        let result_lf = adicionar_coluna_de_credito_presumido(df.lazy());
+        let df = result_lf?.collect()?;
+
+        println!("df: {df}");
+
+        assert!(df.column("Crédito Presumido").is_ok());
+
+        let credito_presumido_col = df.column("Crédito Presumido")?.str()?;
+
+        println!("credito_presumido_col: {credito_presumido_col:?}");
+
+        assert_eq!(
+            credito_presumido_col.get(5),
+            Some(
+                "NCM 1030000 : Crédito Presumido - Lei 12.350/2010, Art. 55 (Animais vivos: Suíno ou Frango)."
+            )
+        );
+        assert_eq!(credito_presumido_col.get(0), None);
+        assert_eq!(credito_presumido_col.get(1), None);
+        assert_eq!(credito_presumido_col.get(2), None);
+        assert_eq!(credito_presumido_col.get(3), None);
+        assert_eq!(credito_presumido_col.get(4), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_adicionar_coluna_de_incidencia_monofasica() -> MyResult<()> {
+        let df = create_test_dataframe()?;
+        let result_lf = adicionar_coluna_de_incidencia_monofasica(df.lazy());
+        let df = result_lf?.collect()?;
+
+        println!("df: {df}");
+
+        assert!(df.column("Incidência Monofásica").is_ok());
+
+        let incidencia_monofasica_col = df.column("Incidência Monofásica")?.str()?;
+
+        println!("incidencia_monofasica_col: {incidencia_monofasica_col:?}");
+
+        assert_eq!(
+            incidencia_monofasica_col.get(4),
+            Some(
+                "NCM 22071000 : Incidência Monofásica - Lei 9.718/1998, Art. 5º (Álcool, Inclusive para Fins Carburantes)."
+            )
+        );
+        assert_eq!(incidencia_monofasica_col.get(0), None);
+        assert_eq!(incidencia_monofasica_col.get(1), None);
+        assert_eq!(incidencia_monofasica_col.get(2), None);
+        assert_eq!(incidencia_monofasica_col.get(3), None);
+        assert_eq!(incidencia_monofasica_col.get(5), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_adicionar_coluna_no_empty_frame() -> MyResult<()> {
+        let df_empty = df! {
+            "Código NCM" => Vec::<&str>::new(),
+            "Descrição do Item" => Vec::<&str>::new(),
+            "Código NCM : NF Item (Todos)" => Vec::<&str>::new(),
+            "Descrição da Mercadoria/Serviço : NF Item (Todos)" => Vec::<&str>::new(),
+            "Tipo de Operação" => Vec::<i64>::new(),
+        }?;
+
+        println!("df_empty: {df_empty}");
+
+        let result_lf = adicionar_coluna_de_aliquota_zero(df_empty.lazy())?;
+        let df_result = result_lf.collect()?;
+
+        println!("df_result: {df_result}");
+
+        // For an empty frame, the column should still be created but be empty
+        assert!(df_result.column("Alíquota Zero").is_ok());
+        assert_eq!(df_result.height(), 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_adicionar_coluna_with_all_null_ncm_description() -> MyResult<()> {
+        let df = df! {
+            "Código NCM" => &[None::<&str>],
+            "Descrição do Item" => &[None::<&str>],
+            "Código NCM : NF Item (Todos)" => &[None::<&str>],
+            "Descrição da Mercadoria/Serviço : NF Item (Todos)" => &[None::<&str>],
+            "Tipo de Operação" => &[1],
+        }?;
+
+        println!("df: {df}");
+
+        let result_lf = adicionar_coluna_de_aliquota_zero(df.lazy());
+        let df_result = result_lf?.collect()?;
+
+        println!("df_result: {df_result}");
+
+        let aliquota_zero_col = df_result.column("Alíquota Zero")?.str()?;
+        assert_eq!(aliquota_zero_col.get(0), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_operacoes_de_entrada_ou_saida_filter() -> MyResult<()> {
+        let df = df! {
+            "Código NCM" => &["31000000", "31000000"],
+            "Descrição do Item" => &["FERTILIZANTE UREIA", "FERTILIZANTE UREIA"],
+            "Código NCM : NF Item (Todos)" => &["31000000", "31000000"],
+            "Descrição da Mercadoria/Serviço : NF Item (Todos)" => &["UREIA AGRÍCOLA", "UREIA AGRÍCOLA"],
+            // Assuming this column drives the filter
+            "Tipo de Operação" => &[1, 3], // Set to 1:Entrada e 3:Ajustes
+        }?;
+        println!("df: {df}");
+
+        // Assert that the new column not exists
+        assert!(df.column("Alíquota Zero").is_err());
+
+        let result_lf = adicionar_coluna_de_aliquota_zero(df.lazy())?;
+        let df_result = result_lf.collect()?;
+        println!("df_result: {df_result}");
+
+        // Assert that the new column exists
+        assert!(df_result.column("Alíquota Zero").is_ok());
+
+        let aliquota_zero_col = df_result.column("Alíquota Zero")?.str()?;
+        println!("aliquota_zero_col: {aliquota_zero_col:?}");
+
+        assert_eq!(
+            aliquota_zero_col.get(0),
+            Some(
+                "NCM 31000000 : Alíquota Zero - Lei 10.925/2004, Art. 1º, Inciso I (Adubos ou Fertilizantes)."
+            )
+        );
+        assert_eq!(aliquota_zero_col.get(1), None);
+
+        Ok(())
+    }
 }
