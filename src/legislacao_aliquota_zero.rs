@@ -89,7 +89,7 @@ fn analisar_colunas_selecionadas(col: &Column) -> Result<Column, PolarsError> {
     let ca_str_ncm = ser_codigoncm.str()?;
     let ca_str_dsc = ser_descricao.str()?;
 
-    let vec_series: StringChunked = ca_str_ncm
+    let new_col: Column = ca_str_ncm
         .into_iter()
         .zip(ca_str_dsc)
         .map(
@@ -104,12 +104,10 @@ fn analisar_colunas_selecionadas(col: &Column) -> Result<Column, PolarsError> {
                 _ => None,
             },
         )
-        .collect();
+        .collect::<StringChunked>()
+        .into_column();
 
-    // Create a new Series from the calculated Munkres assignments.
-    let new_series = Series::new("New".into(), vec_series);
-
-    Ok(new_series.into_column())
+    Ok(new_col)
 }
 
 /// Base Legal conforme código NCM e descrição do item.
