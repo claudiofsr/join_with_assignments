@@ -440,8 +440,15 @@ fn main() -> Result<()> {
 }
 */
 
+//----------------------------------------------------------------------------//
+//                                   Tests                                    //
+//----------------------------------------------------------------------------//
+
+/// Run tests with:
+///
+/// `cargo test -- --show-output tests_aliquota_zero`
 #[cfg(test)]
-mod tests {
+mod tests_aliquota_zero {
     use crate::{
         MyResult, adicionar_coluna_de_aliquota_zero, configure_the_environment,
         get_output_as_int32_fields,
