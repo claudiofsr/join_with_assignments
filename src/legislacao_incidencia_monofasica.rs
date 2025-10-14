@@ -1,7 +1,10 @@
 use polars::{prelude::*, series::Series};
-use rayon::prelude::*;
 
-use crate::{LazyFrameExtension, MyResult, get_output_same_type, operacoes_de_entrada_ou_saida};
+use crate::{
+    LazyFrameExtension, MyResult,
+    Side::{Left, Right},
+    coluna, get_output_same_type, operacoes_de_entrada_ou_saida,
+};
 
 /// Analisar legislação vigente das Contribuições conforme código NCM e descrição dos itens.
 ///
@@ -11,49 +14,48 @@ use crate::{LazyFrameExtension, MyResult, get_output_same_type, operacoes_de_ent
 ///
 /// Nome da nova coluna: `Incidência Monofásica`
 pub fn adicionar_coluna_de_incidencia_monofasica(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
-    let columns: Vec<&'static str> = vec!["Tipo de Operação", "Incidência Monofásica"];
+    let incidencia_monofasica = "Incidência Monofásica";
 
-    let side_a: Vec<&'static str> = vec!["Código NCM", "Descrição do Item", "Coluna Temporária A"];
+    let ncm_col_a: &str = coluna(Left, "ncm"); // "Código NCM";
+    let desc_col_a: &str = coluna(Left, "item_desc"); // "Descrição do Item";
+    let temp_col_a: &str = "Coluna Temporária A";
 
-    let side_b: Vec<&'static str> = vec![
-        "Código NCM : NF Item (Todos)",
-        "Descrição da Mercadoria/Serviço : NF Item (Todos)",
-        "Coluna Temporária B",
-    ];
+    let ncm_col_b: &str = coluna(Right, "ncm"); // "Código NCM : NF Item (Todos)";
+    let desc_col_b: &str = coluna(Right, "descricao_mercadoria"); // "Descrição da Mercadoria/Serviço : NF Item (Todos)";
+    let temp_col_b: &str = "Coluna Temporária B";
 
-    let boolean_a: Expr = col(side_a[2]).is_not_null(); // .and(operacoes_de_entrada_ou_de_saida());
-    let boolean_b: Expr = col(side_b[2]).is_not_null(); // .and(operacoes_de_entrada_ou_de_saida());
+    // Combine null check with the entry/exit operation condition
+    let boolean_a: Expr = operacoes_de_entrada_ou_saida()?.and(col(temp_col_a).is_not_null());
+    let boolean_b: Expr = operacoes_de_entrada_ou_saida()?.and(col(temp_col_b).is_not_null());
 
     // Exemplo: 'NCM 2207.10.90 : Incidência Monofásica - Lei 9.718/1998, Art. 5º (Álcool, Inclusive para Fins Carburantes).'
     let exp_a: Expr = concat_str(
-        [lit("NCM"), col(side_a[0]), lit(":"), col(side_a[2])],
+        [lit("NCM"), col(ncm_col_a), lit(":"), col(temp_col_a)],
         " ",
         true,
     );
     let exp_b: Expr = concat_str(
-        [lit("NCM"), col(side_b[0]), lit(":"), col(side_b[2])],
+        [lit("NCM"), col(ncm_col_b), lit(":"), col(temp_col_b)],
         " ",
         true,
     );
 
     let lazyframe: LazyFrame = lazyframe
-        .with_column(
+        .with_columns([
             // Adicionar 2 colunas temporárias
-            as_struct([col(side_a[0]).cast(DataType::String), col(side_a[1])].to_vec())
+            as_struct([col(ncm_col_a).cast(DataType::String), col(desc_col_a)].to_vec())
                 .apply(
                     |col: Column| analisar_colunas_selecionadas(&col),
                     get_output_same_type,
                 ) // GetOutput::from_type(DataType::String)
-                .alias(side_a[2]),
-        )
-        .with_column(
-            as_struct([col(side_b[0]).cast(DataType::String), col(side_b[1])].to_vec())
+                .alias(temp_col_a),
+            as_struct([col(ncm_col_b).cast(DataType::String), col(desc_col_b)].to_vec())
                 .apply(
                     |col: Column| analisar_colunas_selecionadas(&col),
                     get_output_same_type,
                 ) // GetOutput::from_type(DataType::String)
-                .alias(side_b[2]),
-        )
+                .alias(temp_col_b),
+        ])
         .with_column(
             // Adicionar 1 coluna que concentra as informações das 2 colunas temporárias
             when(boolean_a)
@@ -61,53 +63,51 @@ pub fn adicionar_coluna_de_incidencia_monofasica(lazyframe: LazyFrame) -> MyResu
                 .when(boolean_b)
                 .then(exp_b)
                 .otherwise(lit(NULL))
-                .alias(columns[1]),
-        )
-        .with_column(
-            // Filtrar Operações de Entrada ou de Saída
-            when(operacoes_de_entrada_ou_saida()?)
-                .then(columns[1]) // keep original value
-                .otherwise(lit(NULL)) // replace by null
-                .alias(columns[1]), // .keep_name()
+                .alias(incidencia_monofasica),
         )
         // Remover 2 colunas temporárias
-        .drop_columns(&[side_a[2], side_b[2]])?;
+        .drop_columns(&[temp_col_a, temp_col_b])?;
 
     Ok(lazyframe)
 }
 
+/// Analyzes selected columns (NCM code and description) to determine legal basis.
+///
+/// Expects a StructColumn with two fields: NCM (String) and Description (String).
 fn analisar_colunas_selecionadas(col: &Column) -> Result<Column, PolarsError> {
-    // add feature "dtype-struct"
+    // Add feature "dtype-struct"
+    // Cast the input column to StructChunked
     let struct_chunked: &StructChunked = col.struct_()?;
 
     // Get the fields as Series
     let ser_codigoncm: &Series = &struct_chunked.fields_as_series()[0];
     let ser_descricao: &Series = &struct_chunked.fields_as_series()[1];
 
-    // Get columns with into_iter()
-    let vec_opt_str_ncm: Vec<Option<&str>> = ser_codigoncm.str()?.into_iter().collect();
-    let vec_opt_str_dsc: Vec<Option<&str>> = ser_descricao.str()?.into_iter().collect();
+    // Get ChunkedArray<StringType> for NCM and description
+    let ca_str_ncm = ser_codigoncm.str()?;
+    let ca_str_dsc = ser_descricao.str()?;
 
-    // https://docs.rs/rayon/latest/rayon/iter/struct.MultiZip.html
-    // MultiZip is an iterator that zips up a tuple of parallel iterators to produce tuples of their items.
-    let col: Column = (vec_opt_str_ncm, vec_opt_str_dsc)
-        .into_par_iter() // rayon: parallel iterator
+    // Iterate over NCM and description, apply base_legal function
+    let new_col: Column = ca_str_ncm
+        .into_iter()
+        .zip(ca_str_dsc)
         .map(
-            |(opt_str_ncm, opt_str_dsc)| match (opt_str_ncm, opt_str_dsc) {
-                (Some(str_ncm), Some(str_dsc)) => {
-                    let codigo_ncm = str_ncm.replace('.', "");
+            |(opt_ncm_str, opt_desc_str)| match (opt_ncm_str, opt_desc_str) {
+                (Some(ncm_str), Some(desc_str)) => {
+                    // Remove dots from NCM string and parse as u64
+                    let codigo_ncm = ncm_str.replace('.', "");
                     match codigo_ncm.parse::<u64>() {
-                        Ok(ncm) => base_legal(ncm, str_dsc),
-                        Err(_) => None,
+                        Ok(ncm) => base_legal(ncm, desc_str),
+                        Err(_) => None, // Handle parsing errors by returning None
                     }
                 }
-                _ => None,
+                _ => None, // Handle missing NCM or description by returning None
             },
         )
         .collect::<StringChunked>()
         .into_column();
 
-    Ok(col)
+    Ok(new_col)
 }
 
 /// Base Legal conforme código NCM e descrição do item.
