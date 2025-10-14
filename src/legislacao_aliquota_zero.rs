@@ -2,14 +2,17 @@ use polars::prelude::*;
 use regex::Regex;
 use std::sync::LazyLock as Lazy;
 
-use crate::{MyResult, adicionar_coluna_de_regime_fiscal};
+use crate::{
+    MyResult,
+    regimes_fiscais::{RegimesFiscais, adicionar_coluna_de_regime_fiscal},
+};
 
 pub fn adicionar_coluna_de_aliquota_zero(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
-    adicionar_coluna_de_regime_fiscal(lazyframe, base_legal_de_aliquota_zero, "Alíquota Zero")
+    adicionar_coluna_de_regime_fiscal(lazyframe, RegimesFiscais::AliquotaZero)
 }
 
 /// Base Legal conforme código NCM e descrição do item.
-fn base_legal_de_aliquota_zero(codigo_ncm: u64, descricao: &str) -> Option<&'static str> {
+pub fn base_legal_de_aliquota_zero(codigo_ncm: u64, descricao: &str) -> Option<&'static str> {
     // Specific NCM codes that do not qualify for any exemption
     let especificos: [u64; 1] = [
         3029000, // lei_10925_art01_inciso20a()
@@ -19,6 +22,7 @@ fn base_legal_de_aliquota_zero(codigo_ncm: u64, descricao: &str) -> Option<&'sta
         return None;
     }
 
+    // Match NCM codes to specific legal articles.
     match codigo_ncm {
         31000000..=31999999 => lei_10925_art01_inciso01(),
         38080000..=38089999 | 27075000 => lei_10925_art01_inciso02(),

@@ -2,18 +2,17 @@ use polars::prelude::*;
 use regex::Regex;
 use std::sync::LazyLock as Lazy;
 
-use crate::{MyResult, adicionar_coluna_de_regime_fiscal};
+use crate::{
+    MyResult,
+    regimes_fiscais::{RegimesFiscais, adicionar_coluna_de_regime_fiscal},
+};
 
 pub fn adicionar_coluna_de_credito_presumido(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
-    adicionar_coluna_de_regime_fiscal(
-        lazyframe,
-        base_legal_de_credito_presumido,
-        "Crédito Presumido",
-    )
+    adicionar_coluna_de_regime_fiscal(lazyframe, RegimesFiscais::CreditoPresumido)
 }
 
 /// Base Legal conforme código NCM e descrição do item.
-fn base_legal_de_credito_presumido(codigo_ncm: u64, descricao: &str) -> Option<&'static str> {
+pub fn base_legal_de_credito_presumido(codigo_ncm: u64, descricao: &str) -> Option<&'static str> {
     let especificos: [u64; 1] = [
         3029000, // lei_10925_art01_inciso20a()
     ];
