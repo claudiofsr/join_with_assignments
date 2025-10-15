@@ -30,6 +30,8 @@ pub trait LazyFrameExtension {
 
     /// Rounds float columns (Float32 and Float64) in a LazyFrame to a specified
     /// number of decimal places using optimized Polars expressions.
+    ///
+    /// Columns of other data types remain unchanged.
     fn format_float_columns(self, decimals: u32) -> Self;
 
     /// Adicionar colunas auxiliares das situações de glosa.
