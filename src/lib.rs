@@ -43,11 +43,12 @@ pub use self::{
     excel::*,
     filtros::*,
     glosar_base_de_calculo::glosar_bc,
-    legislacao_aliquota_zero::adicionar_coluna_de_aliquota_zero,
-    legislacao_credito_presumido::adicionar_coluna_de_credito_presumido,
-    legislacao_incidencia_monofasica::adicionar_coluna_de_incidencia_monofasica,
     munkres::{munkres_assignments, try_convert},
     polars_assignments::get_dataframe_after_assignments,
+    regimes_fiscais::{
+        adicionar_coluna_de_aliquota_zero, adicionar_coluna_de_credito_presumido,
+        adicionar_coluna_de_incidencia_monofasica,
+    },
     traits::{
         DataFrameExtension, ExprExtension, FloatIterExtension, LazyFrameExtension,
         ToLiteralListExpr,

@@ -1,14 +1,3 @@
-use polars::prelude::*;
-
-use crate::{
-    MyResult,
-    regimes_fiscais::{RegimesFiscais, adicionar_coluna_de_regime_fiscal},
-};
-
-pub fn adicionar_coluna_de_incidencia_monofasica(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
-    adicionar_coluna_de_regime_fiscal(lazyframe, RegimesFiscais::IncidenciaMonofasica)
-}
-
 /// Base Legal conforme código NCM e descrição do item.
 pub fn base_legal_de_incidencia_monofasica(
     codigo_ncm: u64,

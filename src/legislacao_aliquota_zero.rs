@@ -1,15 +1,5 @@
-use polars::prelude::*;
 use regex::Regex;
 use std::sync::LazyLock as Lazy;
-
-use crate::{
-    MyResult,
-    regimes_fiscais::{RegimesFiscais, adicionar_coluna_de_regime_fiscal},
-};
-
-pub fn adicionar_coluna_de_aliquota_zero(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
-    adicionar_coluna_de_regime_fiscal(lazyframe, RegimesFiscais::AliquotaZero)
-}
 
 /// Base Legal conforme código NCM e descrição do item.
 pub fn base_legal_de_aliquota_zero(codigo_ncm: u64, descricao: &str) -> Option<&'static str> {

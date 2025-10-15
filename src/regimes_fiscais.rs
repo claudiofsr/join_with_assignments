@@ -45,18 +45,43 @@ impl RegimesFiscais {
     }
 }
 
+/// Adds a new column for the 'Alíquota Zero' fiscal regime.
+///
+/// The new column will contain the legal basis for items qualifying for Alíquota Zero,
+/// based on NCM code and item description.
+pub fn adicionar_coluna_de_aliquota_zero(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
+    adicionar_coluna_de_regime_fiscal(lazyframe, RegimesFiscais::AliquotaZero)
+}
+
+/// Adds a new column for the 'Crédito Presumido' fiscal regime.
+///
+/// The new column will contain the legal basis for items qualifying for Crédito Presumido,
+/// based on NCM code and item description.
+pub fn adicionar_coluna_de_credito_presumido(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
+    adicionar_coluna_de_regime_fiscal(lazyframe, RegimesFiscais::CreditoPresumido)
+}
+
+/// Adds a new column for the 'Incidência Monofásica' fiscal regime.
+///
+/// The new column will contain the legal basis for items qualifying for Incidência Monofásica,
+/// based on NCM code and item description.
+pub fn adicionar_coluna_de_incidencia_monofasica(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
+    adicionar_coluna_de_regime_fiscal(lazyframe, RegimesFiscais::IncidenciaMonofasica)
+}
+
 /**
-Analisar legislação vigente das Contribuições conforme código NCM e descrição dos itens.
+Esta função adiciona uma nova coluna ao LazyFrame com informações sobre a
+incidência das Contribuições de acordo com o regime fiscal específico.
 
-Ou seja, a legislação é resultado da função: fn(NCM, Descrição dos Itens).
+As informações adicionadas na nova coluna sobre a incidência das Contribuições
+são obtidas conforme código NCM e descrição dos itens.
 
-O resultado é uma nova coluna com informações sobre a incidência das Contribuições.
+Ou seja, a legislação adicionada é resultado da função: fn(NCM, Descrição dos Itens).
 
-`lazyframe`: The input LazyFrame.
-`base_legal`: A function that determines the legal basis for a given NCM and description.
-`output_col_name`: The name of the new column to be added (e.g., "Alíquota Zero").
+ * `lazyframe`: The input LazyFrame.
+ * `regime_fiscal`: The fiscal regime to be analyzed (e.g., AliquotaZero).
 */
-pub fn adicionar_coluna_de_regime_fiscal(
+fn adicionar_coluna_de_regime_fiscal(
     lazyframe: LazyFrame,
     regime_fiscal: RegimesFiscais,
 ) -> MyResult<LazyFrame> {
@@ -91,14 +116,14 @@ pub fn adicionar_coluna_de_regime_fiscal(
         .with_columns([
             // Add a temporary column A by applying a custom function on NCM and description
             as_struct([col(ncm_col_a).cast(DataType::String), col(desc_col_a)].to_vec())
-                .apply(
+                .map(
                     move |col: Column| aplicar_regime_fiscal(&col, regime_fiscal),
                     get_output_same_type,
                 ) // GetOutput::from_type(DataType::String)
                 .alias(temp_col_a),
             // Add a temporary column B by applying a custom function on NCM and description
             as_struct([col(ncm_col_b).cast(DataType::String), col(desc_col_b)].to_vec())
-                .apply(
+                .map(
                     move |col: Column| aplicar_regime_fiscal(&col, regime_fiscal),
                     get_output_same_type,
                 ) // GetOutput::from_type(DataType::String)
@@ -136,8 +161,8 @@ fn aplicar_regime_fiscal(
     col: &Column,
     regime_fiscal: RegimesFiscais,
 ) -> Result<Column, PolarsError> {
-    // Add feature "dtype-struct"
     // Cast the input column to StructChunked to access its fields.
+    // Ensure the "dtype-struct" feature is enabled in Cargo.toml for StructChunked
     let struct_chunked: &StructChunked = col.struct_()?;
 
     // Get the fields as Series. Expected order: NCM (index 0), Description (index 1).
