@@ -2,7 +2,7 @@ use polars::prelude::*;
 // use rayon::prelude::*; // For parallel processing of rows
 
 use crate::{
-    AllCorrelations, DataFrameExtension, ExprExtension, LazyFrameExtension, MyResult,
+    AllCorrelations, DataFrameExtension, LazyFrameExtension, MyResult,
     Side::{Left, Middle, Right},
     args::Arguments,
     coluna, formatar_ncm_expr, get_lazyframe_from_csv, get_opt_vectuples, get_option_assignments,
@@ -56,9 +56,6 @@ pub fn get_dataframe_after_assignments(args: &Arguments) -> MyResult<DataFrame> 
 
 /// Formatar colunas a fim de realizar comparações e somas de valores.
 fn format_fazyframe_a(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
-    let columns_with_float64: Vec<&str> =
-        vec![coluna(Left, "valor_item"), coluna(Left, "valor_bc")];
-
     let count_lines = coluna(Left, "count_lines");
     let chave = coluna(Left, "chave");
     let ncm = coluna(Left, "ncm");
@@ -85,7 +82,7 @@ fn format_fazyframe_a(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
         .with_column(col(count_lines).cast(DataType::UInt64))
         .with_column(retain_only_digits(chave))
         .with_column(formatar_ncm_expr(ncm))
-        .with_columns([cols(columns_with_float64).as_expr().round_expr(2)]);
+        .format_float_columns(2);
 
     // Lazy operations don’t execute until we call .collect()?.
     Ok(lz.collect()?.lazy())
@@ -93,13 +90,6 @@ fn format_fazyframe_a(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
 
 /// Formatar colunas a fim de realizar comparações e somas de valores.
 fn format_fazyframe_b(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
-    let columns_with_float64: Vec<&str> = vec![
-        coluna(Right, "valor_total"),
-        coluna(Right, "valor_item"),
-        coluna(Right, "valor_bc_icms"),
-        coluna(Right, "valor_icms"),
-    ];
-
     let count_lines = coluna(Right, "count_lines");
     let chave = coluna(Right, "chave");
     let ncm = coluna(Right, "ncm");
@@ -124,7 +114,7 @@ fn format_fazyframe_b(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
         .with_column(col(count_lines).cast(DataType::UInt64))
         .with_column(retain_only_digits(chave))
         .with_column(formatar_ncm_expr(ncm))
-        .with_columns([cols(columns_with_float64).as_expr().round_expr(2)]);
+        .format_float_columns(2);
 
     // Lazy operations don’t execute until we call .collect()?.
     Ok(lz.collect()?.lazy())

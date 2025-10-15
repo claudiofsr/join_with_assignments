@@ -28,6 +28,10 @@ pub trait LazyFrameExtension {
     /// Remover multiple_whitespaces " " e/or "&" das extremidades da linha
     fn format_values(self) -> Self;
 
+    /// Rounds float columns (Float32 and Float64) in a LazyFrame to a specified
+    /// number of decimal places using optimized Polars expressions.
+    fn format_float_columns(self, decimals: u32) -> Self;
+
     /// Adicionar colunas auxiliares das situações de glosa.
     ///
     /// Adicionar 3 colunas contendo CNPJ Base
@@ -112,6 +116,22 @@ impl LazyFrameExtension for LazyFrame {
                 // Remover multiple_whitespaces " " e/or "&" das extremidades da linha
                 .str()
                 .replace_all(lit(r"^[\s&]+|[\s&]+$"), lit(""), false),
+        ])
+    }
+
+    fn format_float_columns(self, decimals: u32) -> Self {
+        // Select columns with Float32 or Float64 data types
+        let float_cols_selector = dtype_cols(&[DataType::Float32, DataType::Float64])
+            .as_selector()
+            .as_expr();
+
+        self.with_columns([
+            // Apply the round expression directly to the selected float columns
+            float_cols_selector
+                //.round(decimals, RoundMode::HalfAwayFromZero)
+                .round_expr(decimals)
+                .name()
+                .keep(), // Keep original column name
         ])
     }
 
