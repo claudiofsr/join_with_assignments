@@ -990,6 +990,8 @@ pub fn formatar_ncm_expr(column_name: &str) -> Expr {
     // Step 1: Extract the first match and clean the extracted NCM candidate by removing non-digit characters.
     let cleaned_digits = string_col
         .clone()
+        //.str()
+        //.replace(lit(r"^\s*0+\s*$"), lit("0000.00.00"), false) // `false` indicates `pat` is a regex
         .str()
         .extract(ncm_extraction_regex, 1)
         .str()
