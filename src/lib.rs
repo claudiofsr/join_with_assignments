@@ -299,7 +299,7 @@ pub fn get_option_assignments(series_efd: &Series, series_nfe: &Series) -> Optio
             // Perform Munkres assignment only if both vectors are not empty.
             if !vec_float64_efd.is_empty() && !vec_float64_nfe.is_empty() {
                 let assignments: Vec<u64> =
-                    munkres_assignments(&vec_float64_efd, &vec_float64_nfe, false);
+                    munkres_assignments(&vec_float64_efd, &vec_float64_nfe, false).ok()?;
                 // Return the assignments as a new Series.
                 Some(Series::new("new".into(), assignments))
             } else {

@@ -1,3 +1,5 @@
+use confy::ConfyError;
+use pathfinding::matrix::MatrixFormatError;
 use polars::prelude::PolarsError;
 use std::{io, path::PathBuf};
 use thiserror::Error;
@@ -22,7 +24,14 @@ implement `Display` using the `#[error(...)]` attribute.
 #[derive(Error, Debug)]
 pub enum JoinError {
     #[error("Confy error: {0}")]
-    Confy(#[from] confy::ConfyError),
+    Confy(#[from] ConfyError),
+
+    #[error("Conversion error from '{from_type}' to '{to_type}': {reason}")]
+    ConversionError {
+        from_type: String,
+        to_type: String,
+        reason: String,
+    },
 
     // Errors encountered while parsing CSV data (e.g., inconsistent columns, invalid data).
     #[error("CSV parsing error: {0} for file {1:?}")] // Adicionado PathBuf para contexto
@@ -42,10 +51,24 @@ pub enum JoinError {
     )]
     InvalidSide(String), // Armazenará o valor de Side que foi inválido (ex: "Middle")
 
+    #[error("Value out of i64 bounds during matrix generation: {value}")]
+    I64OutOfBounds { value: f64 },
+
     // Wrapper for standard IO errors.
     // The #[from] attribute automatically converts io::Error to JoinError::Io.
     #[error("IO error: {0}")]
     Io(#[from] io::Error),
+
+    #[error(
+        "fn munkres_assignments(),\n\
+        Matrix creation error: {source_error}.\n\
+        slice_a_len={slice_a_len}, slice_b_len={slice_b_len}\n"
+    )]
+    MatrixCreationError {
+        source_error: MatrixFormatError, // Não tem #[from] aqui, é um campo direto
+        slice_a_len: usize,
+        slice_b_len: usize,
+    },
 
     // Wrapper for Polars errors (from the Polars library).
     // #[from] handles conversion. Handles errors from Polars operations,
