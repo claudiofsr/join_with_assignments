@@ -72,7 +72,7 @@ Example of use:
     bdt schema df_consolidacao_natureza_da_bcalc.parquet
     bdt count --table df_itens_de_docs_fiscais_result.parquet
 */
-fn main() -> MyResult<()> {
+fn main() -> JoinResult<()> {
     clear_terminal_screen();
     configure_the_environment();
     show_sysinfo();

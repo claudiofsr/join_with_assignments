@@ -2,7 +2,7 @@ use polars::prelude::*;
 // use rayon::prelude::*; // For parallel processing of rows
 
 use crate::{
-    AllCorrelations, DataFrameExtension, LazyFrameExtension, MyResult,
+    AllCorrelations, DataFrameExtension, JoinResult, LazyFrameExtension,
     Side::{Left, Middle, Right},
     args::Arguments,
     coluna, formatar_ncm_expr, get_lazyframe_from_csv, get_opt_vectuples, get_option_assignments,
@@ -14,14 +14,17 @@ use crate::{
 /// A `DataFrame` is built upon a `Vec<Series>` where the `Series` have the same length.
 ///
 /// [polars-core-version/src/frame/mod.rs]
-pub fn get_dataframe_after_assignments(args: &Arguments) -> MyResult<DataFrame> {
+pub fn get_dataframe_after_assignments(args: &Arguments) -> JoinResult<DataFrame> {
+    let count_lines_left = coluna(Left, "count_lines");
+    let count_lines_right = coluna(Right, "count_lines");
+
     println!("Read LazyFrame from CSV files.");
     let lazyframe_a: LazyFrame =
         get_lazyframe_from_csv(args.file1.clone(), args.delimiter_input_1, Left)?
-            .with_row_index(coluna(Left, "count_lines"), Some(0u32));
+            .with_row_index(count_lines_left, Some(0u32));
     let lazyframe_b: LazyFrame =
         get_lazyframe_from_csv(args.file2.clone(), args.delimiter_input_2, Right)?
-            .with_row_index(coluna(Right, "count_lines"), Some(0u32));
+            .with_row_index(count_lines_right, Some(0u32));
 
     println!("Format the columns to perform comparisons and sum values.\n");
     let lazyframe_a: LazyFrame = format_fazyframe_a(lazyframe_a)?;
@@ -55,7 +58,7 @@ pub fn get_dataframe_after_assignments(args: &Arguments) -> MyResult<DataFrame> 
 }
 
 /// Formatar colunas a fim de realizar comparações e somas de valores.
-fn format_fazyframe_a(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
+fn format_fazyframe_a(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     let count_lines = coluna(Left, "count_lines");
     let chave = coluna(Left, "chave");
     let ncm = coluna(Left, "ncm");
@@ -82,14 +85,14 @@ fn format_fazyframe_a(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
         .with_column(col(count_lines).cast(DataType::UInt64))
         .with_column(retain_only_digits(chave))
         .with_column(formatar_ncm_expr(ncm))
-        .format_float_columns(2);
+        .round_float_columns(2);
 
     // Lazy operations don’t execute until we call .collect()?.
     Ok(lz.collect()?.lazy())
 }
 
 /// Formatar colunas a fim de realizar comparações e somas de valores.
-fn format_fazyframe_b(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
+fn format_fazyframe_b(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     let count_lines = coluna(Right, "count_lines");
     let chave = coluna(Right, "chave");
     let ncm = coluna(Right, "ncm");
@@ -114,7 +117,7 @@ fn format_fazyframe_b(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
         .with_column(col(count_lines).cast(DataType::UInt64))
         .with_column(retain_only_digits(chave))
         .with_column(formatar_ncm_expr(ncm))
-        .format_float_columns(2);
+        .round_float_columns(2);
 
     // Lazy operations don’t execute until we call .collect()?.
     Ok(lz.collect()?.lazy())
@@ -805,7 +808,7 @@ mod test_assignments {
 
     #[test]
     /// `cargo test -- --show-output get_number_of_rows`
-    fn get_number_of_rows() -> MyResult<()> {
+    fn get_number_of_rows() -> JoinResult<()> {
         configure_the_environment();
 
         let dataframe_01: DataFrame = df!(
@@ -845,7 +848,7 @@ mod test_assignments {
 
     geany polars-plan-0.37.0/src/dsl/functions/concat.rs&
     */
-    fn concat_str_with_nulls() -> MyResult<()> {
+    fn concat_str_with_nulls() -> JoinResult<()> {
         configure_the_environment();
 
         let dataframe_01: DataFrame = df!(
@@ -936,7 +939,7 @@ mod test_assignments {
     /// <https://github.com/pola-rs/polars/issues/3534>
     ///
     /// <https://github.com/pola-rs/polars/issues/8750>
-    fn filter_even_numbers() -> MyResult<()> {
+    fn filter_even_numbers() -> JoinResult<()> {
         configure_the_environment();
 
         // Column names:
@@ -1012,7 +1015,7 @@ mod test_assignments {
 
     #[test]
     /// `cargo test -- --show-output apply_a_function_to_multiple_columns`
-    fn apply_a_function_to_multiple_columns() -> MyResult<()> {
+    fn apply_a_function_to_multiple_columns() -> JoinResult<()> {
         configure_the_environment();
 
         let dataframe01: DataFrame = df!(
@@ -1077,7 +1080,7 @@ mod test_assignments {
 
     #[test]
     /// `cargo test -- --show-output read_csv_file_v1`
-    fn read_csv_file_v1() -> MyResult<()> {
+    fn read_csv_file_v1() -> JoinResult<()> {
         unsafe {
             env::set_var("POLARS_FMT_TABLE_ROUNDED_CORNERS", "1"); // apply rounded corners to UTF8-styled tables.
             env::set_var("POLARS_FMT_MAX_COLS", "10"); // maximum number of columns shown when formatting DataFrames.
@@ -1191,7 +1194,7 @@ mod test_assignments {
 
     #[test]
     /// `cargo test -- --show-output read_csv_file_v2`
-    fn read_csv_file_v2() -> MyResult<()> {
+    fn read_csv_file_v2() -> JoinResult<()> {
         unsafe {
             env::set_var("POLARS_FMT_TABLE_ROUNDED_CORNERS", "1"); // apply rounded corners to UTF8-styled tables.
             env::set_var("POLARS_FMT_MAX_COLS", "60"); // maximum number of columns shown when formatting DataFrames.

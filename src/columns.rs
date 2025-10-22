@@ -1,6 +1,7 @@
 use polars::datatypes::DataType;
 use std::{
     collections::{HashMap, HashSet},
+    fmt,
     sync::LazyLock as Lazy,
 };
 
@@ -9,6 +10,22 @@ pub enum Side {
     Left,
     Middle,
     Right,
+}
+
+// Implementação de Display para o enum Side
+impl fmt::Display for Side {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // Usamos o formato de depuração (:?) aqui, que é convenientemente
+        // o que já queríamos (ex: "Left", "Right", "Middle").
+        // Alternativamente, poderíamos usar um `match self` para ter controle total.
+        write!(f, "{:?}", self)
+        // Se quiséssemos um controle mais fino:
+        // match self {
+        //     Side::Left => write!(f, "Left"),
+        //     Side::Right => write!(f, "Right"),
+        //     Side::Middle => write!(f, "Middle"),
+        // }
+    }
 }
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]

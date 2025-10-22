@@ -440,7 +440,7 @@ fn main() -> Result<()> {
 #[cfg(test)]
 mod tests_aliquota_zero {
     use crate::{
-        MyResult, adicionar_coluna_de_aliquota_zero, configure_the_environment,
+        JoinResult, adicionar_coluna_de_aliquota_zero, configure_the_environment,
         get_output_as_int32_fields,
     };
     use polars::prelude::*;
@@ -559,7 +559,7 @@ mod tests_aliquota_zero {
     }
 
     #[test]
-    fn filtrar_coluna() -> MyResult<()> {
+    fn filtrar_coluna() -> JoinResult<()> {
         // cargo test -- --show-output filtrar_coluna
 
         configure_the_environment();

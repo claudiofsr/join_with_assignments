@@ -2,7 +2,7 @@ use polars::{datatypes::DataType, prelude::*};
 use std::ops::Neg;
 
 use crate::{
-    ExprExtension, LazyFrameExtension, MyResult, Side::Left, cfop_de_exportacao, coluna,
+    ExprExtension, JoinResult, LazyFrameExtension, Side::Left, cfop_de_exportacao, coluna,
     cst_50_a_66, cst_de_receita_bruta, csts, csts_nao_tributados, entrada_de_credito,
     get_cnpj_base_expr, operacoes_de_ajustes_ou_descontos, operacoes_de_saida,
     receita_bruta_cumulativa, receita_bruta_nao_cumulativa, receita_nao_nula,
@@ -11,7 +11,7 @@ use crate::{
 
 const SMALL_VALUE: f64 = 0.009; // menor que um centavo
 
-pub fn obter_consolidacao_nat(dataframe: &DataFrame, auditar: bool) -> MyResult<DataFrame> {
+pub fn obter_consolidacao_nat(dataframe: &DataFrame, auditar: bool) -> JoinResult<DataFrame> {
     let union_args = UnionArgs {
         parallel: true,
         rechunk: true,
@@ -63,7 +63,7 @@ pub fn obter_consolidacao_nat(dataframe: &DataFrame, auditar: bool) -> MyResult<
 /// Reter apenas as colunas de interesse.
 ///
 /// Em seguida, aplicar filtros.
-fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame, _auditar: bool) -> MyResult<LazyFrame> {
+fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame, _auditar: bool) -> JoinResult<LazyFrame> {
     //let pa_ano: i32 = 2015;
     //let pa_trimestres = Series::from_iter([1, 2, 3, 4]);
 
@@ -249,7 +249,7 @@ fn analisar_natureza_da_bc() -> PolarsResult<Expr> {
     Ok(expr)
 }
 
-fn groupby_and_agg_values(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
+fn groupby_and_agg_values(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     let reg: &str = coluna(Left, "registro");
     let top: &str = coluna(Left, "tipo_operacao");
     let valor_item: &str = coluna(Left, "valor_item"); // "Valor Total do Item"
@@ -362,7 +362,7 @@ fn groupby_and_agg_values(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
 }
 
 /// Replicar a segregacao da Receita para CST entre 50 e 66.
-fn replicar_linha_de_soma_da_receita(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
+fn replicar_linha_de_soma_da_receita(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     // https://pola-rs.github.io/polars-book/user-guide/expressions/window/
     // https://stackoverflow.com/questions/74049748/how-to-get-an-item-in-a-polars-dataframe-column-and-put-it-back-into-the-same-co
     let discrimination_window = [
@@ -467,7 +467,9 @@ fn ratear_creditos(receita: &str) -> PolarsResult<Expr> {
     Ok(expr)
 }
 
-fn ratear_bc_dos_creditos_conforme_receita_segregada(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
+fn ratear_bc_dos_creditos_conforme_receita_segregada(
+    lazyframe: LazyFrame,
+) -> JoinResult<LazyFrame> {
     let lazyframe: LazyFrame = lazyframe.with_columns([
         ratear_creditos("RBNC_Tributada")?,
         ratear_creditos("RBNC_NTributada")?,
@@ -493,7 +495,7 @@ fn analisar_operacoes_de_saida(
     lazyframe: LazyFrame,
     auditar: bool,
     union_args: UnionArgs,
-) -> MyResult<LazyFrame> {
+) -> JoinResult<LazyFrame> {
     let receita_bruta_valores: LazyFrame = lazyframe
         .clone()
         .filter(operacoes_de_saida()?)
@@ -587,7 +589,7 @@ fn analisar_operacoes_de_saida(
 }
 
 /// Analisar débitos omitidos em Operações de Saída
-fn analisar_debitos_omitidos(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
+fn analisar_debitos_omitidos(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     let ncm: &str = coluna(Left, "ncm");
 
     // NCM 2309.90.xx ou 230990xx
@@ -656,7 +658,7 @@ fn analisar_debitos_omitidos(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
 }
 
 /// Agregar colunas para em seguida remover colunas temporárias
-fn remover_colunas_temporarias(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
+fn remover_colunas_temporarias(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     // Collect all temporary column names for later removal
     let colunas_temporarias: Vec<&str> = vec![
         // Remover colunas temporárias
@@ -703,7 +705,7 @@ fn remover_colunas_temporarias(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
 fn adicionar_valores_trimestrais(
     lazyframe: LazyFrame,
     union_args: UnionArgs,
-) -> MyResult<LazyFrame> {
+) -> JoinResult<LazyFrame> {
     let natureza: &str = coluna(Left, "natureza");
     let series: Series = [90, 91, 95].iter().collect();
     let literal_series: Expr = series.implode()?.into_series().lit();
@@ -748,7 +750,7 @@ fn adicionar_valores_trimestrais(
 fn adicionar_linhas_de_soma_da_bc_dos_creditos(
     lazyframe: LazyFrame,
     union_args: UnionArgs,
-) -> MyResult<LazyFrame> {
+) -> JoinResult<LazyFrame> {
     let linha_de_soma_da_bc_dos_creditos: LazyFrame = lazyframe
         .clone()
         .filter(cst_50_a_66()?)
@@ -801,7 +803,7 @@ fn apuracao(aliquota: &str, valor: &str) -> Expr {
 fn adicionar_linhas_de_apuracao_de_pis(
     lazyframe: LazyFrame,
     union_args: UnionArgs,
-) -> MyResult<LazyFrame> {
+) -> JoinResult<LazyFrame> {
     let cst: &str = coluna(Left, "cst");
     let aliq_pis: &str = coluna(Left, "aliq_pis");
     let aliq_cof: &str = coluna(Left, "aliq_cof");
@@ -861,7 +863,7 @@ fn adicionar_linhas_de_apuracao_de_pis(
 fn adicionar_linhas_de_apuracao_de_cofins(
     lazyframe: LazyFrame,
     union_args: UnionArgs,
-) -> MyResult<LazyFrame> {
+) -> JoinResult<LazyFrame> {
     let cst: &str = coluna(Left, "cst");
     let aliq_pis: &str = coluna(Left, "aliq_pis");
     let aliq_cof: &str = coluna(Left, "aliq_cof");
@@ -923,7 +925,7 @@ fn adicionar_linhas_de_apuracao_de_cofins(
 fn adicionar_bc_dos_creditos_valor_total(
     lazyframe: LazyFrame,
     union_args: UnionArgs,
-) -> MyResult<LazyFrame> {
+) -> JoinResult<LazyFrame> {
     // Selecionar apenas a linha de "Base de Cálculo dos Créditos:"
     let cst_200: Expr = col("Código de Situação Tributária (CST)").eq(lit(200));
     let aliq_pis: &str = coluna(Left, "aliq_pis");
@@ -969,7 +971,7 @@ fn adicionar_bc_dos_creditos_valor_total(
 fn adicionar_saldo_de_cred_passivel_de_ressarcimento_pis(
     lazyframe: LazyFrame,
     union_args: UnionArgs,
-) -> MyResult<LazyFrame> {
+) -> JoinResult<LazyFrame> {
     let natureza: &str = coluna(Left, "natureza");
     let aliq_pis: &str = coluna(Left, "aliq_pis");
     let aliq_cof: &str = coluna(Left, "aliq_cof");
@@ -1016,7 +1018,7 @@ fn adicionar_saldo_de_cred_passivel_de_ressarcimento_pis(
 fn adicionar_saldo_de_cred_passivel_de_ressarcimento_cofins(
     lazyframe: LazyFrame,
     union_args: UnionArgs,
-) -> MyResult<LazyFrame> {
+) -> JoinResult<LazyFrame> {
     let natureza: &str = coluna(Left, "natureza");
     let aliq_pis: &str = coluna(Left, "aliq_pis");
     let aliq_cof: &str = coluna(Left, "aliq_cof");
@@ -1063,7 +1065,7 @@ fn adicionar_saldo_de_cred_passivel_de_ressarcimento_cofins(
 /// Formatar valores das colunas.
 ///
 /// Aliquotas e valores podem ter precisões distintas.
-fn formatar_valores(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
+fn formatar_valores(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     let aliq_pis = coluna(Left, "aliq_pis"); // "Alíquota de PIS/PASEP (em percentual)"
     let aliq_cof = coluna(Left, "aliq_cof"); // "Alíquota de COFINS (em percentual)"
     let valor_bc = coluna(Left, "valor_bc"); // "Valor da Base de Cálculo das Contribuições"
@@ -1100,7 +1102,7 @@ fn formatar_valores(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
 }
 
 /// Ordenar colunas
-fn ordenar_colunas(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
+fn ordenar_colunas(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     let cst: &str = coluna(Left, "cst");
 
     let lazy_sorted: LazyFrame = lazyframe
@@ -1135,7 +1137,7 @@ fn ordenar_colunas(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     Ok(lazy_sorted)
 }
 
-fn rename_columns(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
+fn rename_columns(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     // Remover colunas temporárias
     let selected = [
         "RBNC_Tributada",
@@ -1207,7 +1209,7 @@ mod tests {
     /// See polars-0.33.2/tests/it/lazy/explodes.rs
     ///
     /// cargo test -- --show-output duplicar_linhas_do_dataframe
-    fn duplicar_linhas_do_dataframe() -> MyResult<()> {
+    fn duplicar_linhas_do_dataframe() -> JoinResult<()> {
         configure_the_environment();
 
         let dataframe01: DataFrame = df! [

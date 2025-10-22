@@ -1,7 +1,7 @@
 use polars::prelude::*;
 
 use crate::{
-    LazyFrameExtension, MyResult,
+    JoinResult, LazyFrameExtension,
     Side::{Left, Right},
     coluna, get_output_same_type,
     legislacao_aliquota_zero::base_legal_de_aliquota_zero,
@@ -49,7 +49,7 @@ impl RegimesFiscais {
 ///
 /// The new column will contain the legal basis for items qualifying for Alíquota Zero,
 /// based on NCM code and item description.
-pub fn adicionar_coluna_de_aliquota_zero(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
+pub fn adicionar_coluna_de_aliquota_zero(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     adicionar_coluna_de_regime_fiscal(lazyframe, RegimesFiscais::AliquotaZero)
 }
 
@@ -57,7 +57,7 @@ pub fn adicionar_coluna_de_aliquota_zero(lazyframe: LazyFrame) -> MyResult<LazyF
 ///
 /// The new column will contain the legal basis for items qualifying for Crédito Presumido,
 /// based on NCM code and item description.
-pub fn adicionar_coluna_de_credito_presumido(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
+pub fn adicionar_coluna_de_credito_presumido(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     adicionar_coluna_de_regime_fiscal(lazyframe, RegimesFiscais::CreditoPresumido)
 }
 
@@ -65,7 +65,7 @@ pub fn adicionar_coluna_de_credito_presumido(lazyframe: LazyFrame) -> MyResult<L
 ///
 /// The new column will contain the legal basis for items qualifying for Incidência Monofásica,
 /// based on NCM code and item description.
-pub fn adicionar_coluna_de_incidencia_monofasica(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
+pub fn adicionar_coluna_de_incidencia_monofasica(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     adicionar_coluna_de_regime_fiscal(lazyframe, RegimesFiscais::IncidenciaMonofasica)
 }
 
@@ -84,7 +84,7 @@ Ou seja, a legislação adicionada é resultado da função: fn(NCM, Descrição
 fn adicionar_coluna_de_regime_fiscal(
     lazyframe: LazyFrame,
     regime_fiscal: RegimesFiscais,
-) -> MyResult<LazyFrame> {
+) -> JoinResult<LazyFrame> {
     let output_col_name = regime_fiscal.get_column_name();
 
     let ncm_col_a: &str = coluna(Left, "ncm"); // "Código NCM";
@@ -214,7 +214,7 @@ fn aplicar_regime_fiscal(
 mod regime_fiscal_tests {
     use super::*; // Import everything from the parent module
     use crate::{
-        MyResult, adicionar_coluna_de_aliquota_zero, adicionar_coluna_de_credito_presumido,
+        JoinResult, adicionar_coluna_de_aliquota_zero, adicionar_coluna_de_credito_presumido,
         adicionar_coluna_de_incidencia_monofasica,
     };
 
@@ -230,7 +230,7 @@ mod regime_fiscal_tests {
     }
 
     #[test]
-    fn test_adicionar_coluna_de_aliquota_zero() -> MyResult<()> {
+    fn test_adicionar_coluna_de_aliquota_zero() -> JoinResult<()> {
         let df = create_test_dataframe()?;
 
         // Assert that the new column not exists
@@ -272,7 +272,7 @@ mod regime_fiscal_tests {
     }
 
     #[test]
-    fn test_adicionar_coluna_de_credito_presumido() -> MyResult<()> {
+    fn test_adicionar_coluna_de_credito_presumido() -> JoinResult<()> {
         let df = create_test_dataframe()?;
         let result_lf = adicionar_coluna_de_credito_presumido(df.lazy());
         let df = result_lf?.collect()?;
@@ -301,7 +301,7 @@ mod regime_fiscal_tests {
     }
 
     #[test]
-    fn test_adicionar_coluna_de_incidencia_monofasica() -> MyResult<()> {
+    fn test_adicionar_coluna_de_incidencia_monofasica() -> JoinResult<()> {
         let df = create_test_dataframe()?;
         let result_lf = adicionar_coluna_de_incidencia_monofasica(df.lazy());
         let df = result_lf?.collect()?;
@@ -330,7 +330,7 @@ mod regime_fiscal_tests {
     }
 
     #[test]
-    fn test_adicionar_coluna_no_empty_frame() -> MyResult<()> {
+    fn test_adicionar_coluna_no_empty_frame() -> JoinResult<()> {
         let df_empty = df! {
             "Código NCM" => Vec::<&str>::new(),
             "Descrição do Item" => Vec::<&str>::new(),
@@ -354,7 +354,7 @@ mod regime_fiscal_tests {
     }
 
     #[test]
-    fn test_adicionar_coluna_with_all_null_ncm_description() -> MyResult<()> {
+    fn test_adicionar_coluna_with_all_null_ncm_description() -> JoinResult<()> {
         let df = df! {
             "Código NCM" => &[None::<&str>],
             "Descrição do Item" => &[None::<&str>],
@@ -377,7 +377,7 @@ mod regime_fiscal_tests {
     }
 
     #[test]
-    fn test_operacoes_de_entrada_ou_saida_filter() -> MyResult<()> {
+    fn test_operacoes_de_entrada_ou_saida_filter() -> JoinResult<()> {
         let df = df! {
             "Código NCM" => &["31000000", "31000000"],
             "Descrição do Item" => &["FERTILIZANTE UREIA", "FERTILIZANTE UREIA"],

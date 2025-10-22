@@ -1,7 +1,7 @@
 use std::{env, fs::File, io::Write};
 
 use crate::{
-    Arguments, DataFrameExtension, ExprExtension, LazyFrameExtension, MyResult,
+    Arguments, DataFrameExtension, ExprExtension, JoinResult, LazyFrameExtension,
     Side::{Left, Middle, Right},
     adicionar_coluna_de_aliquota_zero, adicionar_coluna_de_credito_presumido,
     adicionar_coluna_de_incidencia_monofasica,
@@ -37,7 +37,7 @@ println!("cte_valor_lazyframe: {:?}", cte_valor_lazyframe.collect()?);
 // ### --- cte_valor.csv --- ###
 */
 
-pub fn glosar_bc(dataframe: &DataFrame, args: &Arguments) -> MyResult<DataFrame> {
+pub fn glosar_bc(dataframe: &DataFrame, args: &Arguments) -> JoinResult<DataFrame> {
     let lazyframe: LazyFrame = dataframe.clone().lazy();
 
     let lazyframe: LazyFrame = adicionar_coluna_de_aliquota_zero(lazyframe)?;
@@ -75,7 +75,7 @@ fn optante_do_simples_nacional() -> Expr {
     col(regime_tributario).eq(lit(1))
 }
 
-fn analisar_situacao01(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
+fn analisar_situacao01(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     // /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/polars-plan-0.34.2/src/dsl/string.rs
     // https://pola-rs.github.io/polars/polars/export/regex/index.html
 
@@ -110,7 +110,7 @@ fn analisar_situacao01(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     Ok(lf_result)
 }
 
-fn analisar_situacao02(lazyframe: LazyFrame, args: &Arguments) -> MyResult<LazyFrame> {
+fn analisar_situacao02(lazyframe: LazyFrame, args: &Arguments) -> JoinResult<LazyFrame> {
     let glosar: &str = coluna(Middle, "glosar");
     let dia_emissao: &str = coluna(Right, "dia_emissao"); // "Dia da Emissão : NF Item (Todos)",
 
@@ -150,7 +150,7 @@ fn analisar_situacao02(lazyframe: LazyFrame, args: &Arguments) -> MyResult<LazyF
     Ok(lf_result)
 }
 
-fn analisar_situacao03(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
+fn analisar_situacao03(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     let glosar: &str = coluna(Middle, "glosar");
     let cfop: &str = coluna(Right, "cfop");
     let origem_do_item: &str = coluna(Right, "origem"); // "Registro de Origem do Item : NF Item (Todos)"
@@ -243,7 +243,7 @@ fn analisar_situacao03(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     Ok(lf_result)
 }
 
-fn analisar_situacao04(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
+fn analisar_situacao04(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     let glosar: &str = coluna(Middle, "glosar");
     let valor_total_do_item: &str = coluna(Left, "valor_item"); // "Valor Total do Item"
     let valor_bc: &str = coluna(Left, "valor_bc"); // "Valor da Base de Cálculo das Contribuições"
@@ -326,7 +326,7 @@ fn analisar_situacao04(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
 }
 
 #[allow(dead_code)]
-fn analisar_situacao05(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
+fn analisar_situacao05(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     let glosar: &str = coluna(Middle, "glosar");
     let valor_bc: &str = coluna(Left, "valor_bc"); // "Valor da Base de Cálculo das Contribuições"
     let valor_da_nota_proporcional_nfe: &str = coluna(Right, "valor_item"); // "Valor da Nota Proporcional : NF Item (Todos) SOMA";
@@ -366,7 +366,7 @@ fn analisar_situacao05(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     Ok(lf_result)
 }
 
-fn analisar_situacao06a(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
+fn analisar_situacao06a(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     let glosar: &str = coluna(Middle, "glosar");
     let periodo_de_apuracao: &str = coluna(Left, "pa"); // "Período de Apuração",
     let chave_efd: &str = coluna(Left, "chave");
@@ -543,7 +543,7 @@ fn analisar_situacao06a(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     Ok(lf_result)
 }
 
-fn analisar_situacao06b(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
+fn analisar_situacao06b(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     let glosar: &str = coluna(Middle, "glosar");
     let periodo_de_apuracao: &str = coluna(Left, "pa"); // "Período de Apuração",
     let registro: &str = coluna(Left, "registro");
@@ -724,7 +724,7 @@ fn analisar_situacao06b(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     Ok(lf_result)
 }
 
-fn analisar_situacao07(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
+fn analisar_situacao07(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     let glosar: &str = coluna(Middle, "glosar");
     let origem_do_item: &str = coluna(Right, "origem"); // "Registro de Origem do Item : NF Item (Todos)"
 
@@ -821,7 +821,7 @@ fn analisar_situacao07(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     Ok(lf_result)
 }
 
-fn analisar_situacao08(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
+fn analisar_situacao08(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     let glosar: &str = coluna(Middle, "glosar");
     let contabil: &str = coluna(Left, "contabil");
 
@@ -863,7 +863,7 @@ fn analisar_situacao08(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     Ok(lf_result)
 }
 
-fn analisar_situacao09(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
+fn analisar_situacao09(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     let glosar: &str = coluna(Middle, "glosar");
     let item_descricao: &str = coluna(Left, "item_desc");
     let escri_contabil: &str = coluna(Left, "contabil");
@@ -900,7 +900,7 @@ fn analisar_situacao09(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     Ok(lf_result)
 }
 
-fn analisar_situacao10(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
+fn analisar_situacao10(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     let glosar: &str = coluna(Middle, "glosar");
     let origem_do_item: &str = coluna(Right, "origem"); // "Registro de Origem do Item : NF Item (Todos)"
     let descricao_cfop: &str = coluna(Right, "descricao_cfop");
@@ -936,7 +936,7 @@ fn analisar_situacao10(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     Ok(lf_result)
 }
 
-fn analisar_situacao11(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
+fn analisar_situacao11(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     let glosar: &str = coluna(Middle, "glosar");
     let item_descricao: &str = coluna(Left, "item_desc");
     let escri_contabil: &str = coluna(Left, "contabil");
@@ -976,7 +976,7 @@ fn analisar_situacao11(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
     Ok(lf_result)
 }
 
-fn analisar_situacao12(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
+fn analisar_situacao12(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     let glosar: &str = coluna(Middle, "glosar");
     let chave: &str = coluna(Left, "chave"); // "Chave do Documento"
 
@@ -1018,7 +1018,7 @@ fn analisar_situacao12(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
 }
 
 #[allow(dead_code)]
-fn analisar_situacao13(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
+fn analisar_situacao13(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     let glosar: &str = coluna(Middle, "glosar");
     let num_linha: &str = coluna(Left, "num_linha"); // "Linhas"
 
@@ -1057,7 +1057,7 @@ fn analisar_situacao13(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
 }
 
 #[allow(dead_code)]
-fn analisar_situacao14(lazyframe: LazyFrame) -> MyResult<LazyFrame> {
+fn analisar_situacao14(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     let glosar: &str = coluna(Middle, "glosar");
     let item_tipo: &str = coluna(Left, "item_tipo");
     let escri_contabil: &str = coluna(Left, "contabil");
@@ -1115,7 +1115,7 @@ fn aplicar_situacao(
     situacao: Expr,
     mensagem: Expr,
     new_value: Expr,
-) -> MyResult<LazyFrame> {
+) -> JoinResult<LazyFrame> {
     let glosar: &str = coluna(Middle, "glosar");
     let valor_bc: &str = coluna(Left, "valor_bc");
 
@@ -1153,7 +1153,7 @@ mod tests_glosar_base_de_calculo {
 
     #[test]
     /// `cargo test -- --show-output test_analisar_situacao02`
-    fn test_analisar_situacao02() -> MyResult<()> {
+    fn test_analisar_situacao02() -> JoinResult<()> {
         configure_the_environment();
 
         let glosar: &str = coluna(Middle, "glosar");
@@ -1230,7 +1230,7 @@ mod tests_glosar_base_de_calculo {
     /// test columns with nulls
     ///
     /// `cargo test -- --show-output test_analisar_situacao03`
-    fn test_analisar_situacao03() -> MyResult<()> {
+    fn test_analisar_situacao03() -> JoinResult<()> {
         configure_the_environment();
 
         let cfop: &str = coluna(Right, "cfop");
@@ -1353,7 +1353,7 @@ mod tests_glosar_base_de_calculo {
 
     #[test]
     /// `cargo test -- --show-output test_analisar_situacao10`
-    fn test_analisar_situacao10() -> MyResult<()> {
+    fn test_analisar_situacao10() -> JoinResult<()> {
         configure_the_environment();
 
         let top: &str = coluna(Left, "tipo_operacao");

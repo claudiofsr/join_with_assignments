@@ -7,7 +7,7 @@ use chrono::{
 };
 
 use crate::{
-    Arguments, MyResult, Side::Left, coluna, get_output_as_date, operacoes_de_entrada_ou_saida,
+    Arguments, JoinResult, Side::Left, coluna, get_output_as_date, operacoes_de_entrada_ou_saida,
 };
 
 /// Colunas temporárias: `Período de Apuração Inicial` e `Período de Apuração Final`.
@@ -16,7 +16,7 @@ use crate::{
 pub fn adicionar_coluna_periodo_de_apuracao_inicial_e_final(
     lazyframe: LazyFrame,
     args: &Arguments,
-) -> MyResult<LazyFrame> {
+) -> JoinResult<LazyFrame> {
     let periodo_de_apuracao: &str = coluna(Left, "pa"); // "Período de Apuração",
     let pa_ini: &str = "Período de Apuração Inicial";
     let pa_fim: &str = "Período de Apuração Final";

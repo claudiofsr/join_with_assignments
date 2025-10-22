@@ -1,4 +1,4 @@
-use crate::MyResult;
+use crate::JoinResult;
 use clap::{
     //ArgAction,
     Command,
@@ -160,7 +160,7 @@ impl default::Default for Arguments {
 
 impl Arguments {
     /// Build Arguments struct
-    pub fn build() -> MyResult<Self> {
+    pub fn build() -> JoinResult<Self> {
         let app: Command = Arguments::command();
         let app_name: &str = app.get_name();
 
@@ -175,7 +175,7 @@ impl Arguments {
     /// Get configuration file.
     ///
     /// A new configuration file is created with default values if none exists.
-    fn get_config_file(mut self, app_name: &str) -> MyResult<Self> {
+    fn get_config_file(mut self, app_name: &str) -> JoinResult<Self> {
         let config_file: Arguments = confy::load(app_name, None)?;
 
         self.file1 = self.file1.or(config_file.file1);
@@ -192,7 +192,7 @@ impl Arguments {
     }
 
     /// Save changes made to a configuration object
-    fn set_config_file(self, app_name: &str) -> MyResult<Self> {
+    fn set_config_file(self, app_name: &str) -> JoinResult<Self> {
         confy::store(app_name, None, self.clone())?;
         Ok(self)
     }
@@ -200,7 +200,7 @@ impl Arguments {
     /// Print configuration file path and its contents
     ///
     /// ~/.config/join_with_assignments/default-config.toml
-    fn print_config_file(self, app_name: &str) -> MyResult<Self> {
+    fn print_config_file(self, app_name: &str) -> JoinResult<Self> {
         if self.verbose.unwrap_or(true) {
             let file_path: PathBuf = confy::get_configuration_file_path(app_name, None)?;
             println!("Configuration file: '{}'", file_path.display());
@@ -224,7 +224,7 @@ mod tests {
 
     #[test]
     /// `cargo test -- --show-output teste_de_logica`
-    fn teste_de_logica() -> MyResult<()> {
+    fn teste_de_logica() -> JoinResult<()> {
         let args: Arguments = Arguments {
             file1: None,
             file2: None,

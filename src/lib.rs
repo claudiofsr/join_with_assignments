@@ -3,6 +3,7 @@ mod args;
 mod columns;
 mod consolidacao_da_natureza;
 mod descricoes;
+mod errors;
 mod excel;
 mod filtros;
 mod glosar_base_de_calculo;
@@ -40,6 +41,7 @@ pub use self::{
         descricao_da_natureza_da_bc_dos_creditos, descricao_da_origem, descricao_do_mes,
         descricao_do_tipo_de_credito, descricao_do_tipo_de_operacao,
     },
+    errors::{JoinError, JoinResult},
     excel::*,
     filtros::*,
     glosar_base_de_calculo::glosar_bc,
@@ -66,9 +68,6 @@ use std::{
     path::PathBuf,
 };
 use sysinfo::System;
-
-pub type MyError = Box<dyn std::error::Error + Send + Sync>;
-pub type MyResult<T> = Result<T, MyError>;
 
 /// Struct to represent a correlation between lines from two different sources (e.g., EFD and NFE).
 #[derive(Debug, Clone)]
@@ -479,7 +478,7 @@ pub fn get_lazyframe_from_csv(
     file_path: Option<PathBuf>,
     delimiter: Option<char>,
     side: Side,
-) -> PolarsResult<LazyFrame> {
+) -> JoinResult<LazyFrame> {
     validate_entries(file_path.clone(), delimiter, side)?;
 
     let mut options = StrptimeOptions {
@@ -493,9 +492,7 @@ pub fn get_lazyframe_from_csv(
         Side::Left => options.format = Some("%Y-%-m-%-d".into()),
         Side::Right => options.format = Some("%-d/%-m/%Y".into()),
         Side::Middle => {
-            return Err(PolarsError::InvalidOperation(
-                "The middle side is not valid!".into(),
-            ));
+            return Err(JoinError::InvalidSide(side.to_string()));
         }
     }
 
@@ -667,7 +664,7 @@ fn read_csv_lazy(
     file_path: Option<PathBuf>, // Optional path to the CSV file
     delimiter: Option<char>,    // Optional delimiter character
     side: Side,                 // Custom parameter (e.g., determines schema)
-) -> PolarsResult<LazyFrame> {
+) -> JoinResult<LazyFrame> {
     match (&file_path, delimiter) {
         (Some(path), Some(separator)) => {
             // Get the expected column names and their data types BEFORE the closure.
@@ -677,7 +674,7 @@ fn read_csv_lazy(
             let plpath = PlPath::Local(path.clone().into());
 
             // Create a LazyCsvReader to process the file lazily.
-            let result_lazyframe: PolarsResult<LazyFrame> =
+            let result_lazyframe: JoinResult<LazyFrame> =
                 LazyCsvReader::new(plpath) // Start lazy reader for the given path
                     .with_encoding(CsvEncoding::LossyUtf8) // Specify UTF-8 encoding with lossy conversion
                     .with_try_parse_dates(false) // Disable automatic date parsing during initial read
@@ -697,20 +694,27 @@ fn read_csv_lazy(
                         apply_custom_schema_rules(schema, &cols_dtype, side)
                     })? // Add the '?' here to unwrap the result of with_schema_modify
                     .with_rechunk(true) // Optional rechunking step
-                    .finish(); // Finalize configuration and get the LazyFrame
-
-            // Print error if creating the LazyFrame failed during finish().
-            if result_lazyframe.is_err() {
-                eprintln!("\nError: Failed to finish lazy reader setup for file {path:#?}");
-            }
+                    .finish() // Finalize configuration and get the LazyFrame
+                    .map_err(|e| JoinError::CSVReadError(e, path.clone()));
 
             result_lazyframe // Return the LazyFrame result
         }
         // Handle cases where file path or delimiter is missing.
         _ => {
-            eprintln!("File path: {file_path:#?}"); // Debug output
-            eprintln!("Delimiter: {delimiter:#?}"); // Debug output
-            panic!("File path or delimiter error!"); // Panic as essential configuration is missing.
+            // Criar uma mensagem de erro mais detalhada
+            let mut message = String::from("Missing essential CSV read configuration.");
+            if file_path.is_none() {
+                message.push_str(" File path is missing.");
+            }
+            if delimiter.is_none() {
+                message.push_str(" Delimiter is missing.");
+            }
+
+            Err(JoinError::IncompleteCsvConfig {
+                message,
+                file_path,
+                delimiter,
+            })
         }
     }
 }
@@ -1301,15 +1305,33 @@ mod tests_read_csv {
     use std::io::Write;
     use tempfile::tempdir;
 
-    fn create_csv(dir: &std::path::Path, filename: &str, contents: &str) -> MyResult<PathBuf> {
+    fn create_csv(dir: &std::path::Path, filename: &str, contents: &str) -> JoinResult<PathBuf> {
         let file_path = dir.join(filename);
         let mut file = File::create(&file_path)?;
         file.write_all(contents.as_bytes())?;
         Ok(file_path)
     }
 
+    // O teste de sucesso não deveria ter esse problema, pois ele espera Ok(LazyFrame)
     #[test]
-    fn test_read_csv_lazy_schema_modify() -> MyResult<()> {
+    fn test_read_csv_lazy_success() -> JoinResult<()> {
+        let dir = tempdir()?;
+        let file_path = create_csv(dir.path(), "data.csv", "col1,col2\n1,a\n2,b")?;
+
+        let lazy_frame = read_csv_lazy(Some(file_path), Some(','), Side::Left)?;
+
+        let df = lazy_frame.collect()?; // Coletar para um DataFrame
+
+        println!("df:\n{df}");
+
+        assert_eq!(df.height(), 2);
+        assert_eq!(df.get_column_names(), &["col1", "col2"]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_csv_lazy_schema_modify() -> JoinResult<()> {
         configure_the_environment();
         let dir = tempdir()?;
         let csv_content = "Linhas,Registro,Valor Total do Item,unknown_csv_col,extra_col_defined_in_map\n\
@@ -1350,7 +1372,7 @@ mod tests_read_csv {
     }
 
     #[test]
-    fn test_read_csv_lazy_empty_fields() -> MyResult<()> {
+    fn test_read_csv_lazy_empty_fields() -> JoinResult<()> {
         configure_the_environment();
         let dir = tempdir()?;
         let csv_content = "Linhas,Registro,Valor Total do Item\n10,,1.1\n,hello,2.2\n30, world";
@@ -1382,19 +1404,56 @@ mod tests_read_csv {
         Ok(())
     }
 
-    // Include the panic tests as well
     #[test]
-    #[should_panic(expected = "File path or delimiter error!")]
-    fn test_read_csv_lazy_panic_on_missing_args() {
-        let _ = read_csv_lazy(None, Some(','), Side::Left).unwrap();
+    fn test_read_csv_lazy_error_on_missing_file_path() {
+        // A função retorna JoinResult<LazyFrame>, então o Ok type é LazyFrame
+        let result = read_csv_lazy(None, Some(','), Side::Left);
+
+        assert!(result.is_err());
+
+        match result.err() {
+            Some(JoinError::IncompleteCsvConfig {
+                message,
+                file_path,
+                delimiter,
+            }) => {
+                assert!(message.contains("File path is missing."));
+                assert!(file_path.is_none());
+                assert_eq!(delimiter, Some(','));
+            }
+            // para cobrir o caso None (se result fosse Ok) e o caso de um erro de tipo diferente.
+            e => panic!(
+                "Esperava JoinError::IncompleteCsvConfig, mas obteve: {:?}",
+                e
+            ),
+        }
     }
 
     #[test]
-    #[should_panic(expected = "File path or delimiter error!")]
-    fn test_read_csv_lazy_panic_on_missing_delimiter() {
+    fn test_read_csv_lazy_error_on_missing_delimiter() {
         let dir = tempdir().unwrap();
         let file_path = create_csv(dir.path(), "dummy.csv", "a,b\n1,2").unwrap();
-        let _ = read_csv_lazy(Some(file_path), None, Side::Left).unwrap();
+        let file_path_clone = file_path.clone();
+
+        let result = read_csv_lazy(Some(file_path), None, Side::Left);
+
+        assert!(result.is_err());
+
+        match result.err() {
+            Some(JoinError::IncompleteCsvConfig {
+                message,
+                file_path,
+                delimiter,
+            }) => {
+                assert!(message.contains("Delimiter is missing."));
+                assert_eq!(file_path, Some(file_path_clone));
+                assert!(delimiter.is_none());
+            }
+            e => panic!(
+                "Esperava JoinError::IncompleteCsvConfig, mas obteve: {:?}",
+                e
+            ),
+        }
     }
 }
 
@@ -1406,7 +1465,7 @@ mod tests_replace_values_with_null {
     use polars::functions::concat_df_horizontal;
 
     #[test]
-    fn test_remove_leading_and_trailing_chars() -> MyResult<()> {
+    fn test_remove_leading_and_trailing_chars() -> JoinResult<()> {
         configure_the_environment();
 
         let df_input = df! {
