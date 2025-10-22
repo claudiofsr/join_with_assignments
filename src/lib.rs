@@ -3,7 +3,7 @@ mod args;
 mod columns;
 mod consolidacao_da_natureza;
 mod descricoes;
-mod errors;
+mod error;
 mod excel;
 mod filtros;
 mod glosar_base_de_calculo;
@@ -41,7 +41,7 @@ pub use self::{
         descricao_da_natureza_da_bc_dos_creditos, descricao_da_origem, descricao_do_mes,
         descricao_do_tipo_de_credito, descricao_do_tipo_de_operacao,
     },
-    errors::{JoinError, JoinResult},
+    error::{JoinError, JoinResult},
     excel::*,
     filtros::*,
     glosar_base_de_calculo::glosar_bc,

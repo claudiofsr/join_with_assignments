@@ -64,7 +64,7 @@ where
     let weights: Matrix<i64> =
         Matrix::from_rows(matrix.clone()).map_err(|why: MatrixFormatError| {
             JoinError::MatrixCreationError {
-                source_error: why, // Passa o erro original diretamente
+                source: why, // Passa o erro original diretamente
                 slice_a_len: slice_a.len(),
                 slice_b_len: slice_b.len(),
             }
