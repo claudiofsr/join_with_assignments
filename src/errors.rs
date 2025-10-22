@@ -1,4 +1,3 @@
-// errors.rs
 use polars::prelude::PolarsError;
 use std::{io, path::PathBuf};
 use thiserror::Error;
