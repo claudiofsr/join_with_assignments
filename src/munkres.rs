@@ -62,9 +62,9 @@ where
 
     // Assign weights to everybody choices.
     let weights: Matrix<i64> =
-        Matrix::from_rows(matrix.clone()).map_err(|why: MatrixFormatError| {
+        Matrix::from_rows(matrix.clone()).map_err(|error: MatrixFormatError| {
             JoinError::MatrixCreationError {
-                source: why, // Passa o erro original diretamente
+                source: error, // Passa o erro original diretamente
                 slice_a_len: slice_a.len(),
                 slice_b_len: slice_b.len(),
             }
@@ -113,10 +113,10 @@ where
     slice
         .iter()
         .map(|&type_t| {
-            U::try_from(type_t).map_err(|why| {
+            U::try_from(type_t).map_err(|error| {
                 let from_type = std::any::type_name::<T>().to_string();
                 let to_type = std::any::type_name::<U>().to_string();
-                let reason = why.to_string();
+                let reason = error.to_string();
 
                 JoinError::ConversionError {
                     from_type,
