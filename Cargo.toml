@@ -52,7 +52,7 @@ features = [
 ]
 
 [dependencies.polars]
-version = "0.51.0"
+version = "0.52.0"
 # git = "https://github.com/pola-rs/polars.git"
 # rev = "8a6bf4b"
 # https://github.com/pola-rs/polars/releases/tag/rs-0.51.0
@@ -96,10 +96,10 @@ features = [
 ]
 
 [dependencies.polars-arrow ]
-version = "0.51.0"
+version = "0.52.0"
 
 [dependencies.rust_xlsxwriter]
-version = "0.91.0"
+version = "0.92.1"
 # https://github.com/jmcnamara/rust_xlsxwriter/blob/main/CHANGELOG.md
 # git = "https://github.com/jmcnamara/rust_xlsxwriter.git"
 # Cargo.toml, update polars version
