@@ -26,7 +26,7 @@ Example of use:
     cargo run -- -1 'Dados - Bo/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Bo/nfe_float64.csv' -c true -p true -r true -s 202010 -f 202012
     cargo run -- -1 'Dados - Br/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Br/nfe_float64.csv' -c true -p true -r true -s 202109 -f 202303
     cargo run -- -1 'Dados - Ca/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Ca/nfe_float64.csv' -c true -p true -r true -s 202310 -f 202412
-    cargo run -- -1 'Dados - Ci/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Ci/nfe_float64.csv' -c true -p true -r true -s 201901 -f 202312
+    cargo run -- -1 'Dados - Ci/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Ci/nfe_float64.csv' -c true -p true -r true -s 201310 -f 201312
     cargo run -- -1 'Dados - Da/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Da/nfe_float64.csv' -c true -p true -r true -s 202201 -f 202206
     cargo run -- -1 'Dados - Du/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Du/nfe_float64.csv' -c true -p true -r true -s 202404 -f 202503
     cargo run -- -1 'Dados - Fa/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Fa/nfe_float64.csv' -c true -p true -r true -s 202104 -f 202112 -o true
@@ -44,7 +44,7 @@ Example of use:
     join_with_assignments -1 'Dados - Bo/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Bo/nfe_float64.csv' -c true -p true -r true -s 202010 -f 202012
     join_with_assignments -1 'Dados - Br/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Br/nfe_float64.csv' -c true -p true -r true -s 202109 -f 202303
     join_with_assignments -1 'Dados - Ca/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Ca/nfe_float64.csv' -c true -p true -r true -s 202310 -f 202412
-    join_with_assignments -1 'Dados - Ci/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Ci/nfe_float64.csv' -c true -p true -r true -s 201901 -f 202312
+    join_with_assignments -1 'Dados - Ci/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Ci/nfe_float64.csv' -c true -p true -r true -s 201310 -f 201312
     join_with_assignments -1 'Dados - Da/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Da/nfe_float64.csv' -c true -p true -r true -s 202201 -f 202206
     join_with_assignments -1 'Dados - Du/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Du/nfe_float64.csv' -c true -p true -r true -s 202404 -f 202503
     join_with_assignments -1 'Dados - Fa/Info do Contribuinte EFD Contribuicoes.csv' -2 'Dados - Fa/nfe_float64.csv' -c true -p true -r true -s 202104 -f 202112 -o true

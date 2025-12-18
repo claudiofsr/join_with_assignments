@@ -3,7 +3,7 @@ name = "join_with_assignments"
 authors = ["Claudio F S Rodrigues <claudiofsrodrigues@gmail.com>"]
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.90"
+rust-version = "1.92"
 homepage = "https://github.com/claudiofsr/join_with_assignments"
 repository = "https://github.com/claudiofsr/join_with_assignments"
 description = """
@@ -29,7 +29,7 @@ readme = "README.md"
 anstyle = "1.0"
 cc = { version = "1.2", features = ["parallel"] }
 chrono = { version = "0.4", features = [ "serde" ] }
-claudiofsr_lib = "0.16"
+claudiofsr_lib = "0.18"
 colored = "3.0"
 confy = "2.0"
 execution-time = "0.3"
@@ -99,7 +99,7 @@ features = [
 version = "0.52.0"
 
 [dependencies.rust_xlsxwriter]
-version = "0.92.1"
+version = "0.92.2"
 # https://github.com/jmcnamara/rust_xlsxwriter/blob/main/CHANGELOG.md
 # git = "https://github.com/jmcnamara/rust_xlsxwriter.git"
 # Cargo.toml, update polars version
