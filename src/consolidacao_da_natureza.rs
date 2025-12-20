@@ -118,7 +118,7 @@ fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame, _auditar: bool) -> Join
     ];
 
     let lazy_filtered: LazyFrame = lazyframe
-        .filter(col(cst).is_not_null()) // Remover descontos de anos anteriores ao Período de Apuração da EFD
+        //.filter(col(cst).is_not_null()) // Remover descontos de anos anteriores ao Período de Apuração da EFD
         //.filter(col("Ano do Período de Apuração").eq(lit(2022)))
         //.filter(col("Mês do Período de Apuração").eq(lit(6)))
         //.filter(col(cst).neq(lit(49))) // excluir CST 49
