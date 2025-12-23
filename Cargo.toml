@@ -29,7 +29,7 @@ readme = "README.md"
 anstyle = "1.0"
 cc = { version = "1.2", features = ["parallel"] }
 chrono = { version = "0.4", features = [ "serde" ] }
-claudiofsr_lib = "0.18"
+claudiofsr_lib = "0.19"
 colored = "3.0"
 confy = "2.0"
 execution-time = "0.3"
