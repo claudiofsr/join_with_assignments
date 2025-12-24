@@ -1219,8 +1219,7 @@ fn ordenar_colunas(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
 }
 
 fn rename_columns(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
-    // Remover colunas temporárias
-    let selected = [
+    let de = [
         "RBNC_Tributada",
         "RBNC_NTributada",
         "RBNC_Exportação",
@@ -1229,21 +1228,16 @@ fn rename_columns(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
         "ReceitaBrutaTotal",
     ];
 
-    let lazyframe: LazyFrame = lazyframe.select(&[
-        all().exclude_cols(selected).as_expr(),
-        col("RBNC_Tributada").alias("Crédito vinculado à Receita Bruta Não Cumulativa: Tributada"),
-        col("RBNC_NTributada")
-            .alias("Crédito vinculado à Receita Bruta Não Cumulativa: Não Tributada"),
-        col("RBNC_Exportação")
-            .alias("Crédito vinculado à Receita Bruta Não Cumulativa: de Exportação"),
-        col("RecBrutaNCumulativa").alias("Crédito vinculado à Receita Bruta Não Cumulativa"),
-        col("RecBrutaCumulativa")
-            .alias("Crédito vinculado à Receita Bruta Cumulativa (Valores Excluídos)"),
-        col("ReceitaBrutaTotal").alias("Crédito vinculado à Receita Bruta Total"),
-    ]);
-    //.drop(selected);
+    let para = [
+        "Crédito vinculado à Receita Bruta Não Cumulativa: Tributada",
+        "Crédito vinculado à Receita Bruta Não Cumulativa: Não Tributada",
+        "Crédito vinculado à Receita Bruta Não Cumulativa: de Exportação",
+        "Crédito vinculado à Receita Bruta Não Cumulativa",
+        "Crédito vinculado à Receita Bruta Cumulativa (Valores Excluídos)",
+        "Crédito vinculado à Receita Bruta Total",
+    ];
 
-    Ok(lazyframe)
+    Ok(lazyframe.rename(de, para, true))
 }
 
 #[cfg(test)]
