@@ -43,13 +43,12 @@ pub fn obter_consolidacao_nat(dataframe: &DataFrame, auditar: bool) -> JoinResul
 
     let lazyframe: LazyFrame = adicionar_linhas_de_apuracao_de_cofins(lazyframe, union_args)?;
 
+    let lazyframe: LazyFrame = adicionar_linhas_credito_disponivel(lazyframe, union_args)?;
+
     let lazyframe: LazyFrame = adicionar_bc_dos_creditos_valor_total(lazyframe, union_args)?;
 
     let lazyframe: LazyFrame =
-        adicionar_saldo_de_cred_passivel_de_ressarcimento_pis(lazyframe, union_args)?;
-
-    let lazyframe: LazyFrame =
-        adicionar_saldo_de_cred_passivel_de_ressarcimento_cofins(lazyframe, union_args)?;
+        adicionar_saldo_de_cred_passivel_de_ressarcimento(lazyframe, union_args)?;
 
     let lazyframe: LazyFrame = formatar_valores(lazyframe)?;
 
@@ -800,6 +799,73 @@ fn apuracao(aliquota: &str, valor: &str) -> Expr {
     (col(aliquota) * col(valor) / lit(100)).alias(valor)
 }
 
+/*
+fn adicionar_linhas_de_apuracao(
+    lazyframe: LazyFrame,
+    union_args: UnionArgs,
+) -> JoinResult<LazyFrame> {
+    let cst_col: &str = coluna(Left, "cst");
+    let aliq_pis: &str = coluna(Left, "aliq_pis");
+    let aliq_cof: &str = coluna(Left, "aliq_cof");
+    let nat_col: &str = "Natureza da Base de Cálculo dos Créditos";
+
+    let colunas_valores = [
+        "Valor da Base de Cálculo das Contribuições",
+        "RBNC_Tributada",
+        "RBNC_NTributada",
+        "RBNC_Exportação",
+        "RecBrutaNCumulativa",
+        "RecBrutaCumulativa",
+        "ReceitaBrutaTotal",
+    ];
+
+    // Configurações: (Alíquota Ativa, Alíquota Nula, Nat Crédito, Nat Débito, CST Sort)
+    let tributos_config = [
+        (aliq_pis, aliq_cof, 201i64, 91i64, 210i64), // PIS
+        (aliq_cof, aliq_pis, 205i64, 95i64, 250i64), // COFINS
+    ];
+
+    let mut partes = vec![lazyframe.clone()];
+
+    for (aliq_ativa, aliq_nula, nat_credito, nat_debito, cst_sort) in tributos_config {
+        // 1. Gerar linhas de Crédito (Baseado no CST 200)
+        let credito = lazyframe.clone()
+            .filter(col(cst_col).eq(lit(200)))
+            .with_columns([
+                lit(cst_sort).alias(cst_col),
+                lit(NULL).cast(DataType::Float64).alias(aliq_nula),
+                lit(nat_credito).alias(nat_col).cast(DataType::Int64),
+            ])
+            .with_columns(
+                colunas_valores
+                    .iter()
+                    .map(|&col_name| apuracao(aliq_ativa, col_name))
+                    .collect::<Vec<_>>()
+            );
+
+        // 2. Gerar linhas de Débito (Baseado na Natureza 90)
+        let debito = lazyframe.clone()
+            .filter(col(nat_col).eq(lit(90)))
+            .with_columns([
+                lit(NULL).cast(DataType::Float64).alias(aliq_nula),
+                lit(nat_debito).alias(nat_col).cast(DataType::Int64),
+            ])
+            .with_columns(
+                colunas_valores
+                    .iter()
+                    .map(|&col_name| apuracao(aliq_ativa, col_name))
+                    .collect::<Vec<_>>()
+            );
+
+        partes.push(credito);
+        partes.push(debito);
+    }
+
+    // Unifica o dataframe original com as 4 novas partes geradas (2 de PIS, 2 de COFINS)
+    Ok(concat(partes, union_args)?)
+}
+*/
+
 fn adicionar_linhas_de_apuracao_de_pis(
     lazyframe: LazyFrame,
     union_args: UnionArgs,
@@ -945,7 +1011,7 @@ fn adicionar_bc_dos_creditos_valor_total(
             col("Ano do Período de Apuração"),
             col("Trimestre do Período de Apuração"),
             col("Mês do Período de Apuração"),
-            lit(NULL).cast(DataType::Int64).alias("Tipo de Operação"),
+            lit(1i64).cast(DataType::Int64).alias("Tipo de Operação"),
             lit(100i64).alias("Tipo de Crédito"),
             lit(400i64).alias("Código de Situação Tributária (CST)"),
             lit(NULL).cast(DataType::Float64).alias(aliq_pis),
@@ -968,83 +1034,101 @@ fn adicionar_bc_dos_creditos_valor_total(
     Ok(lazy_total)
 }
 
-fn adicionar_saldo_de_cred_passivel_de_ressarcimento_pis(
+fn adicionar_linhas_credito_disponivel(
     lazyframe: LazyFrame,
     union_args: UnionArgs,
 ) -> JoinResult<LazyFrame> {
-    let natureza: &str = coluna(Left, "natureza");
     let aliq_pis: &str = coluna(Left, "aliq_pis");
     let aliq_cof: &str = coluna(Left, "aliq_cof");
+    let natureza: &str = coluna(Left, "natureza");
 
-    let series = Series::new(natureza.into(), [31, 41, 51, 61, 91, 201, 211, 221]);
-    let literal_series: Expr = series.implode()?.into_series().lit();
-    let nat_pis: Expr = col(natureza).is_in(literal_series, true);
+    // Filtros para agrupar o que compõe o "Disponível"
+    // PIS: Apurado (201) + Ajustes/Descontos (31, 41, 51, 61)
+    let nat_pis = [31, 41, 51, 61, 91, 201, 211];
+    let series_pis = Series::new(natureza.into(), nat_pis);
+    let literal_series_pis: Expr = series_pis.implode()?.into_series().lit();
+    let filter_pis: Expr = col(natureza).is_in(literal_series_pis, true);
 
-    let saldo_de_pis: LazyFrame = lazyframe
-        .clone()
-        .filter(cst_50_a_66()?.not())
-        //.filter(col(aliq_cof).is_null())
-        //.filter(col(aliq_pis).is_not_null().or(col(natureza).eq(lit(61))))
-        .filter(nat_pis)
-        .with_column(lit(301).alias(natureza).cast(DataType::Int64))
-        .group_by([
-            col("CNPJ Base"),
-            col("Ano do Período de Apuração"),
-            col("Trimestre do Período de Apuração"),
-            col("Mês do Período de Apuração"),
-            lit(NULL).cast(DataType::Int64).alias("Tipo de Operação"),
-            lit(100i64).alias("Tipo de Crédito"),
-            lit(410i64).alias("Código de Situação Tributária (CST)"),
-            lit(NULL).cast(DataType::Float64).alias(aliq_pis),
-            lit(NULL).cast(DataType::Float64).alias(aliq_cof),
-            col("Natureza da Base de Cálculo dos Créditos"),
-        ])
-        .agg([
-            col("Valor da Base de Cálculo das Contribuições").sum(),
-            col("RBNC_Tributada").sum(),
-            col("RBNC_NTributada").sum(),
-            col("RBNC_Exportação").sum(),
-            col("RecBrutaNCumulativa").sum(),
-            col("RecBrutaCumulativa").sum(),
-            col("ReceitaBrutaTotal").sum(),
-        ]);
+    // COFINS: Apurado (205) + Ajustes/Descontos (35, 45, 55, 65)
+    let nat_cofins = [35, 45, 55, 65, 95, 205, 215];
+    let series_cofins = Series::new(natureza.into(), nat_cofins);
+    let literal_series_cofins: Expr = series_cofins.implode()?.into_series().lit();
+    let filter_cofins: Expr = col(natureza).is_in(literal_series_cofins, true);
 
-    // https://docs.rs/polars/latest/polars/prelude/fn.concat.html
-    let lazy_total: LazyFrame = concat(&[lazyframe, saldo_de_pis], union_args)?;
+    let criar_linha_disponivel = |filtro: Expr, novo_id: i64| {
+        lazyframe
+            .clone()
+            .filter(filtro)
+            .group_by([
+                col("CNPJ Base"),
+                col("Ano do Período de Apuração"),
+                col("Trimestre do Período de Apuração"),
+                col("Mês do Período de Apuração"),
+                lit(6i64).cast(DataType::Int64).alias("Tipo de Operação"),
+                col("Tipo de Crédito"),
+                lit(405i64).alias("Código de Situação Tributária (CST)"), // ID temporário para ordenação
+                lit(NULL).cast(DataType::Float64).alias(aliq_pis),
+                lit(NULL).cast(DataType::Float64).alias(aliq_cof),
+                lit(novo_id).alias(natureza).cast(DataType::Int64),
+            ])
+            .agg([
+                col("Valor da Base de Cálculo das Contribuições").sum(),
+                col("RBNC_Tributada").sum(),
+                col("RBNC_NTributada").sum(),
+                col("RBNC_Exportação").sum(),
+                col("RecBrutaNCumulativa").sum(),
+                col("RecBrutaCumulativa").sum(),
+                col("ReceitaBrutaTotal").sum(),
+            ])
+    };
 
-    Ok(lazy_total)
+    let disponivel_pis = criar_linha_disponivel(filter_pis, 221); // 221: Disponível PIS
+    let disponivel_cofins = criar_linha_disponivel(filter_cofins, 225); // 225: Disponível COFINS
+
+    let total = concat(&[lazyframe, disponivel_pis, disponivel_cofins], union_args)?;
+    Ok(total.collect()?.lazy())
 }
 
-fn adicionar_saldo_de_cred_passivel_de_ressarcimento_cofins(
+fn adicionar_saldo_de_cred_passivel_de_ressarcimento(
     lazyframe: LazyFrame,
     union_args: UnionArgs,
 ) -> JoinResult<LazyFrame> {
-    let natureza: &str = coluna(Left, "natureza");
+    let nat_col: &str = coluna(Left, "natureza");
+    let cst_col: &str = coluna(Left, "cst");
     let aliq_pis: &str = coluna(Left, "aliq_pis");
     let aliq_cof: &str = coluna(Left, "aliq_cof");
 
-    let series = Series::new(natureza.into(), [35, 45, 55, 65, 95, 205, 215, 225]);
-    let literal_series: Expr = series.implode()?.into_series().lit();
-    let nat_cofins: Expr = col(natureza).is_in(literal_series, true);
-
-    let saldo_de_pis: LazyFrame = lazyframe
+    // Filtramos as naturezas de "Crédito Disponível" (PIS: 221 e COFINS: 225)
+    // e mapeamos para as naturezas de "Saldo Passível de Ressarcimento" (301 e 305)
+    let saldos: LazyFrame = lazyframe
         .clone()
         .filter(cst_50_a_66()?.not())
-        //.filter(col(aliq_pis).is_null())
-        //.filter(col(aliq_cof).is_not_null().or(col(natureza).eq(lit(65))))
-        .filter(nat_cofins)
-        .with_column(lit(305).alias(natureza).cast(DataType::Int64))
+        .filter(col(nat_col).is_in(lit(Series::new(nat_col.into(), &[221, 225])), true))
+        .with_columns([
+            // Mapeamento dinâmico da Natureza de destino
+            when(col(nat_col).eq(lit(221)))
+                .then(lit(301)) // PIS
+                .otherwise(lit(305)) // COFINS
+                .alias(nat_col)
+                .cast(DataType::Int64),
+            // Mapeamento dinâmico do CST para ordenação
+            when(col(nat_col).eq(lit(221)))
+                .then(lit(410)) // PIS
+                .otherwise(lit(450)) // COFINS
+                .alias(cst_col)
+                .cast(DataType::Int64),
+        ])
         .group_by([
             col("CNPJ Base"),
             col("Ano do Período de Apuração"),
             col("Trimestre do Período de Apuração"),
             col("Mês do Período de Apuração"),
-            lit(NULL).cast(DataType::Int64).alias("Tipo de Operação"),
+            lit(1i64).cast(DataType::Int64).alias("Tipo de Operação"),
             lit(100i64).alias("Tipo de Crédito"),
-            lit(450i64).alias("Código de Situação Tributária (CST)"),
+            col(cst_col),
             lit(NULL).cast(DataType::Float64).alias(aliq_pis),
             lit(NULL).cast(DataType::Float64).alias(aliq_cof),
-            col("Natureza da Base de Cálculo dos Créditos"),
+            col(nat_col),
         ])
         .agg([
             col("Valor da Base de Cálculo das Contribuições").sum(),
@@ -1056,10 +1140,8 @@ fn adicionar_saldo_de_cred_passivel_de_ressarcimento_cofins(
             col("ReceitaBrutaTotal").sum(),
         ]);
 
-    // https://docs.rs/polars/latest/polars/prelude/fn.concat.html
-    let lazy_total: LazyFrame = concat(&[lazyframe, saldo_de_pis], union_args)?;
-
-    Ok(lazy_total)
+    // Concatena o dataframe original com as novas linhas de saldo calculadas
+    Ok(concat(&[lazyframe, saldos], union_args)?)
 }
 
 /// Formatar valores das colunas.
