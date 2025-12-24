@@ -43,12 +43,11 @@ pub fn obter_consolidacao_nat(dataframe: &DataFrame, auditar: bool) -> JoinResul
 
     let lazyframe: LazyFrame = adicionar_linhas_de_apuracao_de_cofins(lazyframe, union_args)?;
 
-    let lazyframe: LazyFrame = adicionar_linhas_credito_disponivel(lazyframe, union_args)?;
+    let lazyframe: LazyFrame = adicionar_linhas_credito_apos_descontos(lazyframe, union_args)?;
 
     let lazyframe: LazyFrame = adicionar_bc_dos_creditos_valor_total(lazyframe, union_args)?;
 
-    let lazyframe: LazyFrame =
-        adicionar_saldo_de_cred_passivel_de_ressarcimento(lazyframe, union_args)?;
+    let lazyframe: LazyFrame = dicionar_saldo_passivel_de_ressarcimento(lazyframe, union_args)?;
 
     let lazyframe: LazyFrame = formatar_valores(lazyframe)?;
 
@@ -807,7 +806,7 @@ fn adicionar_linhas_de_apuracao(
     let cst_col: &str = coluna(Left, "cst");
     let aliq_pis: &str = coluna(Left, "aliq_pis");
     let aliq_cof: &str = coluna(Left, "aliq_cof");
-    let nat_col: &str = "Natureza da Base de Cálculo dos Créditos";
+    let natureza: &str = coluna(Left, "natureza");
 
     let colunas_valores = [
         "Valor da Base de Cálculo das Contribuições",
@@ -1034,7 +1033,7 @@ fn adicionar_bc_dos_creditos_valor_total(
     Ok(lazy_total)
 }
 
-fn adicionar_linhas_credito_disponivel(
+fn adicionar_linhas_credito_apos_descontos(
     lazyframe: LazyFrame,
     union_args: UnionArgs,
 ) -> JoinResult<LazyFrame> {
@@ -1089,7 +1088,7 @@ fn adicionar_linhas_credito_disponivel(
     Ok(total.collect()?.lazy())
 }
 
-fn adicionar_saldo_de_cred_passivel_de_ressarcimento(
+fn dicionar_saldo_passivel_de_ressarcimento(
     lazyframe: LazyFrame,
     union_args: UnionArgs,
 ) -> JoinResult<LazyFrame> {
