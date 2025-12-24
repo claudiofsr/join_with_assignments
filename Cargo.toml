@@ -115,7 +115,7 @@ features = [
 
 [dev-dependencies]
 # Dependencies ONLY needed for testing
-tempfile = "3.23"
+tempfile = "3.24"
 
 # Package release:
 # Cross-compile a Rust application from Linux to Windows

@@ -1,16 +1,102 @@
-use std::collections::HashMap;
-
-use crate::{PolarsXlsxWriter, Side::Left, coluna, format_dataframe, get_output_same_type};
-
 use polars::prelude::*;
+use rayon::prelude::*;
 use regex::Regex;
 use rust_xlsxwriter::{Color, Format, FormatAlign, Workbook, Worksheet};
+use std::sync::{
+    LazyLock,
+    atomic::{AtomicUsize, Ordering},
+};
 
-const FONT_SIZE: f64 = 10.0;
+use crate::{PolarsXlsxWriter, format_dataframe};
+
+// --- Constantes Estéticas ---
+const FONT_SIZE: f64 = 11.0;
+const HEADER_FONT_SIZE: f64 = 10.0;
 const MAX_NUMBER_OF_ROWS: usize = 1_000_000;
 const WIDTH_MIN: usize = 8;
 const WIDTH_MAX: usize = 140;
 const ADJUSTMENT: f64 = 1.1;
+
+const COLOR_SOMA: Color = Color::RGB(0xBFBFBF);
+const COLOR_DESCONTO: Color = Color::RGB(0xCCC0DA);
+const COLOR_SALDO_RED: Color = Color::RGB(0xE6B8B7);
+const COLOR_SALDO_GREEN: Color = Color::RGB(0xC4D79B);
+
+// Regex para identificação de colunas (estático para performance)
+static REGEX_CNPJ_CPF: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?ix)^(:?CNPJ|CPF)").unwrap());
+
+// --- Enums e Gerenciamento de Estilos ---
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(usize)]
+enum RowStyle {
+    Normal = 0,
+    Soma = 1,
+    Desconto = 2,
+    Saldo = 3,
+}
+
+#[derive(Debug, Clone, Copy)]
+#[repr(usize)]
+enum FormatKey {
+    Default = 0,
+    Center = 1,
+    Value = 2,
+    Aliq = 3,
+    Date = 4,
+}
+
+struct FormatGroup {
+    formats: [Format; 4],
+}
+
+impl FormatGroup {
+    fn new(base: Format, saldo_color: Color) -> Self {
+        Self {
+            formats: [
+                base.clone(),
+                base.clone().set_background_color(COLOR_SOMA),
+                base.clone().set_background_color(COLOR_DESCONTO),
+                base.clone().set_background_color(saldo_color),
+            ],
+        }
+    }
+    #[inline]
+    fn get(&self, style: RowStyle) -> &Format {
+        &self.formats[style as usize]
+    }
+}
+
+struct FormatRegistry {
+    groups: [FormatGroup; 5],
+}
+
+impl FormatRegistry {
+    fn new(saldo_color: Color) -> Self {
+        let base_c = Format::new()
+            .set_align(FormatAlign::Center)
+            .set_align(FormatAlign::VerticalCenter)
+            .set_font_size(FONT_SIZE);
+        let base_l = Format::new()
+            .set_align(FormatAlign::VerticalCenter)
+            .set_font_size(FONT_SIZE);
+
+        let keys = [
+            base_l.clone(),                              // Default
+            base_c.clone(),                              // Center
+            base_l.clone().set_num_format("#,##0.00"),   // Value
+            base_c.clone().set_num_format("0.0000"),     // Aliq
+            base_c.clone().set_num_format("dd/mm/yyyy"), // Date
+        ];
+
+        Self {
+            groups: keys.map(|f| FormatGroup::new(f, saldo_color)),
+        }
+    }
+}
+
+// --- Funções Principais ---
 
 /// 1. Write Dataframes to Worksheets;
 ///
@@ -25,49 +111,32 @@ pub fn write_xlsx(dfs: &[DataFrame]) -> PolarsResult<()> {
     let output = "EFD Contribuicoes x Documentos Fiscais.xlsx";
     println!("Write DataFrames to {output:?}\n");
 
-    // Workbook with worksheets
     let mut workbook = Workbook::new();
-
-    for (df, sheet_name) in [
+    let configs = [
         (&dfs[0], "Itens de Docs Fiscais"),
         (&dfs[1], "EFD (original)"),
         (&dfs[2], "EFD (após auditoria)"),
-    ] {
+    ];
+
+    for (df, name) in configs {
         let number_of_rows = df.height();
         let number_of_sheet = number_of_rows.div_ceil(MAX_NUMBER_OF_ROWS);
 
-        //println!("sheet_name: {sheet_name}");
-        //println!("number_of_rows: {number_of_rows}");
-        //println!("number_of_sheet: {number_of_sheet}\n");
-
-        for count in 1..=number_of_sheet {
-            let offset = MAX_NUMBER_OF_ROWS * (count - 1);
-
-            let length = if count >= number_of_sheet {
-                number_of_rows % MAX_NUMBER_OF_ROWS
+        for i in 0..number_of_sheet {
+            let offset = (i * MAX_NUMBER_OF_ROWS) as i64;
+            let slice = df.slice(offset, MAX_NUMBER_OF_ROWS);
+            let sheet_name = if i == 0 {
+                name.into()
             } else {
-                MAX_NUMBER_OF_ROWS
+                format!("{} {}", name, i + 1)
             };
 
-            //println!("count: {count}");
-            //println!("offset: {offset}");
-            //println!("length: {length}\n");
-
-            let data = df.slice_par(offset as i64, length);
-
-            let mut new_name = sheet_name.to_string();
-            if count >= 2 {
-                new_name = format!("{sheet_name} {count}");
-            }
-
-            let worksheet = make_worksheet(&data, &new_name)?;
+            let worksheet = make_worksheet(&slice, &sheet_name)?;
             workbook.push_worksheet(worksheet);
         }
     }
 
-    // Save the workbook to disk.
     workbook.save(output)?;
-
     Ok(())
 }
 
@@ -80,306 +149,212 @@ pub fn make_worksheet(df: &DataFrame, sheet_name: &str) -> PolarsResult<Workshee
     let df_formated: DataFrame = format_dataframe(df)?;
     let df_to_excel: DataFrame = format_to_excel(&df_formated)?;
 
-    let mut worksheet = Worksheet::new();
-
-    format_worksheet(df, &mut worksheet, sheet_name)?;
-
-    // Date format must be applied to PolarsXlsxWriter.
-    let fmt_date = Format::new()
-        .set_align(FormatAlign::Center)
-        .set_num_format("dd/mm/yyyy");
-
     dbg!(&df_to_excel);
 
-    // Write the dataframe to the worksheet using `PolarsXlsxWriter`.
-    PolarsXlsxWriter::new()
-        .set_date_format(fmt_date)
-        // .set_autofit(true)
-        // .set_float_format("#,##0.00")
+    let mut worksheet = Worksheet::new();
+
+    // 1. Determinação de Cores e Registro
+    let saldo_color = if sheet_name.contains("auditoria") {
+        COLOR_SALDO_GREEN
+    } else {
+        COLOR_SALDO_RED
+    };
+    let registry = FormatRegistry::new(saldo_color);
+
+    // --- AJUSTE: Formato de Data para o Writer ---
+    let date_format = registry.groups[FormatKey::Date as usize]
+        .get(RowStyle::Normal)
+        .clone();
+
+    let headers = df_to_excel.get_column_names();
+
+    // 2. Estética do Cabeçalho
+    let header_fmt = Format::new()
+        .set_align(FormatAlign::Center)
+        .set_align(FormatAlign::VerticalCenter)
+        .set_text_wrap()
+        .set_font_size(HEADER_FONT_SIZE);
+
+    worksheet
+        .set_name(sheet_name)?
+        .set_row_height(0, 64)?
+        .set_row_format(0, &header_fmt)?;
+
+    // 3. Formatação Base das Colunas (Alignment e NumFormat)
+    // Aplicamos o formato "Normal" em nível de coluna antes de escrever os dados
+    for (i, &name) in headers.iter().enumerate() {
+        let key = get_format_key(name.as_str());
+        worksheet.set_column_format(
+            i as u16,
+            registry.groups[key as usize].get(RowStyle::Normal),
+        )?;
+    }
+
+    // 4. Escrita dos Dados
+    let mut writer = PolarsXlsxWriter::new();
+    writer
+        .set_date_format(date_format)
         .set_freeze_panes(1, 0)
         .write_dataframe_to_worksheet(&df_to_excel, &mut worksheet, 0, 0)?;
 
-    //worksheet.autofit();
+    // 5. Aplicar Cores Condicionais (Linhas de Soma/Saldo)
+    let col_groups: Vec<&FormatGroup> = headers
+        .iter()
+        .map(|h| &registry.groups[get_format_key(h.as_str()) as usize])
+        .collect();
+
+    apply_conditional_styles(&df_to_excel, &mut worksheet, &col_groups)?;
+
+    // 6. Auto-ajuste de Colunas
     auto_fit(&df_to_excel, &mut worksheet)?;
-    auto_color(&df_to_excel, &mut worksheet, sheet_name)?;
 
     Ok(worksheet)
 }
 
-/// Format worksheet
-fn format_worksheet(
+// --- Funções Auxiliares de Lógica ---
+
+fn get_format_key(name: &str) -> FormatKey {
+    // Regras de Centralização (Baseadas na configuração antiga)
+    if REGEX_CNPJ_CPF.is_match(name)
+        || name.contains("Código")
+        || name.contains("Registro")
+        || name.contains("Chave do Documento")
+        || name.contains("Chave da Nota Fiscal Eletrônica")
+        || name.contains("Ano do Período de Apuração")
+        || name.contains("Trimestre do Período de Apuração")
+    {
+        return FormatKey::Center;
+    }
+
+    // Regras de Valores Financeiros
+    if name.contains("Valor")
+        || name.contains("ICMS")
+        || name.contains("Crédito vinculado à Receita Bruta Não Cumulativa")
+        || name.contains("Crédito vinculado à Receita Bruta Cumulativa")
+        || name.contains("Crédito vinculado à Receita Bruta Total")
+    {
+        return FormatKey::Value;
+    }
+
+    // Regras de Alíquotas
+    if name.contains("PIS: Alíquota ad valorem")
+        || name.contains("COFINS: Alíquota ad valorem")
+        || name.contains("Alíquota de PIS/PASEP")
+        || name.contains("Alíquota de COFINS")
+    {
+        return FormatKey::Aliq;
+    }
+
+    // Regras de Datas
+    if name.contains("Data da Emissão")
+        || name.contains("Data da Entrada")
+        || name.contains("Período de Apuração")
+        || name.contains("Dia da Emissão")
+    {
+        return FormatKey::Date;
+    }
+
+    FormatKey::Default
+}
+
+fn apply_conditional_styles(
     df: &DataFrame,
     worksheet: &mut Worksheet,
-    sheet_name: &str,
+    groups: &[&FormatGroup],
 ) -> PolarsResult<()> {
-    let fmt_header: Format = Format::new()
-        .set_align(FormatAlign::Center) // horizontally
-        .set_align(FormatAlign::VerticalCenter)
-        .set_text_wrap()
-        .set_font_size(FONT_SIZE);
+    // Localiza a coluna que define o comportamento da linha (Natureza)
+    let nature_idx = df
+        .get_column_names()
+        .iter()
+        .position(|n| {
+            n.as_str()
+                .contains("Natureza da Base de Cálculo dos Créditos")
+        })
+        .unwrap_or(0);
 
-    let fmt_center = Format::new().set_align(FormatAlign::Center);
+    let ca = df.get_columns()[nature_idx]
+        .as_materialized_series()
+        .str()?;
 
-    let fmt_values = Format::new().set_num_format("#,##0.00");
+    ca.into_iter().enumerate().for_each(|(i, opt_val)| {
+        let style = match opt_val {
+            Some(s) if s.contains("(Soma)") => RowStyle::Soma,
+            Some(s) if s.contains("Crédito Disponível após Descontos") => RowStyle::Desconto,
+            Some(s) if s.contains("Saldo de Crédito Passível") => RowStyle::Saldo,
+            _ => RowStyle::Normal,
+        };
 
-    let fmt_aliquotas = Format::new()
-        .set_num_format("0.0000")
-        .set_align(FormatAlign::Center);
-
-    worksheet
-        .set_name(sheet_name)?
-        .set_row_format(0, &fmt_header)?
-        //.set_freeze_panes(1, 0)?
-        .set_row_height(0, 64)?;
-
-    let regex_cnpj_cpf = Regex::new(
-        r"(?ix)
-        ^(:?CNPJ|CPF)
-    ",
-    )
-    .unwrap();
-
-    let col_center = [
-        // "CNPJ", "CPF",
-        "Código",
-        "Registro",
-        "Chave do Documento",
-        "Chave da Nota Fiscal Eletrônica",
-        "Ano do Período de Apuração",
-        "Trimestre do Período de Apuração",
-    ];
-
-    let col_values = [
-        "Valor",
-        "ICMS",
-        "Crédito vinculado à Receita Bruta Não Cumulativa",
-        "Crédito vinculado à Receita Bruta Cumulativa",
-        "Crédito vinculado à Receita Bruta Total",
-    ];
-
-    let col_aliquotas = [
-        "PIS: Alíquota ad valorem",
-        "COFINS: Alíquota ad valorem",
-        "Alíquota de PIS/PASEP",
-        "Alíquota de COFINS",
-    ];
-
-    for (column_number, col_name) in df.get_column_names().iter().enumerate() {
-        if regex_cnpj_cpf.is_match(col_name) {
-            worksheet.set_column_format(column_number as u16, &fmt_center)?;
-            continue;
-        }
-
-        for pattern in col_center {
-            if col_name.contains(pattern) {
-                worksheet.set_column_format(column_number as u16, &fmt_center)?;
-                break;
+        if style != RowStyle::Normal {
+            let row_idx = (i + 1) as u32;
+            for (col_idx, group) in groups.iter().enumerate() {
+                // Sobrescreve o formato da célula para aplicar a cor de fundo,
+                // mantendo o alinhamento/formato numérico da coluna.
+                let _ = worksheet.set_cell_format(row_idx, col_idx as u16, group.get(style));
             }
         }
-
-        for value in col_values {
-            if col_name.contains(value) {
-                worksheet.set_column_format(column_number as u16, &fmt_values)?;
-                break;
-            }
-        }
-
-        for aliquota in col_aliquotas {
-            if col_name.contains(aliquota) {
-                worksheet.set_column_format(column_number as u16, &fmt_aliquotas)?;
-                break;
-            }
-        }
-    }
-
+    });
     Ok(())
 }
 
-/// Iterate over all DataFrame and find the max data width for each column.
-///
-/// See:
-///
-/// <https://crates.io/crates/unicode-width>
-///
-/// <https://tomdebruijn.com/posts/rust-string-length-width-calculations>
-#[allow(dead_code)]
 fn auto_fit(df: &DataFrame, worksheet: &mut Worksheet) -> PolarsResult<()> {
-    // Nome de Colunas para ajustes
-    let natureza: &str = coluna(Left, "natureza");
-    let tipo_credito: &str = coluna(Left, "tipo_cred");
+    let headers = df.get_column_names();
+    let widths: Vec<_> = headers
+        .iter()
+        .map(|h| AtomicUsize::new(WIDTH_MIN.max(h.as_str().chars().count().div_ceil(4))))
+        .collect();
 
-    for (col_num, series) in df.iter().enumerate() {
-        let col_name = series.name();
-        let col_width = col_name.chars().count().div_ceil(4);
-        let mut width = WIDTH_MIN.max(col_width);
+    df.get_columns()
+        .par_iter()
+        .enumerate()
+        .for_each(|(col_idx, column)| {
+            let series = column.as_materialized_series();
+            let mut max_w = widths[col_idx].load(Ordering::Relaxed);
+            let col_name = series.name().as_str().to_lowercase();
 
-        // analyze all column fields
-        for row in series.iter() {
-            let text = match row.dtype() {
-                DataType::Float64 => {
-                    let num: f64 = row.try_extract::<f64>()?;
-                    //num.to_string()
-                    format!("{num:0.2}") // two digits after the decimal point
+            for val in series.iter() {
+                let text = val.to_string();
+                let mut w = text.chars().count();
+
+                // Lógica de ajuste proporcional (natureza e tipo_cred costumam ser longos)
+                if col_name.contains("natureza") || col_name.contains("tipo_cred") {
+                    w = (w * 80) / 100;
                 }
-                DataType::Float32 => {
-                    let num: f32 = row.try_extract::<f32>()?;
-                    //num.to_string()
-                    format!("{num:0.2}") // two digits after the decimal point
+
+                if w > max_w {
+                    max_w = w;
                 }
-                _ => row.to_string(),
-            };
-
-            let mut text_width = text.chars().count(); // chars number
-
-            // Aplicar ajustes
-            if [natureza, tipo_credito].contains(&col_name.as_str()) {
-                text_width = text_width * 82 / 100
+                if max_w > WIDTH_MAX {
+                    max_w = WIDTH_MAX;
+                    break;
+                }
             }
+            widths[col_idx].fetch_max(max_w, Ordering::Relaxed);
+        });
 
-            if text_width > width {
-                width = text_width;
-            }
-
-            if width > WIDTH_MAX {
-                width = WIDTH_MAX;
-                break;
-            }
-        }
-        // println!("col_num: {col_num}, col_name: {col_name}, width: {width}");
-        worksheet.set_column_width(col_num as u16, (width as f64) * ADJUSTMENT)?;
+    for (i, atomic) in widths.into_iter().enumerate() {
+        let final_width = (atomic.load(Ordering::Relaxed) as f64) * ADJUSTMENT;
+        let _ = worksheet.set_column_width(i as u16, final_width);
     }
-
     Ok(())
 }
 
-/// Iterate over all DataFrame and color some columns.
-fn auto_color(df: &DataFrame, worksheet: &mut Worksheet, sheet_name: &str) -> PolarsResult<()> {
-    let radix = 16; // hexadecimal
+fn format_to_excel(df: &DataFrame) -> PolarsResult<DataFrame> {
+    let exprs: Vec<Expr> = df
+        .get_column_names()
+        .iter()
+        .map(|name| {
+            let name_str = name.as_str();
+            let dtype = df.column(name_str).expect("Coluna deve existir").dtype();
 
-    let color = if sheet_name.contains("EFD (original)") {
-        "e6b8b7" // vermelho ; "f8cbad"; // rosa
-    } else if sheet_name.contains("EFD (após auditoria)") {
-        "c4d79b" // verde
-    } else {
-        return Ok(());
-    };
-
-    let color_saldoc: u32 = u32::from_str_radix(color, radix).unwrap();
-
-    // BG Color: Saldo de Crédito Passível de Desconto ou Ressarcimento
-    let format_saldoc: Format = Format::new().set_background_color(Color::RGB(color_saldoc));
-
-    let color_bcsoma: u32 = u32::from_str_radix("bfbfbf", radix).unwrap();
-
-    // BG Color: Base de Cálculo dos Créditos - Alíquota Básica (Soma)
-    let format_bcsoma: Format = Format::new().set_background_color(Color::RGB(color_bcsoma));
-
-    let color_debito: u32 = u32::from_str_radix("ccc0da", radix).unwrap();
-    let format_debito: Format = Format::new().set_background_color(Color::RGB(color_debito));
-
-    // BG Color: "Crédito vinculado à Receita Bruta Não Cumulativa"
-    let format_credito_nao_cumulativo: Format = Format::new()
-        .set_background_color(Color::RGB(color_saldoc))
-        .set_num_format("#,##0.00");
-
-    let mut selected_rows = HashMap::new();
-
-    for (col_num, series) in df.iter().enumerate() {
-        let col_name: &str = series.name();
-
-        if col_name.contains("Natureza da Base de Cálculo") {
-            for (row_num, data) in series.iter().enumerate() {
-                if let Some(text) = data.get_str() {
-                    if text.contains("(Soma)") {
-                        worksheet.write_with_format(
-                            row_num as u32 + 1,
-                            col_num as u16,
-                            text,
-                            &format_bcsoma,
-                        )?;
-                    } else if text.contains("Débitos:") {
-                        worksheet.write_with_format(
-                            row_num as u32 + 1,
-                            col_num as u16,
-                            text,
-                            &format_debito,
-                        )?;
-                    } else if text.contains("Saldo de Crédito") {
-                        worksheet.write_with_format(
-                            row_num as u32 + 1,
-                            col_num as u16,
-                            text,
-                            &format_saldoc,
-                        )?;
-                        selected_rows.insert(row_num, 1);
-                    }
-                }
+            match dtype {
+                DataType::Int64 => col(name_str).cast(DataType::Int32),
+                DataType::UInt64 => col(name_str).cast(DataType::UInt32),
+                // Truncamento seguro para o limite de caracteres do Excel
+                DataType::String => col(name_str).str().slice(lit(0), lit(32767)),
+                _ => col(name_str),
             }
-        }
+        })
+        .collect();
 
-        if col_name == "Crédito vinculado à Receita Bruta Não Cumulativa" {
-            for (row_num, data) in series.iter().enumerate() {
-                match data {
-                    AnyValue::Float64(value) if selected_rows.contains_key(&row_num) => {
-                        worksheet.write_with_format(
-                            row_num as u32 + 1,
-                            col_num as u16,
-                            value,
-                            &format_credito_nao_cumulativo,
-                        )?;
-                    }
-                    _ => continue,
-                }
-            }
-        }
-    }
-
-    Ok(())
-}
-
-/// Format data supported by Excel
-fn format_to_excel(data_frame: &DataFrame) -> PolarsResult<DataFrame> {
-    let df_formated: DataFrame = data_frame
-        .clone()
-        .lazy()
-        .with_columns([all().as_expr().apply(
-            format_data,
-            // GetOutput::same_type()
-            //|_, f| Ok(f.clone()),
-            get_output_same_type,
-        )])
-        .collect()?;
-
-    Ok(df_formated)
-}
-
-/// Format DataType
-fn format_data(col: Column) -> PolarsResult<Column> {
-    match col.dtype() {
-        DataType::Int64 => Ok(col.cast(&DataType::Int32)?),
-        DataType::UInt64 => Ok(col.cast(&DataType::UInt32)?),
-        DataType::String => truncate_col(col), // to_n_chars(col)
-        _ => Ok(col),
-    }
-}
-
-fn truncate_col(col: Column) -> PolarsResult<Column> {
-    let new_col: Column = col
-        .str()?
-        .into_iter()
-        .map(
-            |option_str: Option<&str>| option_str.map(|s| truncate_string(s, 32767)), // 2 ^ 15 - 1
-        )
-        .collect::<StringChunked>()
-        .into_column();
-
-    Ok(new_col)
-}
-
-// https://stackoverflow.com/questions/38461429/how-can-i-truncate-a-string-to-have-at-most-n-characters
-fn truncate_string(s: &str, max_chars: usize) -> &str {
-    match s.char_indices().nth(max_chars) {
-        Some((idx, _)) => &s[..idx],
-        None => s,
-    }
+    df.clone().lazy().with_columns(exprs).collect()
 }
