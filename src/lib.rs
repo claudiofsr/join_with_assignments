@@ -28,6 +28,8 @@ mod write;
 /// interact with the [`rust_xlsxwriter`] writing engine that it wraps.
 mod xlsx_writer;
 
+use crate::descricoes::descricao_do_cst;
+
 pub use self::{
     analise_do_periodo_de_apuracao::adicionar_coluna_periodo_de_apuracao_inicial_e_final,
     args::*,
@@ -725,7 +727,12 @@ pub fn write_csv(df: &DataFrame, basename: &str, delimiter: char) -> PolarsResul
     filepath.set_extension("csv");
     println!("Write DataFrame to {filepath:?}\n");
 
-    let mut df_formated: DataFrame = format_dataframe(df)?;
+    // No contexto de arquivos, verificamos se o nome do arquivo sugere que são 'Itens'.
+    // O uso de 'to_lowercase' torna a busca insensível a maiúsculas/minúsculas.
+    let is_itens = basename.to_lowercase().contains("itens");
+
+    // Formata o dataframe com a opção condicional de CST
+    let mut df_formated = format_dataframe(df, is_itens)?;
     println!("{df_formated}\n");
 
     let mut output_csv: File = File::create(filepath)?;
@@ -739,63 +746,48 @@ pub fn write_csv(df: &DataFrame, basename: &str, delimiter: char) -> PolarsResul
     Ok(())
 }
 
-/// Format CSV file
-///
-/// Substituir código por sua descrição nas colunas selecionadas.
-fn format_dataframe(data_frame: &DataFrame) -> PolarsResult<DataFrame> {
-    // Column names:
-    let natureza: &str = coluna(Left, "natureza");
-    let pa_mes: &str = coluna(Left, "pa_mes");
-    let tipo_operacao: &str = coluna(Left, "tipo_operacao");
-    let tipo_cred: &str = coluna(Left, "tipo_cred");
-    let origem: &str = coluna(Left, "origem");
+/// Formata o DataFrame aplicando descrições categóricas.
+/// O parâmetro `incluir_cst` permite condicionalmente descrever o CST.
+pub fn format_dataframe(data_frame: &DataFrame, incluir_cst: bool) -> PolarsResult<DataFrame> {
+    type DescricaoFn = fn(Column) -> PolarsResult<Column>;
 
-    // 1. Get the names of columns currently present in the DataFrame for quick lookup.
-    let current_columns: HashSet<PlSmallStr> =
+    let current_cols_set: HashSet<PlSmallStr> =
         data_frame.get_column_names_owned().into_iter().collect();
 
-    let columns_origem: Vec<&str> = vec![origem];
+    // Lista base de transformações comuns
+    let mut transformations: Vec<(&str, DescricaoFn)> = vec![
+        (coluna(Left, "pa_mes"), descricao_do_mes as DescricaoFn),
+        (
+            coluna(Left, "tipo_operacao"),
+            descricao_do_tipo_de_operacao as DescricaoFn,
+        ),
+        (
+            coluna(Left, "tipo_cred"),
+            descricao_do_tipo_de_credito as DescricaoFn,
+        ),
+        (
+            coluna(Left, "natureza"),
+            descricao_da_natureza_da_bc_dos_creditos as DescricaoFn,
+        ),
+        (coluna(Left, "origem"), descricao_da_origem as DescricaoFn),
+    ];
 
-    // 2. Filter the target list to include only columns that *actually exist*
-    //    in the current DataFrame.
-    // Verificar a existência da coluna "Indicador de Origem" antes aplicar alterações.
-    let columns_to_transform: Vec<&str> = columns_origem
+    // Adiciona CST apenas se solicitado (ex: para a aba de Itens)
+    if incluir_cst {
+        transformations.push((coluna(Left, "cst"), descricao_do_cst as DescricaoFn));
+    }
+
+    let exprs: Vec<Expr> = transformations
         .into_iter()
-        .filter(|&col| current_columns.contains(col))
+        .filter(|(name, _)| current_cols_set.contains(&PlSmallStr::from_str(name)))
+        .map(|(name, func)| col(name).apply(func, get_output_as_string))
         .collect();
 
-    data_frame
-        .clone()
-        .lazy()
-        .with_column(col(pa_mes).apply(
-            descricao_do_mes,
-            // GetOutput::from_type(DataType::String)
-            |_, f| Ok(Field::new(f.name().clone(), DataType::String)),
-        ))
-        .with_column(col(tipo_operacao).apply(
-            descricao_do_tipo_de_operacao,
-            // GetOutput::from_type(DataType::String),
-            |_, f| Ok(Field::new(f.name().clone(), DataType::String)),
-        ))
-        .with_column(col(tipo_cred).apply(
-            descricao_do_tipo_de_credito,
-            // GetOutput::from_type(DataType::String),
-            |_, f| Ok(Field::new(f.name().clone(), DataType::String)),
-        ))
-        .with_column(col(natureza).apply(
-            descricao_da_natureza_da_bc_dos_creditos,
-            // GetOutput::from_type(DataType::String),
-            |_, f| Ok(Field::new(f.name().clone(), DataType::String)),
-        ))
-        .with_columns([
-            // Apply cast only to the intersection of target and existing columns
-            cols(columns_to_transform).as_expr().apply(
-                descricao_da_origem,
-                // GetOutput::from_type(DataType::String)
-                |_, f| Ok(Field::new(f.name().clone(), DataType::String)),
-            ),
-        ])
-        .collect()
+    if exprs.is_empty() {
+        return Ok(data_frame.clone());
+    }
+
+    data_frame.clone().lazy().with_columns(exprs).collect()
 }
 
 /// Write Dataframe to Parquet file
@@ -804,7 +796,13 @@ pub fn write_pqt(df: &DataFrame, basename: &str) -> PolarsResult<()> {
     filepath.set_extension("parquet");
     println!("Write DataFrame to {filepath:?}\n");
 
-    let mut df_formated = format_dataframe(df)?;
+    // Adicioanr Descrição de  CST apenas na aba de "Itens de Docs Fiscais"
+    // No contexto de arquivos, verificamos se o nome do arquivo sugere que são 'Itens'.
+    // O uso de 'to_lowercase' torna a busca insensível a maiúsculas/minúsculas.
+    let is_itens = basename.to_lowercase().contains("itens");
+
+    // Formata o dataframe com a opção condicional de CST
+    let mut df_formated = format_dataframe(df, is_itens)?;
 
     let mut output_parquet: File = File::create(filepath)?;
 

@@ -79,6 +79,7 @@ impl FormatRegistry {
             .set_align(FormatAlign::VerticalCenter)
             .set_font_size(FONT_SIZE);
         let base_l = Format::new()
+            .set_align(FormatAlign::Left)
             .set_align(FormatAlign::VerticalCenter)
             .set_font_size(FONT_SIZE);
 
@@ -146,7 +147,9 @@ pub fn write_xlsx(dfs: &[DataFrame]) -> PolarsResult<()> {
 ///
 /// <https://github.com/jmcnamara/polars_excel_writer/issues/4>
 pub fn make_worksheet(df: &DataFrame, sheet_name: &str) -> PolarsResult<Worksheet> {
-    let df_formated: DataFrame = format_dataframe(df)?;
+    // Adicioanr Descrição de  CST apenas na aba de "Itens de Docs Fiscais"
+    let is_itens = sheet_name.contains("Itens de Docs Fiscais");
+    let df_formated: DataFrame = format_dataframe(df, is_itens)?;
     let df_to_excel: DataFrame = format_to_excel(&df_formated)?;
 
     dbg!(&df_to_excel);
@@ -183,7 +186,7 @@ pub fn make_worksheet(df: &DataFrame, sheet_name: &str) -> PolarsResult<Workshee
     // 3. Formatação Base das Colunas (Alignment e NumFormat)
     // Aplicamos o formato "Normal" em nível de coluna antes de escrever os dados
     for (i, &name) in headers.iter().enumerate() {
-        let key = get_format_key(name.as_str());
+        let key = get_format_key(name.as_str(), is_itens);
         worksheet.set_column_format(
             i as u16,
             registry.groups[key as usize].get(RowStyle::Normal),
@@ -200,7 +203,7 @@ pub fn make_worksheet(df: &DataFrame, sheet_name: &str) -> PolarsResult<Workshee
     // 5. Aplicar Cores Condicionais (Linhas de Soma/Saldo)
     let col_groups: Vec<&FormatGroup> = headers
         .iter()
-        .map(|h| &registry.groups[get_format_key(h.as_str()) as usize])
+        .map(|h| &registry.groups[get_format_key(h.as_str(), is_itens) as usize])
         .collect();
 
     apply_conditional_styles(&df_to_excel, &mut worksheet, &col_groups)?;
@@ -213,7 +216,13 @@ pub fn make_worksheet(df: &DataFrame, sheet_name: &str) -> PolarsResult<Workshee
 
 // --- Funções Auxiliares de Lógica ---
 
-fn get_format_key(name: &str) -> FormatKey {
+fn get_format_key(name: &str, is_itens_context: bool) -> FormatKey {
+    // Aplica alinhamento à esquerda (Default) para CST apenas no contexto de Itens.
+    // Note o uso de 'is_itens_context' como guarda (guard clause).
+    if is_itens_context && (name.contains("CST") || name.contains("Situação Tributária")) {
+        return FormatKey::Default;
+    }
+
     // Regras de Centralização (Baseadas na configuração antiga)
     if REGEX_CNPJ_CPF.is_match(name)
         || name.contains("Código")
@@ -309,14 +318,20 @@ fn auto_fit(df: &DataFrame, worksheet: &mut Worksheet) -> PolarsResult<()> {
         .for_each(|(col_idx, column)| {
             let series = column.as_materialized_series();
             let mut max_w = widths[col_idx].load(Ordering::Relaxed);
-            let col_name = series.name().as_str().to_lowercase();
+            let col_name = series.name().as_str();
 
             for val in series.iter() {
                 let text = val.to_string();
                 let mut w = text.chars().count();
 
                 // Lógica de ajuste proporcional (natureza e tipo_cred costumam ser longos)
-                if col_name.contains("natureza") || col_name.contains("tipo_cred") {
+                if [
+                    "Natureza da Base de Cálculo dos Créditos",
+                    "Tipo de Crédito",
+                    "Código de Situação Tributária (CST)",
+                ]
+                .contains(&col_name)
+                {
                     w = (w * 80) / 100;
                 }
 

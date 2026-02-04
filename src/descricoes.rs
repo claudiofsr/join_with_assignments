@@ -455,3 +455,201 @@ pub fn descricao_da_natureza_da_bc_dos_creditos(col: Column) -> PolarsResult<Col
 
     Ok(new_ca.into_column())
 }
+
+// ============================================================================
+// Código da Situação Tributária (CST)
+// ============================================================================
+
+#[repr(u16)]
+#[derive(Debug, Clone, Copy)]
+pub enum CodigoSituacaoTributaria {
+    OperacaoTributavelComAliquotaBasica = 1,
+    OperacaoTributavelComAliquotaDiferenciada = 2,
+    OperacaoTributavelComAliquotaPorUnidadeDeMedidaDeProduto = 3,
+    OperacaoTributavelMonofasicaRevendaAAliquotaZero = 4,
+    OperacaoTributavelPorSubstituicaoTributaria = 5,
+    OperacaoTributavelAAliquotaZero = 6,
+    OperacaoIsentaDaContribuicao = 7,
+    OperacaoSemIncidenciaDaContribuicao = 8,
+    OperacaoComSuspensaoDaContribuicao = 9,
+    OutrasOperacoesDeSaida = 49,
+    OperacaoComDireitoACreditoVincExclusivamenteARecTribNoMI = 50,
+    OperacaoComDireitoACreditoVincExclusivamenteAReceitaSaoTributadaNoMI = 51,
+    OperacaoComDireitoACreditoVincExclusivamenteAReceitaDeExportacao = 52,
+    OperacaoComDireitoACreditoVincARecTribENTribNoMI = 53,
+    OperacaoComDireitoACreditoVincARecTribNoMIEDeExportacao = 54,
+    OperacaoComDireitoACreditoVincAReceitasNTribNoMIEDeExportacao = 55,
+    OperacaoComDireitoACreditoVincARecTribENTribNoMIEDeExportacao = 56,
+    CreditoPresumidoOperacaoDeAquisicaoVincExclusivamenteARecTribNoMI = 60,
+    CreditoPresumidoOperacaoDeAquisicaoVincExclusivamenteAReceitaNaoTributadaNoMI = 61,
+    CreditoPresumidoOperacaoDeAquisicaoVincExclusivamenteAReceitaDeExportacao = 62,
+    CreditoPresumidoOperacaoDeAquisicaoVincARecTribENTribNoMI = 63,
+    CreditoPresumidoOperacaoDeAquisicaoVincARecTribNoMIEDeExportacao = 64,
+    CreditoPresumidoOperacaoDeAquisicaoVincAReceitasNTribNoMIEDeExportacao = 65,
+    CreditoPresumidoOperacaoDeAquisicaoVincARecTribENTribNoMIEDeExportacao = 66,
+    CreditoPresumidoOutrasOperacoes = 67,
+    OperacaoDeAquisicaoSemDireitoACredito = 70,
+    OperacaoDeAquisicaoComIsencao = 71,
+    OperacaoDeAquisicaoComSuspensao = 72,
+    OperacaoDeAquisicaoAAliquotaZero = 73,
+    OperacaoDeAquisicaoSemIncidenciaDaContribuicao = 74,
+    OperacaoDeAquisicaoPorSubstituicaoTributaria = 75,
+    OutrasOperacoesDeEntrada = 98,
+    OutrasOperacoes = 99,
+}
+
+impl CodigoSituacaoTributaria {
+    pub const fn from_u16(cod: u16) -> Option<Self> {
+        match cod {
+            1 => Some(Self::OperacaoTributavelComAliquotaBasica),
+            2 => Some(Self::OperacaoTributavelComAliquotaDiferenciada),
+            3 => Some(Self::OperacaoTributavelComAliquotaPorUnidadeDeMedidaDeProduto),
+            4 => Some(Self::OperacaoTributavelMonofasicaRevendaAAliquotaZero),
+            5 => Some(Self::OperacaoTributavelPorSubstituicaoTributaria),
+            6 => Some(Self::OperacaoTributavelAAliquotaZero),
+            7 => Some(Self::OperacaoIsentaDaContribuicao),
+            8 => Some(Self::OperacaoSemIncidenciaDaContribuicao),
+            9 => Some(Self::OperacaoComSuspensaoDaContribuicao),
+            49 => Some(Self::OutrasOperacoesDeSaida),
+            50 => Some(Self::OperacaoComDireitoACreditoVincExclusivamenteARecTribNoMI),
+            51 => Some(Self::OperacaoComDireitoACreditoVincExclusivamenteAReceitaSaoTributadaNoMI),
+            52 => Some(Self::OperacaoComDireitoACreditoVincExclusivamenteAReceitaDeExportacao),
+            53 => Some(Self::OperacaoComDireitoACreditoVincARecTribENTribNoMI),
+            54 => Some(Self::OperacaoComDireitoACreditoVincARecTribNoMIEDeExportacao),
+            55 => Some(Self::OperacaoComDireitoACreditoVincAReceitasNTribNoMIEDeExportacao),
+            56 => Some(Self::OperacaoComDireitoACreditoVincARecTribENTribNoMIEDeExportacao),
+            60 => Some(Self::CreditoPresumidoOperacaoDeAquisicaoVincExclusivamenteARecTribNoMI),
+            61 => Some(
+                Self::CreditoPresumidoOperacaoDeAquisicaoVincExclusivamenteAReceitaNaoTributadaNoMI,
+            ),
+            62 => Some(
+                Self::CreditoPresumidoOperacaoDeAquisicaoVincExclusivamenteAReceitaDeExportacao,
+            ),
+            63 => Some(Self::CreditoPresumidoOperacaoDeAquisicaoVincARecTribENTribNoMI),
+            64 => Some(Self::CreditoPresumidoOperacaoDeAquisicaoVincARecTribNoMIEDeExportacao),
+            65 => {
+                Some(Self::CreditoPresumidoOperacaoDeAquisicaoVincAReceitasNTribNoMIEDeExportacao)
+            }
+            66 => {
+                Some(Self::CreditoPresumidoOperacaoDeAquisicaoVincARecTribENTribNoMIEDeExportacao)
+            }
+            67 => Some(Self::CreditoPresumidoOutrasOperacoes),
+            70 => Some(Self::OperacaoDeAquisicaoSemDireitoACredito),
+            71 => Some(Self::OperacaoDeAquisicaoComIsencao),
+            72 => Some(Self::OperacaoDeAquisicaoComSuspensao),
+            73 => Some(Self::OperacaoDeAquisicaoAAliquotaZero),
+            74 => Some(Self::OperacaoDeAquisicaoSemIncidenciaDaContribuicao),
+            75 => Some(Self::OperacaoDeAquisicaoPorSubstituicaoTributaria),
+            98 => Some(Self::OutrasOperacoesDeEntrada),
+            99 => Some(Self::OutrasOperacoes),
+            _ => None,
+        }
+    }
+
+    pub const fn code(self) -> u16 {
+        self as u16
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::OperacaoTributavelComAliquotaBasica => "Operação Tributável com Alíquota Básica",
+            Self::OperacaoTributavelComAliquotaDiferenciada => {
+                "Operação Tributável com Alíquota Diferenciada"
+            }
+            Self::OperacaoTributavelComAliquotaPorUnidadeDeMedidaDeProduto => {
+                "Operação Tributável com Alíquota por Unidade de Medida de Produto"
+            }
+            Self::OperacaoTributavelMonofasicaRevendaAAliquotaZero => {
+                "Operação Tributável Monofásica - Revenda a Alíquota Zero"
+            }
+            Self::OperacaoTributavelPorSubstituicaoTributaria => {
+                "Operação Tributável por Substituição Tributária"
+            }
+            Self::OperacaoTributavelAAliquotaZero => "Operação Tributável a Alíquota Zero",
+            Self::OperacaoIsentaDaContribuicao => "Operação Isenta da Contribuição",
+            Self::OperacaoSemIncidenciaDaContribuicao => "Operação sem Incidência da Contribuição",
+            Self::OperacaoComSuspensaoDaContribuicao => "Operação com Suspensão da Contribuição",
+            Self::OutrasOperacoesDeSaida => "Outras Operações de Saída",
+            Self::OperacaoComDireitoACreditoVincExclusivamenteARecTribNoMI => {
+                "Operação com Direito a Crédito - Vinculada Exclusivamente a Receita Tributada no Mercado Interno"
+            }
+            Self::OperacaoComDireitoACreditoVincExclusivamenteAReceitaSaoTributadaNoMI => {
+                "Operação com Direito a Crédito - Vinculada Exclusivamente a Receita Não-Tributada no Mercado Interno"
+            }
+            Self::OperacaoComDireitoACreditoVincExclusivamenteAReceitaDeExportacao => {
+                "Operação com Direito a Crédito - Vinculada Exclusivamente a Receita de Exportação"
+            }
+            Self::OperacaoComDireitoACreditoVincARecTribENTribNoMI => {
+                "Operação com Direito a Crédito - Vinculada a Receitas Tributadas e Não-Tributadas no Mercado Interno"
+            }
+            Self::OperacaoComDireitoACreditoVincARecTribNoMIEDeExportacao => {
+                "Operação com Direito a Crédito - Vinculada a Receitas Tributadas no Mercado Interno e de Exportação"
+            }
+            Self::OperacaoComDireitoACreditoVincAReceitasNTribNoMIEDeExportacao => {
+                "Operação com Direito a Crédito - Vinculada a Receitas Não Tributadas no Mercado Interno e de Exportação"
+            }
+            Self::OperacaoComDireitoACreditoVincARecTribENTribNoMIEDeExportacao => {
+                "Operação com Direito a Crédito - Vinculada a Receitas Tributadas e Não-Tributadas no Mercado Interno e de Exportação"
+            }
+            Self::CreditoPresumidoOperacaoDeAquisicaoVincExclusivamenteARecTribNoMI => {
+                "Crédito Presumido - Operação de Aquisição Vinculada Exclusivamente a Receita Tributada no Mercado Interno"
+            }
+            Self::CreditoPresumidoOperacaoDeAquisicaoVincExclusivamenteAReceitaNaoTributadaNoMI => {
+                "Crédito Presumido - Operação de Aquisição Vinculada Exclusivamente a Receita Não-Tributada no Mercado Interno"
+            }
+            Self::CreditoPresumidoOperacaoDeAquisicaoVincExclusivamenteAReceitaDeExportacao => {
+                "Crédito Presumido - Operação de Aquisição Vinculada Exclusivamente a Receita de Exportação"
+            }
+            Self::CreditoPresumidoOperacaoDeAquisicaoVincARecTribENTribNoMI => {
+                "Crédito Presumido - Operação de Aquisição Vinculada a Receitas Tributadas e Não-Tributadas no Mercado Interno"
+            }
+            Self::CreditoPresumidoOperacaoDeAquisicaoVincARecTribNoMIEDeExportacao => {
+                "Crédito Presumido - Operação de Aquisição Vinculada a Receitas Tributadas no Mercado Interno e de Exportação"
+            }
+            Self::CreditoPresumidoOperacaoDeAquisicaoVincAReceitasNTribNoMIEDeExportacao => {
+                "Crédito Presumido - Operação de Aquisição Vinculada a Receitas Não-Tributadas no Mercado Interno e de Exportação"
+            }
+            Self::CreditoPresumidoOperacaoDeAquisicaoVincARecTribENTribNoMIEDeExportacao => {
+                "Crédito Presumido - Operação de Aquisição Vinculada a Receitas Tributadas e Não-Tributadas no Mercado Interno e de Exportação"
+            }
+            Self::CreditoPresumidoOutrasOperacoes => "Crédito Presumido - Outras Operações",
+            Self::OperacaoDeAquisicaoSemDireitoACredito => {
+                "Operação de Aquisição sem Direito a Crédito"
+            }
+            Self::OperacaoDeAquisicaoComIsencao => "Operação de Aquisição com Isenção",
+            Self::OperacaoDeAquisicaoComSuspensao => "Operação de Aquisição com Suspensão",
+            Self::OperacaoDeAquisicaoAAliquotaZero => "Operação de Aquisição a Alíquota Zero",
+            Self::OperacaoDeAquisicaoSemIncidenciaDaContribuicao => {
+                "Operação de Aquisição sem Incidência da Contribuição"
+            }
+            Self::OperacaoDeAquisicaoPorSubstituicaoTributaria => {
+                "Operação de Aquisição por Substituição Tributária"
+            }
+            Self::OutrasOperacoesDeEntrada => "Outras Operações de Entrada",
+            Self::OutrasOperacoes => "Outras Operações",
+        }
+    }
+}
+
+pub fn descricao_do_cst(col: Column) -> PolarsResult<Column> {
+    // 1. Converte a coluna para i64 de forma funcional e segura.
+    let ca = col.cast(&DataType::Int64)?;
+    let i64_ca = ca.i64()?;
+
+    // 2. Aplicação amortizada (reutiliza o buffer interno de string)
+    let new_ca = i64_ca.apply_into_string_amortized(|n, buf| {
+        // Converte i64 -> u16 para bater com o Enum
+        match CodigoSituacaoTributaria::from_u16(n as u16) {
+            Some(cst) => {
+                // Formatação idiomática: "01 - Descrição"
+                let _ = write(buf, format_args!("{:02} - {}", cst.code(), cst.as_str()));
+            }
+            None => {
+                // Fallback caso o código não exista na tabela
+                let _ = write(buf, format_args!("{}: Sem descrição", n));
+            }
+        }
+    });
+
+    Ok(new_ca.into_column())
+}
