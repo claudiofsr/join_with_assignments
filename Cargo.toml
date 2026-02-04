@@ -1,0 +1,139 @@
+[package]
+name = "join_with_assignments"
+authors = ["Claudio F S Rodrigues <claudiofsrodrigues@gmail.com>"]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.92"
+homepage = "https://github.com/claudiofsr/join_with_assignments"
+repository = "https://github.com/claudiofsr/join_with_assignments"
+description = """
+This program pairs/aligns two files in CSV format.
+The Kuhn-Munkres algorithm is used to solve the assignment problem.
+https://github.com/claudiofsr/join_with_assignments\
+"""
+documentation = "https://github.com/claudiofsr/join_with_assignments"
+keywords = [
+    "CSV",
+    "polars",
+    "assignment problem",
+    "Kuhn-Munkres algorithm",
+]
+categories = ["command-line-utilities", "text-processing"]
+include = ["src/*.rs", "Cargo.toml", "LICENSE", "README.md"]
+license = "BSD-3-Clause"
+readme = "README.md"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anstyle = "1.0"
+cc = { version = "1.2", features = ["parallel"] }
+chrono = { version = "0.4", features = [ "serde" ] }
+claudiofsr_lib = "0.19"
+colored = "3.1"
+confy = "2.0"
+execution-time = "0.3"
+pathfinding = "4.14"
+rayon = "1.11"
+regex = "1.12"
+serde = { version = "1.0", features = [ "derive" ] }
+sysinfo = "0.38"
+tabled = { version = "0.20", features = ["ansi"] }
+thiserror = "2.0"
+toml = "0.9"
+
+[dependencies.clap]
+version = "4.5"
+features = [
+    "derive",
+    "color",
+    "env",
+    "help",
+]
+
+[dependencies.polars]
+version = "0.52.0"
+# git = "https://github.com/pola-rs/polars.git"
+# rev = "8a6bf4b"
+# https://github.com/pola-rs/polars/releases/tag/rs-0.51.0
+# git clone https://github.com/pola-rs/polars.git
+# path = "/home/claudio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/polars-0.51.0"
+features = [
+    "abs",        # Convert all values to their absolute/positive value.
+    "concat_str", # Concat string data in linear time
+    "csv",
+    "dtype-array",
+    "dtype-categorical",
+    "dtype-date",     # Convert a String column into a Date column.
+    "dtype-datetime", # Convert a String column into a Datetime column.
+    "dtype-decimal",  # Convert a String column into a Decimal column.
+    "dtype-duration",
+    "dtype-i16",      # fix: "unsupported data type when reading CSV: i16 when reading CSV"
+    "dtype-i128",
+    "dtype-struct",
+    "extract_groups", # Extract all captures groups from a regex pattern as a struct
+    "find_many",
+    "is_in",        # Check for membership in Series
+    "lazy",         # Lazy API
+    "list_any_all",
+    "list_count",
+    "list_eval",    # Apply expressions over list elements
+    "list_gather",  # Take sublist by multiple indices
+    "list_drop_nulls",
+    "list_sets",
+    "parquet",      # Read Apache Parquet format
+    "regex",        # Use regexes in column selection
+    "repeat_by",    # Repeat element in an Array N times, where N is given by another array.
+    "round_series", # Round underlying float types of Series
+    "new_streaming",# Be able to process datasets that are larger than RAM.
+    "serde",
+    "serde-lazy",   # Support for serde serialization and deserialization.
+    "strings",      # Extra string utilities for Utf8Chunked
+    "string_pad",   # Pad the start of the string until it reaches the given length.
+    "string_normalize",
+    "temporal",     # Automatically try to parse dates/datetimes and time.
+    "timezones",
+]
+
+[dependencies.polars-arrow ]
+version = "0.52.0"
+
+[dependencies.rust_xlsxwriter]
+version = "0.93"
+# https://github.com/jmcnamara/rust_xlsxwriter/blob/main/CHANGELOG.md
+# git = "https://github.com/jmcnamara/rust_xlsxwriter.git"
+# Cargo.toml, update polars version
+# path = "/home/claudio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rust_xlsxwriter-0.90.2b"
+
+features = [
+    # "constant_memory",
+    "chrono",
+    "polars",
+    "ryu",
+    "zlib",
+]
+
+[dev-dependencies]
+# Dependencies ONLY needed for testing
+tempfile = "3.24"
+
+# Package release:
+# Cross-compile a Rust application from Linux to Windows
+# On Manjaro Linux, install with: pacman -S mingw-w64-gcc
+# rustup target list
+# After downloading the target with `rustup target add x86_64-pc-windows-gnu`
+# cargo b -r --target x86_64-unknown-linux-gnu --target x86_64-pc-windows-gnu
+
+[profile.release]
+# https://doc.rust-lang.org/cargo/reference/profiles.html
+debug = true            # Debug info at all.
+strip = "symbols"       # Strip symbols from a binary.
+opt-level = 3           # All optimizations.
+overflow-checks = true  # Panic will occur on overflow.
+lto = true              # Enable link time optimization.
+codegen-units = 1       # Use a single codegen for size optimization.
+panic = "abort"         # Remove traceback information.
+incremental = true      # Save information to disk, improving re-compile times.
+
+[profile.dev]
+opt-level = 1           # Use slightly better optimizations.
