@@ -85,7 +85,7 @@ pub trait LazyFrameExtension {
     ///         .into_iter()
     ///         .map(|c| c.as_str())
     ///         .collect();
-    ///     
+    ///
     ///     assert!(col_names.contains(&"col1"));
     ///     assert!(col_names.contains(&"col3"));
     ///

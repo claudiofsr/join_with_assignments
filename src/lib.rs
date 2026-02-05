@@ -361,7 +361,7 @@ pub fn get_opt_vectuples(
                     eprintln!("Error: {msg} Skipping row.");
                     PolarsError::ComputeError(msg.into())
                 })
-                .ok()?; // Propagate None if the Series itself is missing.        
+                .ok()?; // Propagate None if the Series itself is missing.
 
             series
             .u64() // Attempt to cast Series to ChunkedArray<UInt64Type>
@@ -421,8 +421,8 @@ fn line_assignments(
             // If either index is out of bounds or the value at that index is None,
             // print a warning and skip this particular assignment.
             eprintln!(
-                "Warning: Invalid index encountered for key '{chave_doc}'. 
-                EFD row_idx: {row_idx}, NFe col_idx: {col_idx}. 
+                "Warning: Invalid index encountered for key '{chave_doc}'.
+                EFD row_idx: {row_idx}, NFe col_idx: {col_idx}.
                 Skipping this assignment.",
             );
         }

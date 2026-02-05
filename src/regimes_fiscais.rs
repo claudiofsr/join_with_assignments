@@ -22,7 +22,7 @@ pub enum RegimesFiscais {
 
 impl RegimesFiscais {
     /// Returns the standardized column name for the given fiscal regime.
-    /// This name will be used as the output column in the DataFrame.    
+    /// This name will be used as the output column in the DataFrame.
     pub fn get_column_name(&self) -> &'static str {
         match self {
             RegimesFiscais::AliquotaZero => "Alíquota Zero",
@@ -33,7 +33,7 @@ impl RegimesFiscais {
 
     /// Returns the specific legal basis function for the given fiscal regime.
     /// This function takes an NCM code (u64) and an item description (&str)
-    /// and returns an `Option<&'static str>` representing the legal justification.    
+    /// and returns an `Option<&'static str>` representing the legal justification.
     pub fn get_base_legal_fn(
         &self,
     ) -> impl Fn(u64, &str) -> Option<&'static str> + Send + Sync + 'static {

@@ -1,22 +1,32 @@
 use polars::prelude::*;
-use std::fmt::{Write, write};
+use std::fmt::Write;
 
-// --- 1. INDICADOR DE ORIGEM ---
-#[derive(Debug, Clone, Copy)]
+// ============================================================================
+// 1. INDICADOR DE ORIGEM
+// ============================================================================
+
+/// Representa o Indicador de Origem (0 - Mercado Interno, 1 - Importação).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IndicadorOrigem {
     MercadoInterno = 0,
     Importacao = 1,
 }
 
 impl IndicadorOrigem {
-    pub fn from_i64(v: i64) -> Option<Self> {
+    /// Tenta converter um `i64` para `IndicadorOrigem`.
+    ///
+    /// Retorna `Some(IndicadorOrigem)` se o valor for válido (0 ou 1),
+    /// caso contrário, retorna `None`.
+    pub const fn from_i64(v: i64) -> Option<Self> {
         match v {
             0 => Some(Self::MercadoInterno),
             1 => Some(Self::Importacao),
             _ => None,
         }
     }
-    pub fn as_str(&self) -> &'static str {
+
+    /// Retorna a descrição completa do Indicador de Origem como uma string estática.
+    pub const fn as_str(&self) -> &'static str {
         match self {
             Self::MercadoInterno => "Operação no Mercado Interno",
             Self::Importacao => "Operação de Importação",
@@ -24,8 +34,31 @@ impl IndicadorOrigem {
     }
 }
 
-// --- 2. TIPO DE OPERAÇÃO ---
-#[derive(Debug, Clone, Copy)]
+/// Transforma uma coluna de `i64` (códigos de Indicador de Origem) em uma coluna de `String`
+/// com as descrições correspondentes.
+///
+/// Valores nulos na entrada resultam em nulos na saída.
+/// Valores numéricos sem correspondência no enum resultam em "{código}: Sem descrição".
+pub fn descricao_da_origem(col: Column) -> PolarsResult<Column> {
+    col.cast(&DataType::Int64)?
+        .i64()?
+        .try_apply_into_string_amortized(|n, buf| {
+            buf.clear();
+            let descricao = IndicadorOrigem::from_i64(n)
+                .map(|e| e.as_str())
+                .unwrap_or("Sem descrição");
+
+            write!(buf, "{descricao}").map_err(|e| PolarsError::ComputeError(e.to_string().into()))
+        })
+        .map(|ca| ca.into_column())
+}
+
+// ============================================================================
+// 2. TIPO DE OPERAÇÃO
+// ============================================================================
+
+/// Representa o Tipo de Operação (Entrada, Saída, Ajuste, Desconto, Detalhamento).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TipoOperacao {
     Entrada = 1,
     Saida = 2,
@@ -37,7 +70,11 @@ pub enum TipoOperacao {
 }
 
 impl TipoOperacao {
-    pub fn from_i64(v: i64) -> Option<Self> {
+    /// Tenta converter um `i64` para `TipoOperacao`.
+    ///
+    /// Retorna `Some(TipoOperacao)` se o valor for válido (1-7),
+    /// caso contrário, retorna `None`.
+    pub const fn from_i64(v: i64) -> Option<Self> {
         match v {
             1 => Some(Self::Entrada),
             2 => Some(Self::Saida),
@@ -49,7 +86,9 @@ impl TipoOperacao {
             _ => None,
         }
     }
-    pub fn as_str(&self) -> &'static str {
+
+    /// Retorna a descrição consolidada do Tipo de Operação.
+    pub const fn as_str(&self) -> &'static str {
         match self {
             Self::Entrada => "Entrada",
             Self::Saida => "Saída",
@@ -60,8 +99,32 @@ impl TipoOperacao {
     }
 }
 
-// --- 3. TIPO DE CRÉDITO ---
-#[derive(Debug, Clone, Copy)]
+/// Transforma uma coluna de `i64` (códigos de Tipo de Operação) em uma coluna de `String`
+/// com as descrições correspondentes.
+///
+/// Valores nulos na entrada resultam em nulos na saída.
+/// Valores numéricos sem correspondência no enum resultam em "{código}: Sem descrição".
+pub fn descricao_do_tipo_de_operacao(col: Column) -> PolarsResult<Column> {
+    col.cast(&DataType::Int64)?
+        .i64()?
+        .try_apply_into_string_amortized(|n, buf| {
+            buf.clear();
+            let descricao = TipoOperacao::from_i64(n)
+                .map(|e| e.as_str())
+                .unwrap_or("Sem descrição");
+
+            write!(buf, "{descricao}").map_err(|e| PolarsError::ComputeError(e.to_string().into()))
+        })
+        .map(|ca| ca.into_column())
+}
+
+// ============================================================================
+// 3. TIPO DE CRÉDITO
+// ============================================================================
+
+/// Representa o Tipo de Crédito para PIS/COFINS.
+/// Mnemônicos são usados para variantes com mais de 20 caracteres.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TipoCredito {
     AliquotaBasica = 1,
     AliquotasDiferenciadas = 2,
@@ -77,7 +140,11 @@ pub enum TipoCredito {
 }
 
 impl TipoCredito {
-    pub fn from_i64(v: i64) -> Option<Self> {
+    /// Tenta converter um `i64` para `TipoCredito`.
+    ///
+    /// Retorna `Some(TipoCredito)` se o valor for válido,
+    /// caso contrário, retorna `None`.
+    pub const fn from_i64(v: i64) -> Option<Self> {
         match v {
             1 => Some(Self::AliquotaBasica),
             2 => Some(Self::AliquotasDiferenciadas),
@@ -93,25 +160,51 @@ impl TipoCredito {
             _ => None,
         }
     }
-    pub fn as_str(&self) -> &'static str {
+
+    /// Retorna a descrição completa do Tipo de Crédito.
+    #[rustfmt::skip]
+    pub const fn as_str(&self) -> &'static str {
         match self {
-            Self::AliquotaBasica => "Alíquota Básica",
+            Self::AliquotaBasica         => "Alíquota Básica",
             Self::AliquotasDiferenciadas => "Alíquotas Diferenciadas",
-            Self::AliquotaUnidade => "Alíquota por Unidade de Produto",
-            Self::EstoqueAbertura => "Estoque de Abertura",
-            Self::AquisicaoEmbalagens => "Aquisição Embalagens para Revenda",
+            Self::AliquotaUnidade        => "Alíquota por Unidade de Produto",
+            Self::EstoqueAbertura        => "Estoque de Abertura",
+            Self::AquisicaoEmbalagens    => "Aquisição Embalagens para Revenda",
             Self::PresumidoAgroindustria => "Presumido da Agroindústria",
-            Self::OutrosPresumidos => "Outros Créditos Presumidos",
-            Self::Importacao => "Importação",
-            Self::AtividadeImobiliaria => "Atividade Imobiliária",
-            Self::Outros => "Outros",
-            Self::Vazio => "",
+            Self::OutrosPresumidos       => "Outros Créditos Presumidos",
+            Self::Importacao             => "Importação",
+            Self::AtividadeImobiliaria   => "Atividade Imobiliária",
+            Self::Outros                 => "Outros",
+            Self::Vazio                  => "",
         }
     }
 }
 
-// --- 4. MÊS ---
-#[derive(Debug, Clone, Copy)]
+/// Transforma uma coluna de `i64` (códigos de Tipo de Crédito) em uma coluna de `String`
+/// com as descrições correspondentes.
+///
+/// Valores nulos na entrada resultam em nulos na saída.
+/// Valores numéricos sem correspondência no enum resultam em "{código}: Sem descrição".
+pub fn descricao_do_tipo_de_credito(col: Column) -> PolarsResult<Column> {
+    col.cast(&DataType::Int64)?
+        .i64()?
+        .try_apply_into_string_amortized(|n, buf| {
+            buf.clear();
+            let descricao = TipoCredito::from_i64(n)
+                .map(|e| e.as_str())
+                .unwrap_or("Sem descrição");
+
+            write!(buf, "{descricao}").map_err(|e| PolarsError::ComputeError(e.to_string().into()))
+        })
+        .map(|ca| ca.into_column())
+}
+
+// ============================================================================
+// 4. MÊS
+// ============================================================================
+
+/// Representa os meses do ano e um valor acumulado.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Mes {
     Jan = 1,
     Fev = 2,
@@ -129,7 +222,11 @@ pub enum Mes {
 }
 
 impl Mes {
-    pub fn from_i64(v: i64) -> Option<Self> {
+    /// Tenta converter um `i64` para `Mes`.
+    ///
+    /// Retorna `Some(Mes)` se o valor for válido (1-13),
+    /// caso contrário, retorna `None`.
+    pub const fn from_i64(v: i64) -> Option<Self> {
         match v {
             1 => Some(Self::Jan),
             2 => Some(Self::Fev),
@@ -147,7 +244,9 @@ impl Mes {
             _ => None,
         }
     }
-    pub fn as_str(&self) -> &'static str {
+
+    /// Retorna o nome completo do mês. Para `Acumulado`, retorna uma string vazia.
+    pub const fn as_str(&self) -> &'static str {
         match self {
             Self::Jan => "janeiro",
             Self::Fev => "fevereiro",
@@ -166,314 +265,255 @@ impl Mes {
     }
 }
 
-// --- 5. NATUREZA DA BC DOS CRÉDITOS ---
-#[derive(Debug, Clone, Copy)]
+/// Transforma uma coluna de `i64` (códigos de Mês) em uma coluna de `String`
+/// com as descrições correspondentes.
+///
+/// Valores nulos na entrada resultam em nulos na saída.
+/// Valores numéricos sem correspondência no enum resultam em "{código}: Sem descrição".
+pub fn descricao_do_mes(col: Column) -> PolarsResult<Column> {
+    col.cast(&DataType::Int64)?
+        .i64()?
+        .try_apply_into_string_amortized(|n, buf| {
+            buf.clear();
+            let descricao = Mes::from_i64(n)
+                .map(|e| e.as_str())
+                .unwrap_or("Sem descrição");
+
+            write!(buf, "{descricao}").map_err(|e| PolarsError::ComputeError(e.to_string().into()))
+        })
+        .map(|ca| ca.into_column())
+}
+
+// ============================================================================
+// 5. NATUREZA DA BC DOS CRÉDITOS
+// ============================================================================
+
+/// Representa a Natureza da Base de Cálculo dos Créditos PIS/COFINS.
+/// Mnemônicos são usados para variantes com mais de 20 caracteres.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NaturezaBC {
-    AquisicaoBensRevenda = 1,
-    AquisicaoBensInsumo = 2,
-    AquisicaoServicosInsumo = 3,
-    EnergiaEletrica = 4,
-    AlugueisPredios = 5,
-    AlugueisMaquinas = 6,
-    ArmazenagemFrete = 7,
-    ArrendamentoMercantil = 8,
-    MaquinasDepreciacao = 9,
-    MaquinasAquisicao = 10,
-    EdificacoesBenfeitorias = 11,
-    DevolucaoVendas = 12,
-    OutrasOperacoes = 13,
-    TransporteSubcontratacao = 14,
-    ImobiliariaCustoIncorrido = 15,
-    ImobiliariaCustoOrcado = 16,
-    ServicosLimpeza = 17,
-    EstoqueAberturaBens = 18,
-    AjusteAcrescimoPis = 31,
-    AjusteAcrescimoCofins = 35,
-    AjusteReducaoPis = 41,
-    AjusteReducaoCofins = 45,
-    DescontoProprioPis = 51,
-    DescontoProprioCofins = 55,
-    DescontoPosteriorPis = 61,
-    DescontoPosteriorCofins = 65,
-    ReceitaBrutaValores = 80,
-    ReceitaBrutaPercentuais = 81,
-    BcDebitosOmitidos = 90,
-    DebitosRevendaNcmPis = 91,
-    DebitosRevendaNcmCofins = 95,
-    BcAlíquotaBasica = 101,
-    BcAliquotasDiferenciadas = 102,
-    BcAlíquotaUnidade = 103,
-    BcEstoqueAbertura = 104,
-    BcAquisicaoEmbalagens = 105,
-    BcPresumidoAgroindustria = 106,
-    BcOutrosPresumidos = 107,
-    BcImportacao = 108,
-    BcAtividadeImobiliaria = 109,
-    BcOutros = 199,
-    CreditoApuradoPis = 201,
-    CreditoApuradoCofins = 205,
-    CreditoDisponivelAjustePis = 211,
-    CreditoDisponivelAjusteCofins = 215,
-    CreditoDisponivelDescontoPis = 221,
-    CreditoDisponivelDescontoCofins = 225,
-    BcValorTotal = 300,
-    SaldoCreditoPis = 301,
-    SaldoCreditoCofins = 305,
+    AqBensRevenda = 1,           // Aquisição de Bens para Revenda
+    AqBensInsumo = 2,            // Aquisição de Bens Utilizados como Insumo
+    AqServInsumo = 3,            // Aquisição de Serviços Utilizados como Insumo
+    EnergEletrica = 4,           // Energia Elétrica
+    AlugPredios = 5,             // Aluguéis de Prédios
+    AlugMaquinas = 6,            // Aluguéis de Máquinas e Equipamentos
+    ArmazFrete = 7,              // Armazenagem de Mercadoria e Frete
+    ArrendMercantil = 8,         // Contraprestações de Arrendamento Mercantil
+    MaquinasDeprec = 9,          // Máquinas, Equipamentos (Depreciação)
+    MaquinasAq = 10,             // Máquinas, Equipamentos (Aquisição)
+    EdificBenfeit = 11,          // Edificações e Benfeitorias
+    DevolVendas = 12,            // Devolução de Vendas
+    OutrasOper = 13,             // Outras Operações
+    TranspSubcontr = 14,         // Transporte de Cargas - Subcontratação
+    ImobCustoIncorr = 15,        // Imobiliária - Custo Incorrido
+    ImobCustoOrcado = 16,        // Imobiliária - Custo Orçado
+    ServLimpeza = 17,            // Serviços de Limpeza, Conservação e Manutenção
+    EstoqueAberturaBens = 18,    // Estoque de Abertura de Bens
+    AjusteAcrescPis = 31,        // Ajuste de Acréscimo (PIS/PASEP)
+    AjusteAcrescCofins = 35,     // Ajuste de Acréscimo (COFINS)
+    AjusteReducPis = 41,         // Ajuste de Redução (PIS/PASEP)
+    AjusteReducCofins = 45,      // Ajuste de Redução (COFINS)
+    DescProprioPis = 51,         // Desconto da Contribuição Apurada no Próprio Período (PIS)
+    DescProprioCofins = 55,      // Desconto da Contribuição Apurada no Próprio Período (COFINS)
+    DescPostPis = 61,            // Desconto Efetuado em Período Posterior (PIS)
+    DescPostCofins = 65,         // Desconto Efetuado em Período Posterior (COFINS)
+    RecBrutaValores = 80,        // Receita Bruta (valores)
+    RecBrutaPerc = 81,           // Receita Bruta (percentuais)
+    BcDebOmitidos = 90,          // Base de Cálculo de Débitos Omitidos
+    DebRevNcmPis = 91,           // Débitos: Revenda de Mercadorias de NCM (PIS)
+    DebRevNcmCofins = 95,        // Débitos: Revenda de Mercadorias de NCM (COFINS)
+    BcAliqBasica = 101,          // Base de Cálculo dos Créditos - Alíquota Básica
+    BcAliqDif = 102,             // Base de Cálculo dos Créditos - Alíquotas Diferenciadas
+    BcAliqUnidade = 103,         // Base de Cálculo dos Créditos - Alíquota por Unidade
+    BcEstoqueAbertura = 104,     // Base de Cálculo dos Créditos - Estoque de Abertura
+    BcAquisicaoEmbalagens = 105, // Base de Cálculo dos Créditos - Aquisição Embalagens
+    BcPresumAgroind = 106,       // Base de Cálculo dos Créditos - Presumido Agroindústria
+    BcOutrosPresum = 107,        // Base de Cálculo dos Créditos - Outros Créditos Presumidos
+    BcImportacao = 108,          // Base de Cálculo dos Créditos - Importação
+    BcAtivImob = 109,            // Base de Cálculo dos Créditos - Atividade Imobiliária
+    BcOutros = 199,              // Base de Cálculo dos Créditos - Outros
+    CredApuradoPis = 201,        // Crédito Apurado no Período (PIS/PASEP)
+    CredApuradoCofins = 205,     // Crédito Apurado no Período (COFINS)
+    CredDispAjustePis = 211,     // Crédito Disponível após Ajustes (PIS/PASEP)
+    CredDispAjusteCofins = 215,  // Crédito Disponível após Ajustes (COFINS)
+    CredDispDescPis = 221,       // Crédito Disponível após Descontos (PIS/PASEP)
+    CredDispDescCofins = 225,    // Crédito Disponível após Descontos (COFINS)
+    BcValorTotal = 300,          // Base de Cálculo dos Créditos - Valor Total
+    SaldoCredPis = 301,          // Saldo de Crédito Passível de Desconto ou Ressarcimento (PIS)
+    SaldoCredCofins = 305,       // Saldo de Crédito Passível de Desconto ou Ressarcimento (COFINS)
 }
 
 impl NaturezaBC {
-    pub fn from_i64(v: i64) -> Option<Self> {
+    /// Tenta converter um `i64` para `NaturezaBC`.
+    ///
+    /// Retorna `Some(NaturezaBC)` se o valor for válido,
+    /// caso contrário, retorna `None`.
+    pub const fn from_i64(v: i64) -> Option<Self> {
         match v {
-            1 => Some(Self::AquisicaoBensRevenda),
-            2 => Some(Self::AquisicaoBensInsumo),
-            3 => Some(Self::AquisicaoServicosInsumo),
-            4 => Some(Self::EnergiaEletrica),
-            5 => Some(Self::AlugueisPredios),
-            6 => Some(Self::AlugueisMaquinas),
-            7 => Some(Self::ArmazenagemFrete),
-            8 => Some(Self::ArrendamentoMercantil),
-            9 => Some(Self::MaquinasDepreciacao),
-            10 => Some(Self::MaquinasAquisicao),
-            11 => Some(Self::EdificacoesBenfeitorias),
-            12 => Some(Self::DevolucaoVendas),
-            13 => Some(Self::OutrasOperacoes),
-            14 => Some(Self::TransporteSubcontratacao),
-            15 => Some(Self::ImobiliariaCustoIncorrido),
-            16 => Some(Self::ImobiliariaCustoOrcado),
-            17 => Some(Self::ServicosLimpeza),
+            1 => Some(Self::AqBensRevenda),
+            2 => Some(Self::AqBensInsumo),
+            3 => Some(Self::AqServInsumo),
+            4 => Some(Self::EnergEletrica),
+            5 => Some(Self::AlugPredios),
+            6 => Some(Self::AlugMaquinas),
+            7 => Some(Self::ArmazFrete),
+            8 => Some(Self::ArrendMercantil),
+            9 => Some(Self::MaquinasDeprec),
+            10 => Some(Self::MaquinasAq),
+            11 => Some(Self::EdificBenfeit),
+            12 => Some(Self::DevolVendas),
+            13 => Some(Self::OutrasOper),
+            14 => Some(Self::TranspSubcontr),
+            15 => Some(Self::ImobCustoIncorr),
+            16 => Some(Self::ImobCustoOrcado),
+            17 => Some(Self::ServLimpeza),
             18 => Some(Self::EstoqueAberturaBens),
-            31 => Some(Self::AjusteAcrescimoPis),
-            35 => Some(Self::AjusteAcrescimoCofins),
-            41 => Some(Self::AjusteReducaoPis),
-            45 => Some(Self::AjusteReducaoCofins),
-            51 => Some(Self::DescontoProprioPis),
-            55 => Some(Self::DescontoProprioCofins),
-            61 => Some(Self::DescontoPosteriorPis),
-            65 => Some(Self::DescontoPosteriorCofins),
-            80 => Some(Self::ReceitaBrutaValores),
-            81 => Some(Self::ReceitaBrutaPercentuais),
-            90 => Some(Self::BcDebitosOmitidos),
-            91 => Some(Self::DebitosRevendaNcmPis),
-            95 => Some(Self::DebitosRevendaNcmCofins),
-            101 => Some(Self::BcAlíquotaBasica),
-            102 => Some(Self::BcAliquotasDiferenciadas),
-            103 => Some(Self::BcAlíquotaUnidade),
+            31 => Some(Self::AjusteAcrescPis),
+            35 => Some(Self::AjusteAcrescCofins),
+            41 => Some(Self::AjusteReducPis),
+            45 => Some(Self::AjusteReducCofins),
+            51 => Some(Self::DescProprioPis),
+            55 => Some(Self::DescProprioCofins),
+            61 => Some(Self::DescPostPis),
+            65 => Some(Self::DescPostCofins),
+            80 => Some(Self::RecBrutaValores),
+            81 => Some(Self::RecBrutaPerc),
+            90 => Some(Self::BcDebOmitidos),
+            91 => Some(Self::DebRevNcmPis),
+            95 => Some(Self::DebRevNcmCofins),
+            101 => Some(Self::BcAliqBasica),
+            102 => Some(Self::BcAliqDif),
+            103 => Some(Self::BcAliqUnidade),
             104 => Some(Self::BcEstoqueAbertura),
             105 => Some(Self::BcAquisicaoEmbalagens),
-            106 => Some(Self::BcPresumidoAgroindustria),
-            107 => Some(Self::BcOutrosPresumidos),
+            106 => Some(Self::BcPresumAgroind),
+            107 => Some(Self::BcOutrosPresum),
             108 => Some(Self::BcImportacao),
-            109 => Some(Self::BcAtividadeImobiliaria),
+            109 => Some(Self::BcAtivImob),
             199 => Some(Self::BcOutros),
-            201 => Some(Self::CreditoApuradoPis),
-            205 => Some(Self::CreditoApuradoCofins),
-            211 => Some(Self::CreditoDisponivelAjustePis),
-            215 => Some(Self::CreditoDisponivelAjusteCofins),
-            221 => Some(Self::CreditoDisponivelDescontoPis),
-            225 => Some(Self::CreditoDisponivelDescontoCofins),
+            201 => Some(Self::CredApuradoPis),
+            205 => Some(Self::CredApuradoCofins),
+            211 => Some(Self::CredDispAjustePis),
+            215 => Some(Self::CredDispAjusteCofins),
+            221 => Some(Self::CredDispDescPis),
+            225 => Some(Self::CredDispDescCofins),
             300 => Some(Self::BcValorTotal),
-            301 => Some(Self::SaldoCreditoPis),
-            305 => Some(Self::SaldoCreditoCofins),
+            301 => Some(Self::SaldoCredPis),
+            305 => Some(Self::SaldoCredCofins),
             _ => None,
         }
     }
 
+    /// Retorna a descrição completa da Natureza da BC dos Créditos.
+    #[rustfmt::skip]
     pub fn as_str(&self) -> &'static str {
         match self {
-            Self::AquisicaoBensRevenda => "Aquisição de Bens para Revenda",
-            Self::AquisicaoBensInsumo => "Aquisição de Bens Utilizados como Insumo",
-            Self::AquisicaoServicosInsumo => "Aquisição de Serviços Utilizados como Insumo",
-            Self::EnergiaEletrica => "Energia Elétrica e Térmica, Inclusive sob a Forma de Vapor",
-            Self::AlugueisPredios => "Aluguéis de Prédios",
-            Self::AlugueisMaquinas => "Aluguéis de Máquinas e Equipamentos",
-            Self::ArmazenagemFrete => "Armazenagem de Mercadoria e Frete na Operação de Venda",
-            Self::ArrendamentoMercantil => "Contraprestações de Arrendamento Mercantil",
-            Self::MaquinasDepreciacao => {
-                "Máquinas, Equipamentos ... (Crédito sobre Encargos de Depreciação)"
-            }
-            Self::MaquinasAquisicao => {
-                "Máquinas, Equipamentos ... (Crédito com Base no Valor de Aquisição)"
-            }
-            Self::EdificacoesBenfeitorias => {
-                "Amortizacao e Depreciação de Edificações e Benfeitorias em Imóveis"
-            }
-            Self::DevolucaoVendas => "Devolução de Vendas Sujeitas à Incidência Não-Cumulativa",
-            Self::OutrasOperacoes => "Outras Operações com Direito a Crédito",
-            Self::TransporteSubcontratacao => "Atividade de Transporte de Cargas - Subcontratação",
-            Self::ImobiliariaCustoIncorrido => {
-                "Atividade Imobiliária - Custo Incorrido de Unidade Imobiliária"
-            }
-            Self::ImobiliariaCustoOrcado => {
-                "Atividade Imobiliária - Custo Orçado de Unidade não Concluída"
-            }
-            Self::ServicosLimpeza => {
-                "Atividade de Prestação de Serviços de Limpeza, Conservação e Manutenção"
-            }
-            Self::EstoqueAberturaBens => "Estoque de Abertura de Bens",
-            Self::AjusteAcrescimoPis => "Ajuste de Acréscimo (PIS/PASEP)",
-            Self::AjusteAcrescimoCofins => "Ajuste de Acréscimo (COFINS)",
-            Self::AjusteReducaoPis => "Ajuste de Redução (PIS/PASEP)",
-            Self::AjusteReducaoCofins => "Ajuste de Redução (COFINS)",
-            Self::DescontoProprioPis => {
-                "Desconto da Contribuição Apurada no Próprio Período (PIS/PASEP)"
-            }
-            Self::DescontoProprioCofins => {
-                "Desconto da Contribuição Apurada no Próprio Período (COFINS)"
-            }
-            Self::DescontoPosteriorPis => "Desconto Efetuado em Período Posterior (PIS/PASEP)",
-            Self::DescontoPosteriorCofins => "Desconto Efetuado em Período Posterior (COFINS)",
-            Self::ReceitaBrutaValores => "Receita Bruta (valores)",
-            Self::ReceitaBrutaPercentuais => "Receita Bruta (percentuais)",
-            Self::BcDebitosOmitidos => "Base de Cálculo de Débitos Omitidos",
-            Self::DebitosRevendaNcmPis => {
-                "Débitos: Revenda de Mercadorias de NCM 2309.90 (PIS/PASEP)"
-            }
-            Self::DebitosRevendaNcmCofins => {
-                "Débitos: Revenda de Mercadorias de NCM 2309.90 (COFINS)"
-            }
-            Self::BcAlíquotaBasica => "Base de Cálculo dos Créditos - Alíquota Básica (Soma)",
-            Self::BcAliquotasDiferenciadas => {
-                "Base de Cálculo dos Créditos - Alíquotas Diferenciadas (Soma)"
-            }
-            Self::BcAlíquotaUnidade => {
-                "Base de Cálculo dos Créditos - Alíquota por Unidade de Produto (Soma)"
-            }
-            Self::BcEstoqueAbertura => "Base de Cálculo dos Créditos - Estoque de Abertura (Soma)",
-            Self::BcAquisicaoEmbalagens => {
-                "Base de Cálculo dos Créditos - Aquisição Embalagens para Revenda (Soma)"
-            }
-            Self::BcPresumidoAgroindustria => {
-                "Base de Cálculo dos Créditos - Presumido da Agroindústria (Soma)"
-            }
-            Self::BcOutrosPresumidos => {
-                "Base de Cálculo dos Créditos - Outros Créditos Presumidos (Soma)"
-            }
-            Self::BcImportacao => "Base de Cálculo dos Créditos - Importação (Soma)",
-            Self::BcAtividadeImobiliaria => {
-                "Base de Cálculo dos Créditos - Atividade Imobiliária (Soma)"
-            }
-            Self::BcOutros => "Base de Cálculo dos Créditos - Outros (Soma)",
-            Self::CreditoApuradoPis => "Crédito Apurado no Período (PIS/PASEP)",
-            Self::CreditoApuradoCofins => "Crédito Apurado no Período (COFINS)",
-            Self::CreditoDisponivelAjustePis => "Crédito Disponível após Ajustes (PIS/PASEP)",
-            Self::CreditoDisponivelAjusteCofins => "Crédito Disponível após Ajustes (COFINS)",
-            Self::CreditoDisponivelDescontoPis => "Crédito Disponível após Descontos (PIS/PASEP)",
-            Self::CreditoDisponivelDescontoCofins => "Crédito Disponível após Descontos (COFINS)",
-            Self::BcValorTotal => "Base de Cálculo dos Créditos - Valor Total (Soma)",
-            Self::SaldoCreditoPis => {
-                "Saldo de Crédito Passível de Desconto ou Ressarcimento (PIS/PASEP)"
-            }
-            Self::SaldoCreditoCofins => {
-                "Saldo de Crédito Passível de Desconto ou Ressarcimento (COFINS)"
-            }
+            Self::AqBensRevenda      => "Aquisição de Bens para Revenda",
+            Self::AqBensInsumo       => "Aquisição de Bens Utilizados como Insumo",
+            Self::AqServInsumo       => "Aquisição de Serviços Utilizados como Insumo",
+            Self::EnergEletrica      => "Energia Elétrica e Térmica, Inclusive sob a Forma de Vapor",
+            Self::AlugPredios        => "Aluguéis de Prédios",
+            Self::AlugMaquinas       => "Aluguéis de Máquinas e Equipamentos",
+            Self::ArmazFrete         => "Armazenagem de Mercadoria e Frete na Operação de Venda",
+            Self::ArrendMercantil    => "Contraprestações de Arrendamento Mercantil",
+            Self::MaquinasDeprec     => "Máquinas, Equipamentos ... (Crédito sobre Encargos de Depreciação)",
+            Self::MaquinasAq         => "Máquinas, Equipamentos ... (Crédito com Base no Valor de Aquisição)",
+            Self::EdificBenfeit      => "Amortizacao e Depreciação de Edificações e Benfeitorias em Imóveis",
+            Self::DevolVendas        => "Devolução de Vendas Sujeitas à Incidência Não-Cumulativa",
+            Self::OutrasOper         => "Outras Operações com Direito a Crédito",
+            Self::TranspSubcontr     => "Atividade de Transporte de Cargas - Subcontratação",
+            Self::ImobCustoIncorr    => "Atividade Imobiliária - Custo Incorrido de Unidade Imobiliária",
+            Self::ImobCustoOrcado    => "Atividade Imobiliária - Custo Orçado de Unidade não Concluída",
+            Self::ServLimpeza        => "Atividade de Prestação de Serviços de Limpeza, Conservação e Manutenção",
+            Self::EstoqueAberturaBens=> "Estoque de Abertura de Bens",
+            Self::AjusteAcrescPis    => "Ajuste de Acréscimo (PIS/PASEP)",
+            Self::AjusteAcrescCofins => "Ajuste de Acréscimo (COFINS)",
+            Self::AjusteReducPis     => "Ajuste de Redução (PIS/PASEP)",
+            Self::AjusteReducCofins  => "Ajuste de Redução (COFINS)",
+            Self::DescProprioPis     => "Desconto da Contribuição Apurada no Próprio Período (PIS/PASEP)",
+            Self::DescProprioCofins  => "Desconto da Contribuição Apurada no Próprio Período (COFINS)",
+            Self::DescPostPis        => "Desconto Efetuado em Período Posterior (PIS/PASEP)",
+            Self::DescPostCofins     => "Desconto Efetuado em Período Posterior (COFINS)",
+            Self::RecBrutaValores    => "Receita Bruta (valores)",
+            Self::RecBrutaPerc       => "Receita Bruta (percentuais)",
+            Self::BcDebOmitidos      => "Base de Cálculo de Débitos Omitidos",
+            Self::DebRevNcmPis       => "Débitos: Revenda de Mercadorias de NCM 2309.90 (PIS/PASEP)",
+            Self::DebRevNcmCofins    => "Débitos: Revenda de Mercadorias de NCM 2309.90 (COFINS)",
+            Self::BcAliqBasica       => "Base de Cálculo dos Créditos - Alíquota Básica (Soma)",
+            Self::BcAliqDif          => "Base de Cálculo dos Créditos - Alíquotas Diferenciadas (Soma)",
+            Self::BcAliqUnidade      => "Base de Cálculo dos Créditos - Alíquota por Unidade de Produto (Soma)",
+            Self::BcEstoqueAbertura  => "Base de Cálculo dos Créditos - Estoque de Abertura (Soma)",
+            Self::BcAquisicaoEmbalagens => "Base de Cálculo dos Créditos - Aquisição Embalagens para Revenda (Soma)",
+            Self::BcPresumAgroind    => "Base de Cálculo dos Créditos - Presumido da Agroindústria (Soma)",
+            Self::BcOutrosPresum     => "Base de Cálculo dos Créditos - Outros Créditos Presumidos (Soma)",
+            Self::BcImportacao       => "Base de Cálculo dos Créditos - Importação (Soma)",
+            Self::BcAtivImob         => "Base de Cálculo dos Créditos - Atividade Imobiliária (Soma)",
+            Self::BcOutros           => "Base de Cálculo dos Créditos - Outros (Soma)",
+            Self::CredApuradoPis     => "Crédito Apurado no Período (PIS/PASEP)",
+            Self::CredApuradoCofins  => "Crédito Apurado no Período (COFINS)",
+            Self::CredDispAjustePis  => "Crédito Disponível após Ajustes (PIS/PASEP)",
+            Self::CredDispAjusteCofins=> "Crédito Disponível após Ajustes (COFINS)",
+            Self::CredDispDescPis    => "Crédito Disponível após Descontos (PIS/PASEP)",
+            Self::CredDispDescCofins => "Crédito Disponível após Descontos (COFINS)",
+            Self::BcValorTotal       => "Base de Cálculo dos Créditos - Valor Total (Soma)",
+            Self::SaldoCredPis       => "Saldo de Crédito Passível de Desconto ou Ressarcimento (PIS/PASEP)",
+            Self::SaldoCredCofins    => "Saldo de Crédito Passível de Desconto ou Ressarcimento (COFINS)",
         }
     }
 }
 
-// --- FUNÇÕES DE TRANSFORMAÇÃO POLARS ---
-
-pub fn descricao_da_origem(col: Column) -> Result<Column, PolarsError> {
-    let ca = col.cast(&DataType::Int64)?;
-    let i64_ca = ca.i64()?;
-
-    let new_ca = i64_ca.apply_into_string_amortized(|n, buf| match IndicadorOrigem::from_i64(n) {
-        Some(e) => buf.push_str(e.as_str()),
-        None => {
-            let _ = write(buf, format_args!("{n}: Sem descrição"));
-        }
-    });
-    Ok(new_ca.into_column())
-}
-
-pub fn descricao_do_tipo_de_operacao(col: Column) -> PolarsResult<Column> {
-    let ca = col.cast(&DataType::Int64)?;
-    let i64_ca = ca.i64()?;
-
-    let new_ca = i64_ca.apply_into_string_amortized(|n, buf| match TipoOperacao::from_i64(n) {
-        Some(e) => buf.push_str(e.as_str()),
-        None => {
-            let _ = write(buf, format_args!("{}: Sem descrição", n));
-        }
-    });
-    Ok(new_ca.into_column())
-}
-
-pub fn descricao_do_tipo_de_credito(col: Column) -> PolarsResult<Column> {
-    let ca = col.cast(&DataType::Int64)?;
-    let i64_ca = ca.i64()?;
-
-    let new_ca = i64_ca.apply_into_string_amortized(|n, buf| match TipoCredito::from_i64(n) {
-        Some(e) => buf.push_str(e.as_str()),
-        None => {
-            let _ = write(buf, format_args!("{}: Sem descrição", n));
-        }
-    });
-    Ok(new_ca.into_column())
-}
-
-pub fn descricao_do_mes(col: Column) -> PolarsResult<Column> {
-    // 1. Converte a coluna para i64 de forma segura (funcional)
-    // Isso elimina a necessidade do match col.dtype() manual.
-    let ca = col.cast(&DataType::Int64)?;
-    let i64_ca = ca.i64()?;
-
-    let new_ca = i64_ca.apply_into_string_amortized(|n, buf| match Mes::from_i64(n) {
-        Some(e) => buf.push_str(e.as_str()),
-        None => {
-            let _ = write(buf, format_args!("{}: Sem descrição", n));
-        }
-    });
-    Ok(new_ca.into_column())
-}
-
+/// Transforma uma coluna de `i64` (códigos de Natureza da BC) em uma coluna de `String`
+/// com as descrições correspondentes.
+///
+/// Mantém a lógica de prefixo "00 - " para códigos <= 18, e apenas a descrição para outros.
+/// Valores nulos na entrada resultam em nulos na saída.
+/// Valores numéricos sem correspondência no enum resultam em "{código}: Sem descrição".
 pub fn descricao_da_natureza_da_bc_dos_creditos(col: Column) -> PolarsResult<Column> {
-    // 1. Resolve o erro de tipo: tenta converter qualquer entrada para i64.
-    // Se a coluna já for i64, o custo é praticamente zero.
-    let ca = col.cast(&DataType::Int64)?;
-    let i64_ca = ca.i64()?;
+    col.cast(&DataType::Int64)?
+        .i64()?
+        .try_apply_into_string_amortized(|n, buf| {
+            buf.clear();
 
-    // 2. Aplicação amortizada (reutiliza o buffer de string para performance)
-    let new_ca = i64_ca.apply_into_string_amortized(|n, buf| {
-        // NaturezaBC::from_i64 retorna Option<NaturezaBC>
-        match NaturezaBC::from_i64(n) {
-            Some(natureza) => {
-                let desc = natureza.as_str();
-                if n <= 18 {
-                    // Mantém a lógica original: prefixo "01 - " com preenchimento de zeros
-                    let _ = write(buf, format_args!("{:02} - {}", n, desc));
-                } else {
-                    // Apenas a descrição para códigos > 18
-                    buf.push_str(desc);
+            match NaturezaBC::from_i64(n) {
+                Some(natureza) => {
+                    let descricao = natureza.as_str();
+                    if n <= 18 {
+                        // Lógica original para prefixo "00 - "
+                        write!(buf, "{:02} - {}", n, descricao)
+                            .map_err(|e| PolarsError::ComputeError(e.to_string().into()))
+                    } else {
+                        // Apenas a descrição para códigos > 18
+                        buf.push_str(descricao);
+                        Ok(())
+                    }
+                }
+                None => {
+                    // Caso o número não conste no Enum
+                    write!(buf, "{:02} - Sem descrição", n)
+                        .map_err(|e| PolarsError::ComputeError(e.to_string().into()))
                 }
             }
-            None => {
-                // Caso o número não conste no Enum
-                let _ = write(buf, format_args!("{}: Sem descrição", n));
-            }
-        }
-    });
-
-    Ok(new_ca.into_column())
+        })
+        .map(|ca| ca.into_column())
 }
 
 // ============================================================================
-// Código da Situação Tributária (CST) - Nomes Encurtados
+// CÓDIGO DA SITUAÇÃO TRIBUTÁRIA (CST)
 // ============================================================================
 
-/**
-Código da Situação Tributária (CST)
-
-Mnemônicos Adotados:
-Operacao -> Oper
-Tributavel -> Trib
-Aliquota -> Aliq
-Receita -> Rec
-Credito -> Cred
-Mercado Interno -> MI
-Exportacao -> Exp
-Aquisicao -> Aq
-Substituicao Tributaria -> ST ou SubstiTrib.
-*/
+/// Código da Situação Tributária (CST) para PIS/COFINS.
+///
+/// **Mnemônicos Adotados:**
+/// - `Operacao` -> `Oper`
+/// - `Tributavel` -> `Trib`
+/// - `Aliquota` -> `Aliq`
+/// - `Receita` -> `Rec`
+/// - `Credito` -> `Cred`
+/// - `Mercado Interno` -> `MI`
+/// - `Exportacao` -> `Exp`
+/// - `Aquisicao` -> `Aq`
+/// - `Substituicao Tributaria` -> `ST` ou `SubstiTrib`
 #[repr(u16)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CodigoSituacaoTributaria {
@@ -522,7 +562,10 @@ pub enum CodigoSituacaoTributaria {
 }
 
 impl CodigoSituacaoTributaria {
-    /// Converte u16 para o Enum CodigoSituacaoTributaria
+    /// Tenta converter um `u16` para `CodigoSituacaoTributaria`.
+    ///
+    /// Retorna `Some(CodigoSituacaoTributaria)` se o valor for válido,
+    /// caso contrário, retorna `None`.
     pub const fn from_u16(n: u16) -> Option<Self> {
         match n {
             1 => Some(Self::OperTribAliqBasica),
@@ -562,11 +605,7 @@ impl CodigoSituacaoTributaria {
         }
     }
 
-    pub const fn code(self) -> u16 {
-        self as u16
-    }
-
-    // Adicione esta linha para ignorar a formatação automática nesta função
+    /// Retorna a descrição completa do CST como uma string estática.
     #[rustfmt::skip]
     pub fn as_str(&self) -> &'static str {
         match self {
@@ -607,25 +646,22 @@ impl CodigoSituacaoTributaria {
     }
 }
 
-// ============================================================================
-// Funções de Integração Polars
-// ============================================================================
-
+/// Transforma códigos CST em descrições formatadas ("XX - Descrição").
+///
+/// Valores nulos na entrada resultam em nulos na saída.
+/// Valores numéricos sem correspondência no enum resultam em "{código}: Sem descrição".
 pub fn descricao_do_cst(col: Column) -> PolarsResult<Column> {
     col.cast(&DataType::Int64)? // Converte (cast) a coluna para Int64 e acesso aos dados
         .i64()?
         .try_apply_into_string_amortized(|n, buf: &mut String| -> PolarsResult<()> {
             // Essencial para reutilizar o buffer da linha anterior
             buf.clear();
-
-            // Estilo Funcional: Tenta converter e mapear para a tupla (código, descrição)
-            let (code, label) = CodigoSituacaoTributaria::from_u16(n as u16)
-                .map(|cst| (cst.code(), cst.as_str()))
-                .unwrap_or((n as u16, "Sem descrição"));
+            let descricao = CodigoSituacaoTributaria::from_u16(n as u16)
+                .map(|codigo_cst| codigo_cst.as_str())
+                .unwrap_or("Sem descrição");
 
             // O write! retorna std::fmt::Error.
-            // O '?' converte std::fmt::Error -> JoinError::Fmt automaticamente
-            write!(buf, "{:02} - {}", code, label)
+            write!(buf, "{:02} - {}", n, descricao)
                 .map_err(|e| PolarsError::ComputeError(e.to_string().into()))
         })
         .map(|ca| ca.into_column())

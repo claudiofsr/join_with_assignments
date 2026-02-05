@@ -538,7 +538,7 @@ fn analisar_situacao06a(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     file.write_all(df_groupby_chaves.to_string().as_bytes())?; // Escreve os bytes da string no arquivo
     println!("DataFrame salvo em '{filename}'\n");
 
-    configure_the_environment(); // Retornar à configuração padrão.    
+    configure_the_environment(); // Retornar à configuração padrão.
 
     Ok(lf_result)
 }
@@ -719,7 +719,7 @@ fn analisar_situacao06b(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     file.write_all(df_groupby_cnpj.to_string().as_bytes())?; // Escreve os bytes da string no arquivo
     println!("DataFrame salvo em '{filename}'\n");
 
-    configure_the_environment(); // Retornar à configuração padrão.    
+    configure_the_environment(); // Retornar à configuração padrão.
 
     Ok(lf_result)
 }
