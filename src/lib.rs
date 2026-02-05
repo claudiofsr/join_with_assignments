@@ -756,25 +756,19 @@ pub fn format_dataframe(data_frame: &DataFrame, incluir_cst: bool) -> PolarsResu
 
     // Lista base de transformações comuns
     let mut transformations: Vec<(&str, DescricaoFn)> = vec![
-        (coluna(Left, "pa_mes"), descricao_do_mes as DescricaoFn),
-        (
-            coluna(Left, "tipo_operacao"),
-            descricao_do_tipo_de_operacao as DescricaoFn,
-        ),
-        (
-            coluna(Left, "tipo_cred"),
-            descricao_do_tipo_de_credito as DescricaoFn,
-        ),
+        (coluna(Left, "pa_mes"), descricao_do_mes),
+        (coluna(Left, "tipo_operacao"), descricao_do_tipo_de_operacao),
+        (coluna(Left, "tipo_cred"), descricao_do_tipo_de_credito),
         (
             coluna(Left, "natureza"),
-            descricao_da_natureza_da_bc_dos_creditos as DescricaoFn,
+            descricao_da_natureza_da_bc_dos_creditos,
         ),
-        (coluna(Left, "origem"), descricao_da_origem as DescricaoFn),
+        (coluna(Left, "origem"), descricao_da_origem),
     ];
 
     // Adiciona CST apenas se solicitado (ex: para a aba de Itens)
     if incluir_cst {
-        transformations.push((coluna(Left, "cst"), descricao_do_cst as DescricaoFn));
+        transformations.push((coluna(Left, "cst"), descricao_do_cst));
     }
 
     let exprs: Vec<Expr> = transformations

@@ -54,6 +54,10 @@ pub enum JoinError {
     #[error("Value out of i64 bounds during matrix generation: {value}")]
     I64OutOfBounds { value: f64 },
 
+    // Adicione esta variante para capturar erros de formatação do write!
+    #[error("Format error: {0}")]
+    Fmt(#[from] std::fmt::Error),
+
     // Wrapper for standard IO errors.
     // The #[from] attribute automatically converts io::Error to JoinError::Io.
     #[error("IO error: {0}")]
@@ -92,5 +96,16 @@ impl From<String> for JoinError {
     fn from(err: String) -> JoinError {
         // Prefer using specific error variants when possible, fallback to Other.
         JoinError::Other(err)
+    }
+}
+
+impl From<JoinError> for PolarsError {
+    fn from(err: JoinError) -> Self {
+        match err {
+            // Se já for um erro do Polars, extrai o erro original
+            JoinError::Polars(polars_error) => polars_error,
+            // Caso contrário, converte a descrição em um erro de computação do Polars
+            _ => PolarsError::ComputeError(err.to_string().into()),
+        }
     }
 }
