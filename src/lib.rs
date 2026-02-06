@@ -53,10 +53,7 @@ pub use self::{
         adicionar_coluna_de_aliquota_zero, adicionar_coluna_de_credito_presumido,
         adicionar_coluna_de_incidencia_monofasica,
     },
-    traits::{
-        DataFrameExtension, ExprExtension, FloatIterExtension, LazyFrameExtension,
-        ToLiteralListExpr,
-    },
+    traits::*,
     write::ExcelWriter,
     xlsx_writer::PolarsXlsxWriter,
 };
