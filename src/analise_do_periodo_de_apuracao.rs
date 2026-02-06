@@ -24,9 +24,14 @@ pub fn adicionar_coluna_periodo_de_apuracao_inicial_e_final(
     let dt_start: Option<u32> = args.date_start;
     let dt_final: Option<u32> = args.date_final;
 
+    // O Polars ignora valores nulos em funções de agregação como .min() e .max().
+    // Portanto, ao adicionar as colunas de período inicial e final:
+
     let lf_result: LazyFrame = lazyframe
         .with_column(
             when(operacoes_de_entrada_ou_saida()?)
+                // O .min() ignorará os nulos que criamos para as somas,
+                // pegando apenas os meses reais (1 a 12).
                 .then(col(periodo_de_apuracao).min())
                 .otherwise(lit(NULL)) // replace by null
                 .alias(pa_ini),

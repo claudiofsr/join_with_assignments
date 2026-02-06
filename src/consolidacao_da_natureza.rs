@@ -716,8 +716,11 @@ fn adicionar_valores_trimestrais(
             col("CNPJ Base"),
             col("Ano do Período de Apuração"),
             col("Trimestre do Período de Apuração"),
-            // Mês fictício 13, para fins de acumulação de valores trimestrais e ordenação
-            lit(13i64).alias("Mês do Período de Apuração"),
+            // Mês NULL para fins de acumulação de valores trimestrais.
+            // A ordenação de Null será descendente, ou seja, por último.
+            lit(NULL)
+                .cast(DataType::Int64)
+                .alias("Mês do Período de Apuração"),
             col("Tipo de Operação"),
             col("Tipo de Crédito"),
             col("Código de Situação Tributária (CST)"),
@@ -1011,7 +1014,9 @@ fn adicionar_bc_dos_creditos_valor_total(
             col("Trimestre do Período de Apuração"),
             col("Mês do Período de Apuração"),
             lit(1i64).cast(DataType::Int64).alias("Tipo de Operação"),
-            lit(100i64).alias("Tipo de Crédito"),
+            // Tipo de Crédito como NULL para representar o valor total.
+            // A ordenação de Null será descendente, ou seja, por último.
+            lit(NULL).cast(DataType::Int64).alias("Tipo de Crédito"),
             lit(400i64).alias("Código de Situação Tributária (CST)"),
             lit(NULL).cast(DataType::Float64).alias(aliq_pis),
             lit(NULL).cast(DataType::Float64).alias(aliq_cof),
@@ -1123,7 +1128,9 @@ fn dicionar_saldo_passivel_de_ressarcimento(
             col("Trimestre do Período de Apuração"),
             col("Mês do Período de Apuração"),
             lit(1i64).cast(DataType::Int64).alias("Tipo de Operação"),
-            lit(100i64).alias("Tipo de Crédito"),
+            // Tipo de Crédito como NULL para representar o valor total.
+            // A ordenação de Null será descendente, ou seja, por último.
+            lit(NULL).cast(DataType::Int64).alias("Tipo de Crédito"),
             col(cst_col),
             lit(NULL).cast(DataType::Float64).alias(aliq_pis),
             lit(NULL).cast(DataType::Float64).alias(aliq_cof),
@@ -1185,6 +1192,13 @@ fn formatar_valores(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
 /// Ordenar colunas
 fn ordenar_colunas(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     let cst: &str = coluna(Left, "cst");
+    let tipo_operacao: &str = coluna(Left, "tipo_operacao");
+    let tipo_cred: &str = coluna(Left, "tipo_cred");
+
+    // 1. Criamos uma lógica de "ranking" apenas para a ordenação
+    let ordem_tipo_de_credito = when(col(tipo_operacao).eq(lit(2))) // Se for Saída (2)
+        .then(lit(0)) // Atribua 0 (menor valor)
+        .otherwise(col(tipo_cred)); // Senão, mantenha o original (1, 2, 3 ...)     
 
     let lazy_sorted: LazyFrame = lazyframe
         .sort_by_exprs(
@@ -1192,8 +1206,8 @@ fn ordenar_colunas(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
                 col("CNPJ Base"),
                 col("Ano do Período de Apuração"),
                 col("Trimestre do Período de Apuração"),
-                col("Mês do Período de Apuração"),
-                col("Tipo de Crédito"),
+                col("Mês do Período de Apuração"), // Jan..Dez -> null (Trimestral)
+                ordem_tipo_de_credito,             // 1..99 -> null (Total)
                 col("Tipo de Operação"),
                 col("Código de Situação Tributária (CST)"),
                 col("Natureza da Base de Cálculo dos Créditos"),
@@ -1206,7 +1220,7 @@ fn ordenar_colunas(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
                 .with_maintain_order(true)
                 .with_multithreaded(true)
                 .with_order_descending(false)
-                .with_nulls_last(false),
+                .with_nulls_last(true), // <--- Garante que a soma (null) fique abaixo dos meses 1-12
         )
         .with_column(
             when(col(cst).gt(lit(100)))

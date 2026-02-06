@@ -38,17 +38,20 @@ impl IndicadorOrigem {
 /// com as descrições correspondentes.
 ///
 /// Valores nulos na entrada resultam em nulos na saída.
-/// Valores numéricos sem correspondência no enum resultam em "{código}: Sem descrição".
+/// Valores numéricos sem correspondência no enum resultam em "{código}: Valor Inválido!".
 pub fn descricao_da_origem(col: Column) -> PolarsResult<Column> {
     col.cast(&DataType::Int64)?
         .i64()?
         .try_apply_into_string_amortized(|n, buf| {
             buf.clear();
-            let descricao = IndicadorOrigem::from_i64(n)
-                .map(|e| e.as_str())
-                .unwrap_or("Sem descrição");
-
-            write!(buf, "{descricao}").map_err(|e| PolarsError::ComputeError(e.to_string().into()))
+            match IndicadorOrigem::from_i64(n) {
+                Some(origem) => {
+                    buf.push_str(origem.as_str());
+                    Ok(())
+                }
+                None => write!(buf, "{n}: Valor Inválido!")
+                    .map_err(|e| PolarsError::ComputeError(e.to_string().into())),
+            }
         })
         .map(|ca| ca.into_column())
 }
@@ -103,17 +106,20 @@ impl TipoOperacao {
 /// com as descrições correspondentes.
 ///
 /// Valores nulos na entrada resultam em nulos na saída.
-/// Valores numéricos sem correspondência no enum resultam em "{código}: Sem descrição".
+/// Valores numéricos sem correspondência no enum resultam em "{código}: Valor Inválido!".
 pub fn descricao_do_tipo_de_operacao(col: Column) -> PolarsResult<Column> {
     col.cast(&DataType::Int64)?
         .i64()?
         .try_apply_into_string_amortized(|n, buf| {
             buf.clear();
-            let descricao = TipoOperacao::from_i64(n)
-                .map(|e| e.as_str())
-                .unwrap_or("Sem descrição");
-
-            write!(buf, "{descricao}").map_err(|e| PolarsError::ComputeError(e.to_string().into()))
+            match TipoOperacao::from_i64(n) {
+                Some(tipo) => {
+                    buf.push_str(tipo.as_str());
+                    Ok(())
+                }
+                None => write!(buf, "{n}: Valor Inválido!")
+                    .map_err(|e| PolarsError::ComputeError(e.to_string().into())),
+            }
         })
         .map(|ca| ca.into_column())
 }
@@ -136,7 +142,6 @@ pub enum TipoCredito {
     Importacao = 8,
     AtividadeImobiliaria = 9,
     Outros = 99,
-    Vazio = 100,
 }
 
 impl TipoCredito {
@@ -156,7 +161,6 @@ impl TipoCredito {
             8 => Some(Self::Importacao),
             9 => Some(Self::AtividadeImobiliaria),
             99 => Some(Self::Outros),
-            100 => Some(Self::Vazio),
             _ => None,
         }
     }
@@ -175,7 +179,6 @@ impl TipoCredito {
             Self::Importacao             => "Importação",
             Self::AtividadeImobiliaria   => "Atividade Imobiliária",
             Self::Outros                 => "Outros",
-            Self::Vazio                  => "",
         }
     }
 }
@@ -184,17 +187,20 @@ impl TipoCredito {
 /// com as descrições correspondentes.
 ///
 /// Valores nulos na entrada resultam em nulos na saída.
-/// Valores numéricos sem correspondência no enum resultam em "{código}: Sem descrição".
+/// Valores numéricos sem correspondência no enum resultam em "{código}: Valor Inválido!".
 pub fn descricao_do_tipo_de_credito(col: Column) -> PolarsResult<Column> {
     col.cast(&DataType::Int64)?
         .i64()?
         .try_apply_into_string_amortized(|n, buf| {
             buf.clear();
-            let descricao = TipoCredito::from_i64(n)
-                .map(|e| e.as_str())
-                .unwrap_or("Sem descrição");
-
-            write!(buf, "{descricao}").map_err(|e| PolarsError::ComputeError(e.to_string().into()))
+            match TipoCredito::from_i64(n) {
+                Some(tipo) => {
+                    buf.push_str(tipo.as_str());
+                    Ok(())
+                }
+                None => write!(buf, "{n}: Valor Inválido!")
+                    .map_err(|e| PolarsError::ComputeError(e.to_string().into())),
+            }
         })
         .map(|ca| ca.into_column())
 }
@@ -218,7 +224,6 @@ pub enum Mes {
     Out = 10,
     Nov = 11,
     Dez = 12,
-    Acumulado = 13,
 }
 
 impl Mes {
@@ -240,12 +245,11 @@ impl Mes {
             10 => Some(Self::Out),
             11 => Some(Self::Nov),
             12 => Some(Self::Dez),
-            13 => Some(Self::Acumulado),
             _ => None,
         }
     }
 
-    /// Retorna o nome completo do mês. Para `Acumulado`, retorna uma string vazia.
+    /// Retorna o nome completo do mês.
     pub const fn as_str(&self) -> &'static str {
         match self {
             Self::Jan => "janeiro",
@@ -260,7 +264,6 @@ impl Mes {
             Self::Out => "outubro",
             Self::Nov => "novembro",
             Self::Dez => "dezembro",
-            Self::Acumulado => "",
         }
     }
 }
@@ -269,17 +272,20 @@ impl Mes {
 /// com as descrições correspondentes.
 ///
 /// Valores nulos na entrada resultam em nulos na saída.
-/// Valores numéricos sem correspondência no enum resultam em "{código}: Sem descrição".
+/// Valores numéricos sem correspondência no enum resultam em "{código}: Valor Inválido!".
 pub fn descricao_do_mes(col: Column) -> PolarsResult<Column> {
     col.cast(&DataType::Int64)?
         .i64()?
         .try_apply_into_string_amortized(|n, buf| {
             buf.clear();
-            let descricao = Mes::from_i64(n)
-                .map(|e| e.as_str())
-                .unwrap_or("Sem descrição");
-
-            write!(buf, "{descricao}").map_err(|e| PolarsError::ComputeError(e.to_string().into()))
+            match Mes::from_i64(n) {
+                Some(mes) => {
+                    buf.push_str(mes.as_str());
+                    Ok(())
+                }
+                None => write!(buf, "{n}: Valor Inválido!")
+                    .map_err(|e| PolarsError::ComputeError(e.to_string().into())),
+            }
         })
         .map(|ca| ca.into_column())
 }
@@ -468,31 +474,22 @@ impl NaturezaBC {
 ///
 /// Mantém a lógica de prefixo "00 - " para códigos <= 18, e apenas a descrição para outros.
 /// Valores nulos na entrada resultam em nulos na saída.
-/// Valores numéricos sem correspondência no enum resultam em "{código}: Sem descrição".
+/// Valores numéricos sem correspondência no enum resultam em "{código}: Valor Inválido!".
 pub fn descricao_da_natureza_da_bc_dos_creditos(col: Column) -> PolarsResult<Column> {
     col.cast(&DataType::Int64)?
         .i64()?
         .try_apply_into_string_amortized(|n, buf| {
             buf.clear();
-
             match NaturezaBC::from_i64(n) {
-                Some(natureza) => {
-                    let descricao = natureza.as_str();
-                    if n <= 18 {
-                        // Lógica original para prefixo "00 - "
-                        write!(buf, "{:02} - {}", n, descricao)
-                            .map_err(|e| PolarsError::ComputeError(e.to_string().into()))
-                    } else {
-                        // Apenas a descrição para códigos > 18
-                        buf.push_str(descricao);
-                        Ok(())
-                    }
+                Some(natureza) => if n <= 18 {
+                    write!(buf, "{:02} - {}", n, natureza.as_str())
+                } else {
+                    buf.push_str(natureza.as_str());
+                    Ok(())
                 }
-                None => {
-                    // Caso o número não conste no Enum
-                    write!(buf, "{:02} - Sem descrição", n)
-                        .map_err(|e| PolarsError::ComputeError(e.to_string().into()))
-                }
+                .map_err(|e| PolarsError::ComputeError(e.to_string().into())),
+                None => write!(buf, "{n}: Valor Inválido!")
+                    .map_err(|e| PolarsError::ComputeError(e.to_string().into())),
             }
         })
         .map(|ca| ca.into_column())
@@ -649,20 +646,18 @@ impl CodigoSituacaoTributaria {
 /// Transforma códigos CST em descrições formatadas ("XX - Descrição").
 ///
 /// Valores nulos na entrada resultam em nulos na saída.
-/// Valores numéricos sem correspondência no enum resultam em "{código}: Sem descrição".
+/// Valores numéricos sem correspondência no enum resultam em "{código}: Valor Inválido!".
 pub fn descricao_do_cst(col: Column) -> PolarsResult<Column> {
-    col.cast(&DataType::Int64)? // Converte (cast) a coluna para Int64 e acesso aos dados
+    col.cast(&DataType::Int64)?
         .i64()?
-        .try_apply_into_string_amortized(|n, buf: &mut String| -> PolarsResult<()> {
-            // Essencial para reutilizar o buffer da linha anterior
+        .try_apply_into_string_amortized(|n, buf| {
             buf.clear();
-            let descricao = CodigoSituacaoTributaria::from_u16(n as u16)
-                .map(|codigo_cst| codigo_cst.as_str())
-                .unwrap_or("Sem descrição");
-
-            // O write! retorna std::fmt::Error.
-            write!(buf, "{:02} - {}", n, descricao)
-                .map_err(|e| PolarsError::ComputeError(e.to_string().into()))
+            match CodigoSituacaoTributaria::from_u16(n as u16) {
+                Some(cst) => write!(buf, "{:02} - {}", n, cst.as_str())
+                    .map_err(|e| PolarsError::ComputeError(e.to_string().into())),
+                None => write!(buf, "{n}: Valor Inválido!")
+                    .map_err(|e| PolarsError::ComputeError(e.to_string().into())),
+            }
         })
         .map(|ca| ca.into_column())
 }
