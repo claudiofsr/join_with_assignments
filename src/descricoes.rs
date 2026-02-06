@@ -42,7 +42,7 @@ impl IndicadorOrigem {
 pub fn descricao_da_origem(col: Column) -> PolarsResult<Column> {
     col.cast(&DataType::Int64)?
         .i64()?
-        .try_apply_into_string_amortized(|n, buf| {
+        .try_apply_into_string_amortized(|n, buf: &mut String| -> PolarsResult<()> {
             buf.clear();
             match IndicadorOrigem::from_i64(n) {
                 Some(origem) => {
