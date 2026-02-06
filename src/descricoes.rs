@@ -1,6 +1,8 @@
 use polars::prelude::*;
 use std::fmt::Write;
 
+use crate::JoinError;
+
 // ============================================================================
 // 1. INDICADOR DE ORIGEM
 // ============================================================================
@@ -42,16 +44,13 @@ impl IndicadorOrigem {
 pub fn descricao_da_origem(col: Column) -> PolarsResult<Column> {
     col.cast(&DataType::Int64)?
         .i64()?
-        .try_apply_into_string_amortized(|n, buf: &mut String| -> PolarsResult<()> {
+        .try_apply_into_string_amortized(|n, buf| {
             buf.clear();
             match IndicadorOrigem::from_i64(n) {
-                Some(origem) => {
-                    buf.push_str(origem.as_str());
-                    Ok(())
-                }
-                None => write!(buf, "{n}: Valor Inválido!")
-                    .map_err(|e| PolarsError::ComputeError(e.to_string().into())),
+                Some(origem) => write!(buf, "{}", origem.as_str()),
+                None => write!(buf, "{n}: Valor Inválido!"),
             }
+            .map_err(|e| JoinError::from(e).into())
         })
         .map(|ca| ca.into_column())
 }
@@ -113,13 +112,10 @@ pub fn descricao_do_tipo_de_operacao(col: Column) -> PolarsResult<Column> {
         .try_apply_into_string_amortized(|n, buf| {
             buf.clear();
             match TipoOperacao::from_i64(n) {
-                Some(tipo) => {
-                    buf.push_str(tipo.as_str());
-                    Ok(())
-                }
-                None => write!(buf, "{n}: Valor Inválido!")
-                    .map_err(|e| PolarsError::ComputeError(e.to_string().into())),
+                Some(tipo) => write!(buf, "{}", tipo.as_str()),
+                None => write!(buf, "{n}: Valor Inválido!"),
             }
+            .map_err(|e| JoinError::from(e).into())
         })
         .map(|ca| ca.into_column())
 }
@@ -194,13 +190,10 @@ pub fn descricao_do_tipo_de_credito(col: Column) -> PolarsResult<Column> {
         .try_apply_into_string_amortized(|n, buf| {
             buf.clear();
             match TipoCredito::from_i64(n) {
-                Some(tipo) => {
-                    buf.push_str(tipo.as_str());
-                    Ok(())
-                }
-                None => write!(buf, "{n}: Valor Inválido!")
-                    .map_err(|e| PolarsError::ComputeError(e.to_string().into())),
+                Some(tipo) => write!(buf, "{}", tipo.as_str()),
+                None => write!(buf, "{n}: Valor Inválido!"),
             }
+            .map_err(|e| JoinError::from(e).into())
         })
         .map(|ca| ca.into_column())
 }
@@ -279,13 +272,10 @@ pub fn descricao_do_mes(col: Column) -> PolarsResult<Column> {
         .try_apply_into_string_amortized(|n, buf| {
             buf.clear();
             match Mes::from_i64(n) {
-                Some(mes) => {
-                    buf.push_str(mes.as_str());
-                    Ok(())
-                }
-                None => write!(buf, "{n}: Valor Inválido!")
-                    .map_err(|e| PolarsError::ComputeError(e.to_string().into())),
+                Some(mes) => write!(buf, "{}", mes.as_str()),
+                None => write!(buf, "{n}: Valor Inválido!"),
             }
+            .map_err(|e| JoinError::from(e).into())
         })
         .map(|ca| ca.into_column())
 }
@@ -480,17 +470,15 @@ pub fn descricao_da_natureza_da_bc_dos_creditos(col: Column) -> PolarsResult<Col
         .i64()?
         .try_apply_into_string_amortized(|n, buf| {
             buf.clear();
+
+            // Lógica unificada retornando Result do write!
             match NaturezaBC::from_i64(n) {
-                Some(natureza) => if n <= 18 {
-                    write!(buf, "{:02} - {}", n, natureza.as_str())
-                } else {
-                    buf.push_str(natureza.as_str());
-                    Ok(())
-                }
-                .map_err(|e| PolarsError::ComputeError(e.to_string().into())),
-                None => write!(buf, "{n}: Valor Inválido!")
-                    .map_err(|e| PolarsError::ComputeError(e.to_string().into())),
+                Some(nat) if n <= 18 => write!(buf, "{:02} - {}", n, nat.as_str()),
+                Some(nat) => write!(buf, "{}", nat.as_str()),
+                None => write!(buf, "{n}: Valor Inválido!"),
             }
+            // Aplica a ponte JoinError -> PolarsError uma única vez
+            .map_err(|e| JoinError::from(e).into())
         })
         .map(|ca| ca.into_column())
 }
@@ -652,12 +640,18 @@ pub fn descricao_do_cst(col: Column) -> PolarsResult<Column> {
         .i64()?
         .try_apply_into_string_amortized(|n, buf| {
             buf.clear();
-            match CodigoSituacaoTributaria::from_u16(n as u16) {
-                Some(cst) => write!(buf, "{:02} - {}", n, cst.as_str())
-                    .map_err(|e| PolarsError::ComputeError(e.to_string().into())),
-                None => write!(buf, "{n}: Valor Inválido!")
-                    .map_err(|e| PolarsError::ComputeError(e.to_string().into())),
+
+            // Tenta converter i64 para u16 de forma segura antes de buscar o CST
+            let cst_opt = u16::try_from(n)
+                .ok()
+                .and_then(CodigoSituacaoTributaria::from_u16);
+
+            match cst_opt {
+                Some(cst) => write!(buf, "{:02} - {}", n, cst.as_str()),
+                None => write!(buf, "{n}: Valor Inválido!"),
             }
+            // Transforma o erro do write! (se houver) usando sua arquitetura
+            .map_err(|e| JoinError::from(e).into())
         })
         .map(|ca| ca.into_column())
 }
