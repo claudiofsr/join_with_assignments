@@ -37,6 +37,18 @@ pub enum JoinError {
     #[error("CSV parsing error: {0} for file {1:?}")] // Adicionado PathBuf para contexto
     CSVReadError(PolarsError, PathBuf), // Alterado para PolarsError e PathBuf
 
+    // Adicione esta variante para capturar erros de formatação do write!
+    #[error("Format error: {0}")]
+    Fmt(#[from] std::fmt::Error),
+
+    #[error("Value out of i64 bounds during matrix generation: {value}")]
+    I64OutOfBounds { value: f64 },
+
+    // Wrapper for standard IO errors.
+    // The #[from] attribute automatically converts io::Error to JoinError::Io.
+    #[error("IO error: {0}")]
+    Io(#[from] io::Error),
+
     #[error(
         "Incomplete CSV read configuration: {message}. File path: {file_path:?}, Delimiter: {delimiter:?}"
     )]
@@ -50,18 +62,6 @@ pub enum JoinError {
         "Invalid 'Side' value provided: '{0}'. The middle side is not valid for this operation."
     )]
     InvalidSide(String), // Armazenará o valor de Side que foi inválido (ex: "Middle")
-
-    #[error("Value out of i64 bounds during matrix generation: {value}")]
-    I64OutOfBounds { value: f64 },
-
-    // Adicione esta variante para capturar erros de formatação do write!
-    #[error("Format error: {0}")]
-    Fmt(#[from] std::fmt::Error),
-
-    // Wrapper for standard IO errors.
-    // The #[from] attribute automatically converts io::Error to JoinError::Io.
-    #[error("IO error: {0}")]
-    Io(#[from] io::Error),
 
     #[error(
         "fn munkres_assignments(),\n\
