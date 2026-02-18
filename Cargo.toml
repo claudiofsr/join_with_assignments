@@ -52,7 +52,7 @@ features = [
 ]
 
 [dependencies.polars]
-version = "0.52.0"
+version = "0.53.0"
 # git = "https://github.com/pola-rs/polars.git"
 # rev = "8a6bf4b"
 # https://github.com/pola-rs/polars/releases/tag/rs-0.51.0
@@ -96,14 +96,14 @@ features = [
 ]
 
 [dependencies.polars-arrow ]
-version = "0.52.0"
+version = "0.53.0"
 
 [dependencies.rust_xlsxwriter]
-version = "0.93"
+# version = "0.93"
 # https://github.com/jmcnamara/rust_xlsxwriter/blob/main/CHANGELOG.md
 # git = "https://github.com/jmcnamara/rust_xlsxwriter.git"
 # Cargo.toml, update polars version
-# path = "/home/claudio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rust_xlsxwriter-0.90.2b"
+path = "/home/claudio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rust_xlsxwriter-0.93.0b"
 
 features = [
     # "constant_memory",
@@ -115,7 +115,7 @@ features = [
 
 [dev-dependencies]
 # Dependencies ONLY needed for testing
-tempfile = "3.24"
+tempfile = "3.25"
 
 # Package release:
 # Cross-compile a Rust application from Linux to Windows

@@ -197,7 +197,7 @@ impl LazyFrameExtension for LazyFrame {
         } else {
             // Drop only the columns that actually exist in the LazyFrame.
             // `by_name` with `true` indicates that we are providing a list of column names to drop.
-            Ok(self.drop(by_name(existing_columns_to_drop, true)))
+            Ok(self.drop(by_name(existing_columns_to_drop, true, true)))
         }
     }
 }

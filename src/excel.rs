@@ -281,9 +281,7 @@ fn apply_conditional_styles(
         })
         .unwrap_or(0);
 
-    let ca = df.get_columns()[nature_idx]
-        .as_materialized_series()
-        .str()?;
+    let ca = df.columns()[nature_idx].as_materialized_series().str()?;
 
     ca.into_iter().enumerate().for_each(|(i, opt_val)| {
         let style = match opt_val {
@@ -312,7 +310,7 @@ fn auto_fit(df: &DataFrame, worksheet: &mut Worksheet) -> PolarsResult<()> {
         .map(|h| AtomicUsize::new(WIDTH_MIN.max(h.as_str().chars().count().div_ceil(4))))
         .collect();
 
-    df.get_columns()
+    df.columns()
         .par_iter()
         .enumerate()
         .for_each(|(col_idx, column)| {

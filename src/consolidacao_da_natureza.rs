@@ -19,6 +19,7 @@ pub fn obter_consolidacao_nat(dataframe: &DataFrame, auditar: bool) -> JoinResul
         diagonal: false,
         from_partitioned_ds: false,
         maintain_order: true,
+        strict: true,
     };
 
     let lazyframe: LazyFrame = dataframe.clone().lazy();
@@ -1198,7 +1199,7 @@ fn ordenar_colunas(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     // 1. Criamos uma lógica de "ranking" apenas para a ordenação
     let ordem_tipo_de_credito = when(col(tipo_operacao).eq(lit(2))) // Se for Saída (2)
         .then(lit(0)) // Atribua 0 (menor valor)
-        .otherwise(col(tipo_cred)); // Senão, mantenha o original (1, 2, 3 ...)     
+        .otherwise(col(tipo_cred)); // Senão, mantenha o original (1, 2, 3 ...)
 
     let lazy_sorted: LazyFrame = lazyframe
         .sort_by_exprs(
@@ -1257,7 +1258,7 @@ fn rename_columns(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{configure_the_environment, get_output_as_boolean};
+    use crate::{EXPLODE_OPTIONS, configure_the_environment, get_output_as_boolean};
 
     // cargo test -- --help
     // cargo test -- --nocapture
@@ -1284,7 +1285,7 @@ mod tests {
             .lazy()
             .select([col("text").str().split(lit(" ")).alias("tokens")])
             .with_row_index("row_nr", None)
-            .explode(cols(["tokens"]))
+            .explode(cols(["tokens"]), EXPLODE_OPTIONS)
             .select([col("row_nr"), col("tokens")])
             .collect()?;
 
@@ -1320,7 +1321,7 @@ mod tests {
                     .alias("Código Div"),
             )
             // repeat each row in a polars dataframe a particular number of times?
-            .select(&[all().as_expr().repeat_by(lit(2)).explode()])
+            .select(&[all().as_expr().repeat_by(lit(2)).explode(EXPLODE_OPTIONS)])
             //.explode([col("contador")]);
             // contador de linhas
             .with_row_index("contador", Some(1u32));
@@ -1402,7 +1403,7 @@ mod tests {
 
         println!("dataframe02: {dataframe02}\n");
 
-        let out = dataframe02.column("vals")?.explode(false)?;
+        let out = dataframe02.column("vals")?.explode(EXPLODE_OPTIONS)?;
         let out = out.i32().unwrap();
         assert_eq!(
             out.into_no_null_iter().collect::<Vec<_>>(),

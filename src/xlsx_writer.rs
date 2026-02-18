@@ -246,7 +246,7 @@ impl PolarsXlsxWriter {
         }
 
         // Iterate through the dataframe column by column.
-        for (col_num, column) in df.get_columns().iter().enumerate() {
+        for (col_num, column) in df.columns().iter().enumerate() {
             let col_num = col_offset + col_num as u16;
 
             // Store the column names for use as table headers.

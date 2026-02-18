@@ -2,7 +2,7 @@ use polars::prelude::*;
 // use rayon::prelude::*; // For parallel processing of rows
 
 use crate::{
-    AllCorrelations, DataFrameExtension, JoinResult, LazyFrameExtension,
+    AllCorrelations, DataFrameExtension, EXPLODE_OPTIONS, JoinResult, LazyFrameExtension,
     Side::{Left, Middle, Right},
     args::Arguments,
     coluna, formatar_ncm_expr, get_lazyframe_from_csv, get_opt_vectuples, get_option_assignments,
@@ -169,9 +169,9 @@ fn groupby_fazyframe_a(lazyframe: LazyFrame) -> PolarsResult<LazyFrame> {
                     .unique()
                     .count()
                     .alias(period_count),
-                col("Valores dos Itens da Nota Fiscal EFD").explode(),
+                col("Valores dos Itens da Nota Fiscal EFD").explode(EXPLODE_OPTIONS),
                 col("Valores dos Itens da Nota Fiscal EFD")
-                    .explode()
+                    .explode(EXPLODE_OPTIONS)
                     .sum()
                     .alias("Soma dos Valores dos Itens"),
             ])
@@ -759,7 +759,7 @@ mod test_assignments {
         CorrelatedLines, ExprExtension, LazyFrameExtension, Side, apply_custom_schema_rules,
         configure_the_environment,
     };
-    use std::{collections::HashMap, env};
+    use std::{collections::HashMap, env, path::PathBuf};
 
     // cargo test -- --help
     // cargo test -- --nocapture
@@ -1092,13 +1092,14 @@ mod test_assignments {
 
         let delimiter = ';';
         let file_path = "src/tests/csv_file01";
+        let path_buf = PathBuf::from(file_path);
         let value_p = "Value P";
-        let plpath = PlPath::from_str(file_path);
+        let pl_ref_path = PlRefPath::try_from_pathbuf(path_buf)?;
 
         // --- with_infer_schema_length --- //
         println!("\n### --- with_infer_schema_length --- ###\n");
 
-        let result_lazyframe_a: PolarsResult<LazyFrame> = LazyCsvReader::new(plpath.clone())
+        let result_lazyframe_a: PolarsResult<LazyFrame> = LazyCsvReader::new(pl_ref_path.clone())
             .with_try_parse_dates(true)
             .with_separator(delimiter as u8)
             .with_has_header(true)
@@ -1142,7 +1143,7 @@ mod test_assignments {
 
         let cols_dtype: Arc<HashMap<&'static str, DataType>> = Arc::new(column_dtypes);
 
-        let result_lazyframe_b: PolarsResult<LazyFrame> = LazyCsvReader::new(plpath)
+        let result_lazyframe_b: PolarsResult<LazyFrame> = LazyCsvReader::new(pl_ref_path)
             .with_try_parse_dates(false) // use regex
             .with_separator(delimiter as u8)
             .with_has_header(true)
@@ -1204,13 +1205,14 @@ mod test_assignments {
 
         let delimiter = ';';
         let file_path = "src/tests/csv_file02";
+        let path_buf = PathBuf::from(file_path);
         let valor_item = coluna(Right, "valor_item"); // "Valor da Nota Proporcional : NF Item (Todos) SOMA"
-        let plpath = PlPath::from_str(file_path);
+        let pl_ref_path = PlRefPath::try_from_pathbuf(path_buf)?;
 
         // --- with_infer_schema_length --- //
         println!("\n### --- with_infer_schema_length --- ###\n");
 
-        let result_lazyframe: PolarsResult<LazyFrame> = LazyCsvReader::new(plpath)
+        let result_lazyframe: PolarsResult<LazyFrame> = LazyCsvReader::new(pl_ref_path)
             .with_encoding(CsvEncoding::LossyUtf8)
             .with_try_parse_dates(true)
             .with_separator(delimiter as u8)

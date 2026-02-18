@@ -126,6 +126,13 @@ pub fn configure_the_environment() {
     }
 }
 
+pub const EXPLODE_OPTIONS: ExplodeOptions = ExplodeOptions {
+    // Explode an empty list into a `null`.
+    empty_as_null: true,
+    // Explode a `null` into a `null`.
+    keep_nulls: true,
+};
+
 /**
 Returns a Field closure that indicates the output Series will have
 the same type as the input field.
@@ -234,7 +241,7 @@ pub fn remove_null_columns(frame: Frame) -> PolarsResult<DataFrame> {
 
     // Determine which columns to keep.
     let columns_to_keep: Vec<&str> = df
-        .get_columns()
+        .columns()
         .iter()
         .filter_map(|col| {
             let name = col.name().as_str();
@@ -670,11 +677,11 @@ fn read_csv_lazy(
             // Use Arc to efficiently share the map ownership with the 'move' closure.
             let cols_dtype: HashMap<&str, DataType> = MyColumn::get_cols_dtype(side);
 
-            let plpath = PlPath::Local(path.clone().into());
+            let pl_ref_path = PlRefPath::try_from_path(path)?;
 
             // Create a LazyCsvReader to process the file lazily.
             let result_lazyframe: JoinResult<LazyFrame> =
-                LazyCsvReader::new(plpath) // Start lazy reader for the given path
+                LazyCsvReader::new(pl_ref_path) // Start lazy reader for the given path
                     .with_encoding(CsvEncoding::LossyUtf8) // Specify UTF-8 encoding with lossy conversion
                     .with_try_parse_dates(false) // Disable automatic date parsing during initial read
                     .with_separator(separator as u8) // Set the column delimiter
@@ -1483,11 +1490,11 @@ mod tests_replace_values_with_null {
             .lazy()
             .with_columns([condition.alias("other name"), replacement_expr]) // Apply the selected expression
             .collect()?;
-        df_temp.set_column_names(["foo_stripped", "is_in condition"])?;
+        df_temp.set_column_names(&["foo_stripped", "is_in condition"])?;
 
         // Concat DataFrames horizontally.
         // let df_output = df_input.hstack(df_temp.get_columns())?;
-        let df_output = concat_df_horizontal(&[df_input, df_temp], true)?;
+        let df_output = concat_df_horizontal(&[df_input, df_temp], true, true, true)?;
 
         println!("df_output: {df_output}");
 

@@ -1,7 +1,7 @@
 use std::{env, fs::File, io::Write};
 
 use crate::{
-    Arguments, DataFrameExtension, ExprExtension, JoinResult, LazyFrameExtension,
+    Arguments, DataFrameExtension, EXPLODE_OPTIONS, ExprExtension, JoinResult, LazyFrameExtension,
     Side::{Left, Middle, Right},
     adicionar_coluna_de_aliquota_zero, adicionar_coluna_de_credito_presumido,
     adicionar_coluna_de_incidencia_monofasica,
@@ -404,7 +404,7 @@ fn analisar_situacao06a(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
             .drop_nulls() // Remove nulls da lista (se Strings podem ser nulas)
             .list()
             .unique() // Aplica a operação unique dentro de cada lista
-            .explode()
+            .explode(EXPLODE_OPTIONS)
             .alias(chaves_unificadas),
     );
 
