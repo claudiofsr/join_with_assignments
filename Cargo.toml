@@ -99,11 +99,11 @@ features = [
 version = "0.53.0"
 
 [dependencies.rust_xlsxwriter]
-# version = "0.93"
+version = "0.94"
 # https://github.com/jmcnamara/rust_xlsxwriter/blob/main/CHANGELOG.md
 # git = "https://github.com/jmcnamara/rust_xlsxwriter.git"
 # Cargo.toml, update polars version
-path = "/home/claudio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rust_xlsxwriter-0.93.0b"
+# path = "/home/claudio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rust_xlsxwriter-0.93.0b"
 
 features = [
     # "constant_memory",
