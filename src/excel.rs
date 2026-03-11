@@ -204,8 +204,7 @@ pub fn make_worksheet(df: &DataFrame, sheet_name: &str) -> JoinResult<Worksheet>
     worksheet
         .set_name(sheet_name)?
         .set_row_height(0, 64)?
-        .set_row_format(0, &FormatRegistry::header())?
-        .set_freeze_panes(1, 0)?;
+        .set_row_format(0, &FormatRegistry::header())?;
 
     let registry = FormatRegistry::new(color_saldo);
 
@@ -222,6 +221,7 @@ pub fn make_worksheet(df: &DataFrame, sheet_name: &str) -> JoinResult<Worksheet>
     if let Some(date_format) = registry.get_format(FormatKey::Date, RowStyle::Normal) {
         writer
             .set_date_format(date_format)
+            .set_freeze_panes(1, 0)
             .write_dataframe_to_worksheet(&df_to_excel, &mut worksheet, 0, 0)?;
     }
 
