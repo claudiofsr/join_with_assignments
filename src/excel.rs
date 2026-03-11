@@ -2,12 +2,15 @@ use polars::prelude::*;
 use rayon::prelude::*;
 use regex::Regex;
 use rust_xlsxwriter::{Color, Format, FormatAlign, Workbook, Worksheet};
-use std::sync::{
-    LazyLock,
-    atomic::{AtomicUsize, Ordering},
+use std::{
+    collections::HashMap,
+    sync::{
+        LazyLock,
+        atomic::{AtomicUsize, Ordering},
+    },
 };
 
-use crate::{PolarsXlsxWriter, format_dataframe};
+use crate::{JoinResult, PolarsXlsxWriter, format_dataframe};
 
 // --- Constantes Estéticas ---
 const FONT_SIZE: f64 = 11.0;
@@ -15,7 +18,7 @@ const HEADER_FONT_SIZE: f64 = 10.0;
 const MAX_NUMBER_OF_ROWS: usize = 1_000_000;
 const WIDTH_MIN: usize = 8;
 const WIDTH_MAX: usize = 140;
-const ADJUSTMENT: f64 = 1.1;
+const ADJUSTMENT: f64 = 1.12;
 
 const COLOR_SOMA: Color = Color::RGB(0xBFBFBF);
 const COLOR_DESCONTO: Color = Color::RGB(0xCCC0DA);
@@ -28,72 +31,94 @@ static REGEX_CNPJ_CPF: LazyLock<Regex> =
 
 // --- Enums e Gerenciamento de Estilos ---
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(usize)]
-enum RowStyle {
-    Normal = 0,
-    Soma = 1,
-    Desconto = 2,
-    Saldo = 3,
-}
-
-#[derive(Debug, Clone, Copy)]
-#[repr(usize)]
+/// Identificadores para tipos de formatação de coluna.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum FormatKey {
-    Default = 0,
-    Center = 1,
-    Value = 2,
-    Aliq = 3,
-    Date = 4,
+    Default,
+    Center,
+    Value,
+    Aliquota,
+    Date,
 }
 
-struct FormatGroup {
-    formats: [Format; 4],
-}
-
-impl FormatGroup {
-    fn new(base: Format, saldo_color: Color) -> Self {
-        Self {
-            formats: [
-                base.clone(),
-                base.clone().set_background_color(COLOR_SOMA),
-                base.clone().set_background_color(COLOR_DESCONTO),
-                base.clone().set_background_color(saldo_color),
-            ],
-        }
-    }
-    #[inline]
-    fn get(&self, style: RowStyle) -> &Format {
-        &self.formats[style as usize]
+impl FormatKey {
+    pub fn new() -> [(FormatKey, FormatAlign, Option<&'static str>); 5] {
+        [
+            (FormatKey::Default, FormatAlign::Left, None),
+            (FormatKey::Center, FormatAlign::Center, None),
+            (FormatKey::Value, FormatAlign::Right, Some("#,##0.00")),
+            (FormatKey::Aliquota, FormatAlign::Center, Some("0.0000")),
+            (FormatKey::Date, FormatAlign::Center, Some("dd/mm/yyyy")),
+        ]
     }
 }
 
-struct FormatRegistry {
-    groups: [FormatGroup; 5],
+/// Estados de estilo para uma linha inteira.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum RowStyle {
+    Normal,
+    Soma,
+    Desconto,
+    Saldo,
+}
+
+impl RowStyle {
+    pub fn new(color_saldo: Color) -> [(RowStyle, Option<Color>); 4] {
+        [
+            (RowStyle::Normal, None),
+            (RowStyle::Soma, Some(COLOR_SOMA)),
+            (RowStyle::Desconto, Some(COLOR_DESCONTO)),
+            (RowStyle::Saldo, Some(color_saldo)),
+        ]
+    }
+}
+
+/// Gerenciador central de formatos que mapeia (Tipo de Coluna x Estilo de Linha).
+#[derive(Debug, Default)]
+pub struct FormatRegistry {
+    matrix: HashMap<(FormatKey, RowStyle), Format>,
 }
 
 impl FormatRegistry {
-    fn new(saldo_color: Color) -> Self {
-        let base_c = Format::new()
+    /// Cria um novo registro com todos os formatos pré-calculados.
+    pub fn new(color_saldo: Color) -> Self {
+        let mut matrix = HashMap::new();
+        let keys = FormatKey::new();
+        let styles = RowStyle::new(color_saldo);
+
+        for (f_key, align, num_fmt) in keys {
+            for (r_style, color) in styles {
+                let mut f = Format::new()
+                    .set_align(align)
+                    .set_align(FormatAlign::VerticalCenter)
+                    .set_font_size(FONT_SIZE);
+
+                if let Some(fmt) = num_fmt {
+                    f = f.set_num_format(fmt);
+                }
+                if let Some(c) = color {
+                    f = f.set_background_color(c);
+                }
+
+                matrix.insert((f_key, r_style), f);
+            }
+        }
+        Self { matrix }
+    }
+
+    /// Obtém um formato específico da matriz.
+    #[inline]
+    fn get_format(&self, f_key: FormatKey, r_style: RowStyle) -> Option<&Format> {
+        self.matrix.get(&(f_key, r_style))
+    }
+
+    /// Atalho para formato de cabeçalho.
+    pub fn header() -> Format {
+        Format::new()
+            .set_text_wrap()
             .set_align(FormatAlign::Center)
             .set_align(FormatAlign::VerticalCenter)
-            .set_font_size(FONT_SIZE);
-        let base_l = Format::new()
-            .set_align(FormatAlign::Left)
-            .set_align(FormatAlign::VerticalCenter)
-            .set_font_size(FONT_SIZE);
-
-        let keys = [
-            base_l.clone(),                              // Default
-            base_c.clone(),                              // Center
-            base_l.clone().set_num_format("#,##0.00"),   // Value
-            base_c.clone().set_num_format("0.0000"),     // Aliq
-            base_c.clone().set_num_format("dd/mm/yyyy"), // Date
-        ];
-
-        Self {
-            groups: keys.map(|f| FormatGroup::new(f, saldo_color)),
-        }
+            .set_font_size(HEADER_FONT_SIZE)
     }
 }
 
@@ -108,11 +133,12 @@ impl FormatRegistry {
 /// <https://crates.io/crates/polars_excel_writer>
 ///
 /// <https://github.com/jmcnamara/polars_excel_writer/issues/4>
-pub fn write_xlsx(dfs: &[DataFrame]) -> PolarsResult<()> {
+pub fn write_xlsx(dfs: &[DataFrame]) -> JoinResult<()> {
     let output = "EFD Contribuicoes x Documentos Fiscais.xlsx";
-    println!("Write DataFrames to {output:?}\n");
+    println!("Gerando arquivo Excel: {output}\n");
 
     let mut workbook = Workbook::new();
+
     let configs = [
         (&dfs[0], "Itens de Docs Fiscais"),
         (&dfs[1], "EFD (original)"),
@@ -127,7 +153,7 @@ pub fn write_xlsx(dfs: &[DataFrame]) -> PolarsResult<()> {
             let offset = (i * MAX_NUMBER_OF_ROWS) as i64;
             let slice = df.slice(offset, MAX_NUMBER_OF_ROWS);
             let sheet_name = if i == 0 {
-                name.into()
+                name.to_string()
             } else {
                 format!("{} {}", name, i + 1)
             };
@@ -146,9 +172,12 @@ pub fn write_xlsx(dfs: &[DataFrame]) -> PolarsResult<()> {
 /// <https://crates.io/crates/polars_excel_writer>
 ///
 /// <https://github.com/jmcnamara/polars_excel_writer/issues/4>
-pub fn make_worksheet(df: &DataFrame, sheet_name: &str) -> PolarsResult<Worksheet> {
+pub fn make_worksheet(df: &DataFrame, sheet_name: &str) -> JoinResult<Worksheet> {
     // Adicioanr Descrição de  CST apenas na aba de "Itens de Docs Fiscais"
     let is_itens = sheet_name.contains("Itens de Docs Fiscais");
+    let is_auditoria = sheet_name.contains("auditoria");
+
+    // Transformações iniciais do DataFrame
     let df_formated: DataFrame = format_dataframe(df, is_itens)?;
     let df_to_excel: DataFrame = format_to_excel(&df_formated)?;
 
@@ -157,58 +186,49 @@ pub fn make_worksheet(df: &DataFrame, sheet_name: &str) -> PolarsResult<Workshee
     let mut worksheet = Worksheet::new();
 
     // 1. Determinação de Cores e Registro
-    let saldo_color = if sheet_name.contains("auditoria") {
+    let color_saldo = if is_auditoria {
         COLOR_SALDO_GREEN
     } else {
         COLOR_SALDO_RED
     };
-    let registry = FormatRegistry::new(saldo_color);
-
-    // --- AJUSTE: Formato de Data para o Writer ---
-    let date_format = registry.groups[FormatKey::Date as usize]
-        .get(RowStyle::Normal)
-        .clone();
 
     let headers = df_to_excel.get_column_names();
 
-    // 2. Estética do Cabeçalho
-    let header_fmt = Format::new()
-        .set_align(FormatAlign::Center)
-        .set_align(FormatAlign::VerticalCenter)
-        .set_text_wrap()
-        .set_font_size(HEADER_FONT_SIZE);
+    // Mapeamento de tipos de coluna (cacheado para evitar re-match em cada linha)
+    let col_configs: Vec<FormatKey> = headers
+        .iter()
+        .map(|&name| get_format_key(name, is_itens))
+        .collect();
 
+    // 1. Setup básico da Worksheet
     worksheet
         .set_name(sheet_name)?
         .set_row_height(0, 64)?
-        .set_row_format(0, &header_fmt)?;
+        .set_row_format(0, &FormatRegistry::header())?
+        .set_freeze_panes(1, 0)?;
 
-    // 3. Formatação Base das Colunas (Alignment e NumFormat)
-    // Aplicamos o formato "Normal" em nível de coluna antes de escrever os dados
-    for (i, &name) in headers.iter().enumerate() {
-        let key = get_format_key(name.as_str(), is_itens);
-        worksheet.set_column_format(
-            i as u16,
-            registry.groups[key as usize].get(RowStyle::Normal),
-        )?;
+    let registry = FormatRegistry::new(color_saldo);
+
+    // 2. Aplicar Formatação Base nas Colunas
+    for (i, &f_key) in col_configs.iter().enumerate() {
+        if let Some(fmt) = registry.get_format(f_key, RowStyle::Normal) {
+            worksheet.set_column_format(i as u16, fmt)?;
+        }
     }
 
-    // 4. Escrita dos Dados
+    // 3. Escrita dos Dados via PolarsXlsxWriter
     let mut writer = PolarsXlsxWriter::new();
-    writer
-        .set_date_format(date_format)
-        .set_freeze_panes(1, 0)
-        .write_dataframe_to_worksheet(&df_to_excel, &mut worksheet, 0, 0)?;
 
-    // 5. Aplicar Cores Condicionais (Linhas de Soma/Saldo)
-    let col_groups: Vec<&FormatGroup> = headers
-        .iter()
-        .map(|h| &registry.groups[get_format_key(h.as_str(), is_itens) as usize])
-        .collect();
+    if let Some(date_format) = registry.get_format(FormatKey::Date, RowStyle::Normal) {
+        writer
+            .set_date_format(date_format)
+            .write_dataframe_to_worksheet(&df_to_excel, &mut worksheet, 0, 0)?;
+    }
 
-    apply_conditional_styles(&df_to_excel, &mut worksheet, &col_groups)?;
+    // 4. Estilos Condicionais (Linhas de Soma/Saldo)
+    apply_conditional_styles(&df_to_excel, &mut worksheet, &registry, &col_configs)?;
 
-    // 6. Auto-ajuste de Colunas
+    // 5. Ajuste de Largura (Funcional e Paralelo)
     auto_fit(&df_to_excel, &mut worksheet)?;
 
     Ok(worksheet)
@@ -216,6 +236,7 @@ pub fn make_worksheet(df: &DataFrame, sheet_name: &str) -> PolarsResult<Workshee
 
 // --- Funções Auxiliares de Lógica ---
 
+/// Identifica a chave de formatação baseada no nome da coluna.
 fn get_format_key(name: &str, is_itens_context: bool) -> FormatKey {
     // Aplica alinhamento à esquerda (Default) para CST apenas no contexto de Itens.
     // Note o uso de 'is_itens_context' como guarda (guard clause).
@@ -251,7 +272,7 @@ fn get_format_key(name: &str, is_itens_context: bool) -> FormatKey {
         || name.contains("Alíquota de PIS/PASEP")
         || name.contains("Alíquota de COFINS")
     {
-        return FormatKey::Aliq;
+        return FormatKey::Aliquota;
     }
 
     // Regras de Datas
@@ -266,11 +287,13 @@ fn get_format_key(name: &str, is_itens_context: bool) -> FormatKey {
     FormatKey::Default
 }
 
+/// Aplica cores de fundo em linhas inteiras baseado no conteúdo de colunas específicas.
 fn apply_conditional_styles(
     df: &DataFrame,
     worksheet: &mut Worksheet,
-    groups: &[&FormatGroup],
-) -> PolarsResult<()> {
+    registry: &FormatRegistry,
+    col_keys: &[FormatKey],
+) -> JoinResult<()> {
     // Localiza a coluna que define o comportamento da linha (Natureza)
     let nature_idx = df
         .get_column_names()
@@ -283,23 +306,30 @@ fn apply_conditional_styles(
 
     let ca = df.columns()[nature_idx].as_materialized_series().str()?;
 
-    ca.into_iter().enumerate().for_each(|(i, opt_val)| {
-        let style = match opt_val {
-            Some(s) if s.contains("(Soma)") => RowStyle::Soma,
-            Some(s) if s.contains("Crédito Disponível após Descontos") => RowStyle::Desconto,
-            Some(s) if s.contains("Saldo de Crédito Passível") => RowStyle::Saldo,
-            _ => RowStyle::Normal,
-        };
+    ca.into_iter()
+        .enumerate()
+        .try_for_each(|(i, opt_val)| -> JoinResult<()> {
+            let style = match opt_val {
+                Some(s) if s.contains("(Soma)") => RowStyle::Soma,
+                Some(s) if s.contains("Crédito Disponível após Descontos") => RowStyle::Desconto,
+                Some(s) if s.contains("Saldo de Crédito Passível") => RowStyle::Saldo,
+                _ => RowStyle::Normal,
+            };
 
-        if style != RowStyle::Normal {
-            let row_idx = (i + 1) as u32;
-            for (col_idx, group) in groups.iter().enumerate() {
-                // Sobrescreve o formato da célula para aplicar a cor de fundo,
-                // mantendo o alinhamento/formato numérico da coluna.
-                let _ = worksheet.set_cell_format(row_idx, col_idx as u16, group.get(style));
+            if style != RowStyle::Normal {
+                let row_idx = (i + 1) as u32;
+                for (col_idx, &f_key) in col_keys.iter().enumerate() {
+                    if let Some(fmt) = registry.get_format(f_key, style) {
+                        // Sobrescreve o formato da célula para aplicar a cor de fundo,
+                        // mantendo o alinhamento/formato numérico da coluna.
+                        worksheet.set_cell_format(row_idx, col_idx as u16, fmt)?;
+                    }
+                }
             }
-        }
-    });
+
+            Ok(())
+        })?;
+
     Ok(())
 }
 
@@ -346,7 +376,7 @@ fn auto_fit(df: &DataFrame, worksheet: &mut Worksheet) -> PolarsResult<()> {
 
     for (i, atomic) in widths.into_iter().enumerate() {
         let final_width = (atomic.load(Ordering::Relaxed) as f64) * ADJUSTMENT;
-        let _ = worksheet.set_column_width(i as u16, final_width);
+        worksheet.set_column_width(i as u16, final_width)?;
     }
     Ok(())
 }

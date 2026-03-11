@@ -84,6 +84,10 @@ pub enum JoinError {
     #[error("TOML error: {0}")]
     Toml(#[from] toml::ser::Error),
 
+    // Adicione esta variante:
+    #[error("Excel error: {0}")]
+    Xlsx(#[from] rust_xlsxwriter::XlsxError),
+
     // A catch-all for other, less specific errors not covered by specific variants.
     // Uses a String to describe the error. Consider using this sparingly.
     #[error("Other error: {0}")]
