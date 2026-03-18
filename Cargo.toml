@@ -33,7 +33,7 @@ claudiofsr_lib = "0.19"
 colored = "3.1"
 confy = "2.0"
 execution-time = "0.3"
-pathfinding = "4.14"
+pathfinding = "4.15"
 rayon = "1.11"
 regex = "1.12"
 serde = { version = "1.0", features = [ "derive" ] }
@@ -43,7 +43,7 @@ thiserror = "2.0"
 toml = "0.9"
 
 [dependencies.clap]
-version = "4.5"
+version = "4.6"
 features = [
     "derive",
     "color",
@@ -115,7 +115,7 @@ features = [
 
 [dev-dependencies]
 # Dependencies ONLY needed for testing
-tempfile = "3.25"
+tempfile = "3.27"
 
 # Package release:
 # Cross-compile a Rust application from Linux to Windows
