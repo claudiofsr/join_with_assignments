@@ -156,8 +156,8 @@ fn analisar_situacao03(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     let origem_do_item: &str = coluna(Right, "origem"); // "Registro de Origem do Item : NF Item (Todos)"
     let regime_tributario: &str = coluna(Right, "regime_tributario"); // "CRT : NF (Todos)"
 
-    // let aliq_pis: &str = coluna(Right, "aliq_pis");
-    // let aliq_cof: &str = coluna(Right, "aliq_cof");
+    let aliq_pis: &str = coluna(Right, "aliq_pis");
+    let aliq_cof: &str = coluna(Right, "aliq_cof");
 
     let columns: Vec<&str> = vec![
         "Alíquota Zero",
@@ -182,7 +182,7 @@ fn analisar_situacao03(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     let cfop_de_insumos: Expr = col(cfop).is_in(literal_series, true);
 
     // Alíquotas de PIS/PASEP e de COFINS iguais a Zero
-    // let aliquotas_zero: Expr = col(aliq_pis).eq(lit(0)).and(col(aliq_cof).eq(lit(0)));
+    let aliquotas_zero: Expr = col(aliq_pis).eq(lit(0)).and(col(aliq_cof).eq(lit(0)));
 
     let filter: Expr = operacoes_de_credito()?
         .and(cst_50_a_56()?) // Excluir crédito Presumido da Agroindústria
@@ -192,8 +192,8 @@ fn analisar_situacao03(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
                 .or(optante_do_simples_nacional().not()),
         )
         .and(col(origem_do_item).is_null().or(nfe))
-        .and(col(cfop).is_null().or(cfop_de_insumos.not()));
-    //.and(aliquotas_zero);
+        .and(col(cfop).is_null().or(cfop_de_insumos.not()))
+        .and(aliquotas_zero);
 
     // Adicionar coluna temporária
     let lazyframe: LazyFrame = lazyframe
@@ -221,6 +221,7 @@ fn analisar_situacao03(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
             col(glosar),
             lit("Situação 03:"),
             lit("Aquisição de bens ou serviços não sujeitos ao pagamento da contribuição."),
+            lit("Verificado alíquotas de PIS/PASEP e de COFINS iguais a Zero."),
             lit(
                 "De acordo com o inciso II do § 2º do art. 3º das Leis 10.637/2002 e 10.833/2003, não dará direito",
             ),
