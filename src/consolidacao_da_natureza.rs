@@ -611,7 +611,8 @@ fn analisar_debitos_omitidos(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
             col("Trimestre do Período de Apuração"),
             col("Mês do Período de Apuração"),
             col("Tipo de Operação"),
-            col("Tipo de Crédito"),
+            //col("Tipo de Crédito"),
+            lit(1).alias("Tipo de Crédito"), // TipoCredito::AliquotaBasica = 1
             col("Código de Situação Tributária (CST)"),
             lit(NULL).cast(DataType::String).alias("Registro"),
             lit(NULL)
