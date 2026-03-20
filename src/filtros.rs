@@ -427,7 +427,7 @@ pub fn receita_bruta_cumulativa() -> PolarsResult<Expr> {
 }
 
 // Retain only credit entries (50 <= CST <= 66)
-pub fn apply_filter(data_frame: DataFrame, args: &Arguments) -> Result<DataFrame, PolarsError> {
+pub fn apply_filter(data_frame: DataFrame, args: &Arguments) -> PolarsResult<DataFrame> {
     // Opções da coluna "tipo_operacao":
     // 1: Entrada, 2: Saída, 3 e 4: Ajustes, 5 e 6: Descontos, 7: Detalhamento.
     // let tipo_operacao: &str = coluna(Left, "tipo_operacao");
@@ -436,8 +436,13 @@ pub fn apply_filter(data_frame: DataFrame, args: &Arguments) -> Result<DataFrame
         data_frame
             .lazy()
             //.filter(csts([63u32]))
+            .filter(entrada_de_credito()?.or(operacoes_de_entrada_ou_saida()?.not()))
+            .collect()
+    } else if let Some(true) = args.excluir_saidas {
+        data_frame
+            .lazy()
+            //.filter(csts([63u32]))
             .filter(operacoes_de_saida()?.not())
-            //.filter(entrada_de_credito().or(operacoes_de_entrada_ou_saida().not()))
             .collect()
     } else {
         Ok(data_frame)

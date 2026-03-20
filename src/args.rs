@@ -105,6 +105,14 @@ pub struct Arguments {
     #[arg(short('f'), long, required = false)]
     pub date_final: Option<u32>,
 
+    /// Exclui itens de operações de SAÍDA dos arquivos finais.
+    ///
+    /// Ou seja, não imprimir nos arquivos finais as operações em que:
+    ///
+    /// Tipo de Operação = Saídas (01 <= CST <= 49)
+    #[arg(short('e'), long, required = false)]
+    pub excluir_saidas: Option<bool>,
+
     /// Apply filter: Retain only credit entries (50 <= CST <= 66)
     ///
     /// Reter apenas operações de crédito
@@ -112,16 +120,16 @@ pub struct Arguments {
     /// Ou seja, imprimir nos arquivos finais itens de operações com alguna
     ///
     /// Natureza da Base de Cálculo.
-    #[arg(short, long, required = false)]
+    #[arg(short('o'), long, required = false)]
     pub operacoes_de_creditos: Option<bool>,
 
     /// Print CSV files
     #[arg(short('c'), long, required = false)]
     pub print_csv: Option<bool>,
 
-    /// Print Excel files
-    #[arg(short('e'), long, required = false, default_value = "true")]
-    pub print_excel: Option<bool>,
+    /// Print XLSX (Excel) files
+    #[arg(short('x'), long, required = false, default_value = "true")]
+    pub print_xlsx: Option<bool>,
 
     /// Print PARQUET files
     #[arg(short('p'), long, required = false)]
@@ -148,9 +156,10 @@ impl default::Default for Arguments {
             delimiter_output: Some(';'),
             date_start: None,
             date_final: None,
+            excluir_saidas: Some(false),
             operacoes_de_creditos: Some(false),
             print_csv: Some(false),
-            print_excel: Some(true),
+            print_xlsx: Some(true),
             print_parquet: Some(false),
             remove_null_columns: Some(true),
             verbose: Some(true),
@@ -233,9 +242,10 @@ mod tests {
             delimiter_output: Some(';'),
             date_start: None,
             date_final: None,
+            excluir_saidas: Some(false),
             operacoes_de_creditos: Some(false),
             print_csv: Some(false),
-            print_excel: Some(true),
+            print_xlsx: Some(true),
             print_parquet: Some(false),
             remove_null_columns: Some(true),
             verbose: Some(true),
@@ -250,9 +260,10 @@ mod tests {
             delimiter_input_1: Some('|'),
             delimiter_input_2: Some(';'),
             delimiter_output: Some(';'),
+            excluir_saidas: Some(false),
             operacoes_de_creditos: Some(false),
             print_csv: Some(false),
-            print_excel: Some(true),
+            print_xlsx: Some(true),
             print_parquet: Some(false),
             remove_null_columns: Some(true),
             verbose: Some(true),

@@ -102,7 +102,7 @@ fn main() -> JoinResult<()> {
         }
     }
 
-    if args.print_excel == Some(true) {
+    if args.print_xlsx == Some(true) {
         write_xlsx(&dataframes)?;
     }
 
