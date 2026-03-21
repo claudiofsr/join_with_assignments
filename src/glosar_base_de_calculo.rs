@@ -221,7 +221,9 @@ fn analisar_situacao03(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
             col(glosar),
             lit("Situação 03:"),
             lit("Aquisição de bens ou serviços não sujeitos ao pagamento da contribuição."),
-            lit("Verificado alíquotas de PIS/PASEP e de COFINS iguais a Zero."),
+            lit(
+                "Conforme NFe/CTe de aquisição, foram constatadas alíquotas de PIS/PASEP e de COFINS iguais a Zero.",
+            ),
             lit(
                 "De acordo com o inciso II do § 2º do art. 3º das Leis 10.637/2002 e 10.833/2003, não dará direito",
             ),
