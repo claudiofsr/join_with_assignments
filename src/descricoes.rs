@@ -128,6 +128,7 @@ pub fn descricao_do_tipo_de_operacao(col: Column) -> PolarsResult<Column> {
 /// Mnemônicos são usados para variantes com mais de 20 caracteres.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TipoCredito {
+    DebitoOmitido = 0,
     AliquotaBasica = 1,
     AliquotasDiferenciadas = 2,
     AliquotaUnidade = 3,
@@ -147,6 +148,7 @@ impl TipoCredito {
     /// caso contrário, retorna `None`.
     pub const fn from_i64(v: i64) -> Option<Self> {
         match v {
+            0 => Some(Self::DebitoOmitido),
             1 => Some(Self::AliquotaBasica),
             2 => Some(Self::AliquotasDiferenciadas),
             3 => Some(Self::AliquotaUnidade),
@@ -165,6 +167,7 @@ impl TipoCredito {
     #[rustfmt::skip]
     pub const fn as_str(&self) -> &'static str {
         match self {
+            Self::DebitoOmitido          => "Débito Omitido",
             Self::AliquotaBasica         => "Alíquota Básica",
             Self::AliquotasDiferenciadas => "Alíquotas Diferenciadas",
             Self::AliquotaUnidade        => "Alíquota por Unidade de Produto",

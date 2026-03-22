@@ -612,7 +612,7 @@ fn analisar_debitos_omitidos(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
             col("Mês do Período de Apuração"),
             col("Tipo de Operação"),
             //col("Tipo de Crédito"),
-            lit(1).alias("Tipo de Crédito"), // TipoCredito::AliquotaBasica = 1
+            lit(0).alias("Tipo de Crédito"), // TipoCredito::DebitoOmitido = 0,
             col("Código de Situação Tributária (CST)"),
             lit(NULL).cast(DataType::String).alias("Registro"),
             lit(NULL)
@@ -706,14 +706,9 @@ fn adicionar_valores_trimestrais(
     lazyframe: LazyFrame,
     union_args: UnionArgs,
 ) -> JoinResult<LazyFrame> {
-    let natureza: &str = coluna(Left, "natureza");
-    let series: Series = [90, 91, 95].iter().collect();
-    let literal_series: Expr = series.implode()?.into_series().lit();
-    let debitos_omitidos: Expr = col(natureza).is_in(literal_series, true);
-
     let lazyframe_trimestral: LazyFrame = lazyframe
         .clone()
-        .filter(col("Tipo de Crédito").is_not_null().or(debitos_omitidos))
+        .filter(col("Tipo de Crédito").is_not_null())
         .group_by([
             col("CNPJ Base"),
             col("Ano do Período de Apuração"),
@@ -802,73 +797,6 @@ fn adicionar_linhas_de_soma_da_bc_dos_creditos(
 fn apuracao(aliquota: &str, valor: &str) -> Expr {
     (col(aliquota) * col(valor) / lit(100)).alias(valor)
 }
-
-/*
-fn adicionar_linhas_de_apuracao(
-    lazyframe: LazyFrame,
-    union_args: UnionArgs,
-) -> JoinResult<LazyFrame> {
-    let cst_col: &str = coluna(Left, "cst");
-    let aliq_pis: &str = coluna(Left, "aliq_pis");
-    let aliq_cof: &str = coluna(Left, "aliq_cof");
-    let natureza: &str = coluna(Left, "natureza");
-
-    let colunas_valores = [
-        "Valor da Base de Cálculo das Contribuições",
-        "RBNC_Tributada",
-        "RBNC_NTributada",
-        "RBNC_Exportação",
-        "RecBrutaNCumulativa",
-        "RecBrutaCumulativa",
-        "ReceitaBrutaTotal",
-    ];
-
-    // Configurações: (Alíquota Ativa, Alíquota Nula, Nat Crédito, Nat Débito, CST Sort)
-    let tributos_config = [
-        (aliq_pis, aliq_cof, 201i64, 91i64, 210i64), // PIS
-        (aliq_cof, aliq_pis, 205i64, 95i64, 250i64), // COFINS
-    ];
-
-    let mut partes = vec![lazyframe.clone()];
-
-    for (aliq_ativa, aliq_nula, nat_credito, nat_debito, cst_sort) in tributos_config {
-        // 1. Gerar linhas de Crédito (Baseado no CST 200)
-        let credito = lazyframe.clone()
-            .filter(col(cst_col).eq(lit(200)))
-            .with_columns([
-                lit(cst_sort).alias(cst_col),
-                lit(NULL).cast(DataType::Float64).alias(aliq_nula),
-                lit(nat_credito).alias(nat_col).cast(DataType::Int64),
-            ])
-            .with_columns(
-                colunas_valores
-                    .iter()
-                    .map(|&col_name| apuracao(aliq_ativa, col_name))
-                    .collect::<Vec<_>>()
-            );
-
-        // 2. Gerar linhas de Débito (Baseado na Natureza 90)
-        let debito = lazyframe.clone()
-            .filter(col(nat_col).eq(lit(90)))
-            .with_columns([
-                lit(NULL).cast(DataType::Float64).alias(aliq_nula),
-                lit(nat_debito).alias(nat_col).cast(DataType::Int64),
-            ])
-            .with_columns(
-                colunas_valores
-                    .iter()
-                    .map(|&col_name| apuracao(aliq_ativa, col_name))
-                    .collect::<Vec<_>>()
-            );
-
-        partes.push(credito);
-        partes.push(debito);
-    }
-
-    // Unifica o dataframe original com as 4 novas partes geradas (2 de PIS, 2 de COFINS)
-    Ok(concat(partes, union_args)?)
-}
-*/
 
 fn adicionar_linhas_de_apuracao_de_pis(
     lazyframe: LazyFrame,
@@ -1198,9 +1126,11 @@ fn ordenar_colunas(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     let tipo_cred: &str = coluna(Left, "tipo_cred");
 
     // 1. Criamos uma lógica de "ranking" apenas para a ordenação
-    let ordem_tipo_de_credito = when(col(tipo_operacao).eq(lit(2))) // Se for Saída (2)
-        .then(lit(0)) // Atribua 0 (menor valor)
-        .otherwise(col(tipo_cred)); // Senão, mantenha o original (1, 2, 3 ...)
+    let ordem_tipo_de_credito = when(col(tipo_operacao).eq(lit(2)).and(col(tipo_cred).is_null())) // Se for Saída (2)
+        .then(lit(0.0)) // Atribua 0 (menor valor)
+        .when(col(tipo_cred).eq(lit(0))) // TipoCredito::DebitoOmitido = 0
+        .then(lit(0.1))
+        .otherwise(col(tipo_cred)); // Senão, mantenha o original (1, 2, 3 ...)    
 
     let lazy_sorted: LazyFrame = lazyframe
         .sort_by_exprs(
