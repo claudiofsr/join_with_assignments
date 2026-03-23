@@ -69,10 +69,18 @@ pub fn glosar_bc(dataframe: &DataFrame, args: &Arguments) -> JoinResult<DataFram
         .sort_by_columns(None)?)
 }
 
-/// Código de Regime Tributário (CRT) igual a 1
-fn optante_do_simples_nacional() -> Expr {
+/// Código de Regime Tributário (CRT) igual a 1 ou 4 com direito a crédito
+fn optante_do_simples_nacional_ou_mei() -> Expr {
     let regime_tributario: &str = coluna(Right, "regime_tributario"); // "CRT : NF (Todos)"
-    col(regime_tributario).eq(lit(1))
+
+    let inner_series = Series::from_iter([1, 4]);
+    let list_series: Series = Series::new(
+        "new".into(),       // Final Series name
+        vec![inner_series], // Vector with one Series => List Series with one row
+    );
+
+    // Verifica se o valor está na lista [1, 4]
+    col(regime_tributario).is_in(lit(list_series), true)
 }
 
 fn analisar_situacao01(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
@@ -189,7 +197,7 @@ fn analisar_situacao03(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
         .and(
             col(regime_tributario)
                 .is_null()
-                .or(optante_do_simples_nacional().not()),
+                .or(optante_do_simples_nacional_ou_mei().not()),
         )
         .and(col(origem_do_item).is_null().or(nfe))
         .and(col(cfop).is_null().or(cfop_de_insumos.not()))
@@ -285,7 +293,7 @@ fn analisar_situacao04(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     let valor_justo: Expr = col(valor_bc) - col(valor_cte_vinculado);
 
     let situacao_04: Expr = operacoes_de_credito()?
-        .and(optante_do_simples_nacional().not())
+        .and(optante_do_simples_nacional_ou_mei().not())
         .and(valores_iguais)
         .and(operacao_de_compra)
         .and(tomador_remetente)
@@ -1413,6 +1421,48 @@ mod tests_glosar_base_de_calculo {
                 Some(52.07)
             ]
         );
+
+        Ok(())
+    }
+
+    #[test]
+    /// cargo test -- --show-output identificar_elementos_em_uma_lista
+    fn identificar_elementos_em_uma_lista() -> PolarsResult<()> {
+        let regime_tributario: &str = coluna(Right, "regime_tributario"); // "CRT : NF (Todos)"
+
+        // 1. Construir o DataFrame inicial
+        let df = df! {
+            // coluna "CRT" com valores de 1 a 4
+            regime_tributario => [Some(1), Some(2), Some(3), Some(4), None],
+            "Letras" => ["a", "b", "c", "d", "e"]
+        }?;
+
+        println!("df: {}", df);
+
+        let simples_nacional = "eh_simples_nacional";
+
+        // 2. Usar o Lazy API para adicionar a coluna condicional
+        let df_resultado = df
+            .lazy() // Entra no modo Lazy para melhor performance e sintaxe
+            .with_column(
+                optante_do_simples_nacional_ou_mei().alias(simples_nacional), // Adiciona a coluna com um nome amigável
+            )
+            .collect()?; // Executa as operações e volta para um DataFrame comum
+
+        // 3. Imprimir o resultado
+        println!("df_resultado: {}", df_resultado);
+
+        let col_condicao: Vec<bool> = df_resultado
+            .column(simples_nacional)?
+            .bool()?
+            .iter()
+            .flatten()
+            .collect();
+
+        println!("col_condicao: {:?}", col_condicao);
+
+        // Assert that the new column exists
+        assert_eq!(col_condicao, [true, false, false, true, false]);
 
         Ok(())
     }

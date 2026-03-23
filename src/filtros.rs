@@ -162,7 +162,7 @@ Get series from array
 use polars::error::PolarsResult;
 use join_with_assignments::get_series;
 
-fn main() -> PolarsResult<()> {
+fn new_series() -> PolarsResult<()> {
 
     let array: [u32; 4] = [1, 5, 8, 9];
     let series = get_series(array);
