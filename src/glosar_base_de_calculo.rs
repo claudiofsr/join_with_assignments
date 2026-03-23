@@ -1460,8 +1460,6 @@ mod tests_glosar_base_de_calculo {
             .collect();
 
         println!("col_condicao: {:?}", col_condicao);
-
-        // Assert that the new column exists
         assert_eq!(col_condicao, [true, false, false, true, false]);
 
         Ok(())
