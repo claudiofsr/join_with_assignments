@@ -42,7 +42,16 @@ Example of use:
     bdt schema df_consolidacao_natureza_da_bcalc.parquet
     bdt count --table df_itens_de_docs_fiscais_result.parquet
 */
+
 fn main() -> JoinResult<()> {
+    if let Err(error) = run() {
+        eprintln!("Operation failed!\n{}", error);
+        std::process::exit(1); // Explicitly exit with failure code
+    }
+    Ok(())
+}
+
+fn run() -> JoinResult<()> {
     clear_terminal_screen();
     configure_the_environment();
     show_sysinfo();
