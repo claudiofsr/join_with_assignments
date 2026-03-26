@@ -2,9 +2,9 @@ use polars::{datatypes::DataType, prelude::*};
 use std::ops::Neg;
 
 use crate::{
-    ExprExtension, JoinResult, LazyFrameExtension, Side::Left, cfop_de_exportacao, coluna,
-    cst_50_a_66, cst_de_receita_bruta, csts, csts_nao_tributados, entrada_de_credito,
-    get_cnpj_base_expr, operacoes_de_ajustes_ou_descontos, operacoes_de_saida,
+    ExprExtension, JoinResult, LazyFrameExtension, Side::Left, ToLiteralListExpr,
+    cfop_de_exportacao, coluna, cst_50_a_66, cst_de_receita_bruta, csts, csts_nao_tributados,
+    entrada_de_credito, get_cnpj_base_expr, operacoes_de_ajustes_ou_descontos, operacoes_de_saida,
     receita_bruta_cumulativa, receita_bruta_nao_cumulativa, receita_nao_nula,
     saida_de_receita_bruta,
 };
@@ -280,7 +280,7 @@ fn groupby_and_agg_values(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     let condition_f = col("RecBrutaTotal").or(operacoes_de_ajustes_ou_descontos()?);
 
     let series = Series::new(reg.into(), ["M100", "1100"]);
-    let literal_series: Expr = series.implode()?.into_series().lit();
+    let literal_series: Expr = series.to_list_expr()?;
     //let pattern: Expr = lit(r"(i?)M100|1100"); // regex
 
     let registros_selecionados = col(reg).is_in(literal_series, true);
@@ -980,13 +980,13 @@ fn adicionar_linhas_credito_apos_descontos(
     // PIS: Apurado (201) + Ajustes/Descontos (31, 41, 51, 61)
     let nat_pis = [31, 41, 51, 61, 91, 201, 211];
     let series_pis = Series::new(natureza.into(), nat_pis);
-    let literal_series_pis: Expr = series_pis.implode()?.into_series().lit();
+    let literal_series_pis: Expr = series_pis.to_list_expr()?;
     let filter_pis: Expr = col(natureza).is_in(literal_series_pis, true);
 
     // COFINS: Apurado (205) + Ajustes/Descontos (35, 45, 55, 65)
     let nat_cofins = [35, 45, 55, 65, 95, 205, 215];
     let series_cofins = Series::new(natureza.into(), nat_cofins);
-    let literal_series_cofins: Expr = series_cofins.implode()?.into_series().lit();
+    let literal_series_cofins: Expr = series_cofins.to_list_expr()?;
     let filter_cofins: Expr = col(natureza).is_in(literal_series_cofins, true);
 
     let criar_linha_disponivel = |filtro: Expr, novo_id: i64| {
@@ -1032,12 +1032,15 @@ fn dicionar_saldo_passivel_de_ressarcimento(
     let aliq_pis: &str = coluna(Left, "aliq_pis");
     let aliq_cof: &str = coluna(Left, "aliq_cof");
 
+    let series = Series::new(nat_col.into(), &[221, 225]);
+    let literal_series: Expr = series.to_list_expr()?;
+
     // Filtramos as naturezas de "Crédito Disponível" (PIS: 221 e COFINS: 225)
     // e mapeamos para as naturezas de "Saldo Passível de Ressarcimento" (301 e 305)
     let saldos: LazyFrame = lazyframe
         .clone()
         .filter(cst_50_a_66()?.not())
-        .filter(col(nat_col).is_in(lit(Series::new(nat_col.into(), &[221, 225])), true))
+        .filter(col(nat_col).is_in(literal_series, true))
         .with_columns([
             // Mapeamento dinâmico da Natureza de destino
             when(col(nat_col).eq(lit(221)))

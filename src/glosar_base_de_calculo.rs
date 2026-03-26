@@ -3,7 +3,7 @@ use std::{env, fs::File, io::Write};
 use crate::{
     Arguments, DataFrameExtension, EXPLODE_OPTIONS, ExprExtension, JoinResult, LazyFrameExtension,
     Side::{Left, Middle, Right},
-    adicionar_coluna_de_aliquota_zero, adicionar_coluna_de_credito_presumido,
+    ToLiteralListExpr, adicionar_coluna_de_aliquota_zero, adicionar_coluna_de_credito_presumido,
     adicionar_coluna_de_incidencia_monofasica,
     adicionar_coluna_periodo_de_apuracao_inicial_e_final, coluna, configure_the_environment,
     cst_50_a_56, equal, format_list_dates, operacoes_de_credito, unequal,
@@ -70,17 +70,14 @@ pub fn glosar_bc(dataframe: &DataFrame, args: &Arguments) -> JoinResult<DataFram
 }
 
 /// Código de Regime Tributário (CRT) igual a 1 ou 4 com direito a crédito
-fn optante_do_simples_nacional_ou_mei() -> Expr {
+fn optante_do_simples_nacional_ou_mei() -> JoinResult<Expr> {
     let regime_tributario: &str = coluna(Right, "regime_tributario"); // "CRT : NF (Todos)"
 
-    let inner_series = Series::from_iter([1, 4]);
-    let list_series: Series = Series::new(
-        "new".into(),       // Final Series name
-        vec![inner_series], // Vector with one Series => List Series with one row
-    );
+    let series = Series::from_iter([1, 4]);
+    let literal_series: Expr = series.to_list_expr()?;
 
     // Verifica se o valor está na lista [1, 4]
-    col(regime_tributario).is_in(lit(list_series), true)
+    Ok(col(regime_tributario).is_in(literal_series, true))
 }
 
 fn analisar_situacao01(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
@@ -184,7 +181,7 @@ fn analisar_situacao03(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     ]
     .concat();
     let series: Series = cfop_valido.iter().collect();
-    let literal_series: Expr = series.implode()?.into_series().lit();
+    let literal_series: Expr = series.to_list_expr()?;
 
     // Estes serviços são insumos com direito à crédito das Contribuições que devem ser excluídos das glosas.
     let cfop_de_insumos: Expr = col(cfop).is_in(literal_series, true);
@@ -197,7 +194,7 @@ fn analisar_situacao03(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
         .and(
             col(regime_tributario)
                 .is_null()
-                .or(optante_do_simples_nacional_ou_mei().not()),
+                .or(optante_do_simples_nacional_ou_mei()?.not()),
         )
         .and(col(origem_do_item).is_null().or(nfe))
         .and(col(cfop).is_null().or(cfop_de_insumos.not()))
@@ -293,7 +290,7 @@ fn analisar_situacao04(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     let valor_justo: Expr = col(valor_bc) - col(valor_cte_vinculado);
 
     let situacao_04: Expr = operacoes_de_credito()?
-        .and(optante_do_simples_nacional_ou_mei().not())
+        .and(optante_do_simples_nacional_ou_mei()?.not())
         .and(valores_iguais)
         .and(operacao_de_compra)
         .and(tomador_remetente)
@@ -762,7 +759,7 @@ fn analisar_situacao07(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     ]
     .concat();
     let series: Series = cfop_valido.iter().collect();
-    let literal_series: Expr = series.implode()?.into_series().lit();
+    let literal_series: Expr = series.to_list_expr()?;
 
     // Estes serviços são insumos com direito à crédito das Contribuições que devem ser excluídos das glosas.
     let cfop_de_insumos: Expr = col(columns[1])
@@ -1002,7 +999,7 @@ fn analisar_situacao12(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     .map(|doc| doc.to_string())
     .collect();
 
-    let literal_series: Expr = series.implode()?.into_series().lit();
+    let literal_series: Expr = series.to_list_expr()?;
 
     let chave_inexistente: Expr = col(chave).is_in(literal_series, true);
 
@@ -1043,7 +1040,7 @@ fn analisar_situacao13(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     .iter()
     .collect();
 
-    let literal_series: Expr = series.implode()?.into_series().lit();
+    let literal_series: Expr = series.to_list_expr()?;
 
     let linhas: Expr = col(num_linha).is_in(literal_series, true);
 
@@ -1291,7 +1288,7 @@ mod tests_glosar_base_de_calculo {
         ]
         .concat();
         let series: Series = cfop_valido.iter().collect();
-        let literal_series: Expr = series.implode()?.into_series().lit();
+        let literal_series: Expr = series.to_list_expr()?;
 
         // Estes serviços são insumos com direito à crédito das Contribuições que devem ser excluídos das glosas.
         let cfop_de_insumos: Expr = col(cfop).is_in(literal_series, true);
@@ -1445,7 +1442,7 @@ mod tests_glosar_base_de_calculo {
         let df_resultado = df
             .lazy() // Entra no modo Lazy para melhor performance e sintaxe
             .with_column(
-                optante_do_simples_nacional_ou_mei().alias(simples_nacional), // Adiciona a coluna com um nome amigável
+                optante_do_simples_nacional_ou_mei()?.alias(simples_nacional), // Adiciona a coluna com um nome amigável
             )
             .collect()?; // Executa as operações e volta para um DataFrame comum
 

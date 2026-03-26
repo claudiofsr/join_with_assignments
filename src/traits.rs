@@ -227,6 +227,7 @@ pub trait ToLiteralListExpr {
 
 impl ToLiteralListExpr for Series {
     fn to_list_expr(&self) -> PolarsResult<Expr> {
+        /*
         // 1. Implode the Series into a single ChunkedArray<ListType> (height 1).
         let imploded_chunked_array = self.implode()?; // implode returns PolarsResult, propagate error with `?`
 
@@ -238,6 +239,9 @@ impl ToLiteralListExpr for Series {
 
         // Return the Expression wrapped in Ok, as the method signature requires PolarsResult<Expr>
         Ok(literal_expr)
+        */
+
+        Ok(self.implode()?.into_series().lit())
     }
 }
 
