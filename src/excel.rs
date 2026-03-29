@@ -259,6 +259,7 @@ fn get_format_key(name: &str, is_itens_context: bool) -> FormatKey {
     // Regras de Valores Financeiros
     if name.contains("Valor")
         || name.contains("ICMS")
+        || name.contains("ISS")
         || name.contains("Crédito vinculado à Receita Bruta Não Cumulativa")
         || name.contains("Crédito vinculado à Receita Bruta Cumulativa")
         || name.contains("Crédito vinculado à Receita Bruta Total")
