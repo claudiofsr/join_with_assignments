@@ -477,8 +477,10 @@ fn analisar_situacao06a(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
 
     // Early exit if no duplicate keys across periods are found
     let number_of_rows = df_groupby_chaves.height();
+
     if number_of_rows == 0 {
-        let lazyframe = lazyframe.drop_columns(&colunas_temporarias)?;
+        // No início, foi adicionada 'chaves_unificadas' em lazyframe, então só ela existe para ser removida.
+        let lazyframe = lazyframe.drop_columns(&[chaves_unificadas])?;
         return Ok(lazyframe);
     }
 
@@ -646,8 +648,10 @@ fn analisar_situacao06b(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
 
     // Early exit if no duplicate keys across periods are found
     let number_of_rows = df_groupby_cnpj.height();
+
     if number_of_rows == 0 {
-        let lazyframe = lazyframe.drop_columns(&colunas_temporarias)?;
+        // Na '06b', nao foi executado 'with_column' no lazyframe original antes do agrupamento.
+        // Então basta retornar o lazyframe como ele veio.
         return Ok(lazyframe);
     }
 
