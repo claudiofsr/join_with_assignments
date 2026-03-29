@@ -37,15 +37,21 @@ println!("cte_valor_lazyframe: {:?}", cte_valor_lazyframe.collect()?);
 // ### --- cte_valor.csv --- ###
 */
 
+/// Performs tax basis adjustments (Glosas) based on multiple fiscal compliance rules.
+///
+/// This function chains several analysis steps, each representing a "Situation"
+/// where the tax credit might be disallowed or adjusted according to Brazilian legislation.
 pub fn glosar_bc(dataframe: &DataFrame, args: &Arguments) -> JoinResult<DataFrame> {
     let lazyframe: LazyFrame = dataframe.clone().lazy();
 
+    // Inject tax-related auxiliary columns
     let lazyframe: LazyFrame = adicionar_coluna_de_aliquota_zero(lazyframe)?;
     let lazyframe: LazyFrame = adicionar_coluna_de_credito_presumido(lazyframe)?;
     let lazyframe: LazyFrame = adicionar_coluna_de_incidencia_monofasica(lazyframe)?;
 
     let lazyframe: LazyFrame = lazyframe.adicionar_colunas_auxiliares();
 
+    // Sequence of analysis "Situations"
     let lazyframe: LazyFrame = analisar_situacao01(lazyframe)?;
     let lazyframe: LazyFrame = analisar_situacao02(lazyframe, args)?;
     let lazyframe: LazyFrame = analisar_situacao03(lazyframe)?;
@@ -69,7 +75,11 @@ pub fn glosar_bc(dataframe: &DataFrame, args: &Arguments) -> JoinResult<DataFram
         .sort_by_columns(None)?)
 }
 
+/// Checks if the tax regime (CRT) belongs to 'Simples Nacional' or MEI (1 or 4).
+///
 /// Código de Regime Tributário (CRT) igual a 1 ou 4 com direito a crédito
+///
+/// Returns a boolean Expression.
 fn optante_do_simples_nacional_ou_mei() -> JoinResult<Expr> {
     let regime_tributario: &str = coluna(Right, "regime_tributario"); // "CRT : NF (Todos)"
 
@@ -80,10 +90,10 @@ fn optante_do_simples_nacional_ou_mei() -> JoinResult<Expr> {
     Ok(col(regime_tributario).is_in(literal_series, true))
 }
 
+/// **Situation 01:** Disallows credits from canceled NF-e/CT-e documents.
+///
+/// Based on CONFAZ Sinief adjustments and RIPI Art. 327.
 fn analisar_situacao01(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
-    // /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/polars-plan-0.34.2/src/dsl/string.rs
-    // https://pola-rs.github.io/polars/polars/export/regex/index.html
-
     let glosar: &str = coluna(Middle, "glosar");
     let cancelada: &str = coluna(Right, "cancelada");
 
@@ -115,6 +125,7 @@ fn analisar_situacao01(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     Ok(lf_result)
 }
 
+/// **Situation 02:** Disallows extemporaneous credits (issued outside the calculation period).
 fn analisar_situacao02(lazyframe: LazyFrame, args: &Arguments) -> JoinResult<LazyFrame> {
     let glosar: &str = coluna(Middle, "glosar");
     let dia_emissao: &str = coluna(Right, "dia_emissao"); // "Dia da Emissão : NF Item (Todos)",
@@ -155,6 +166,9 @@ fn analisar_situacao02(lazyframe: LazyFrame, args: &Arguments) -> JoinResult<Laz
     Ok(lf_result)
 }
 
+/// **Situation 03:** Disallows credits for items with zero tax rate or monophasic incidence.
+///
+/// Based on Laws 10.637/2002 and 10.833/2003.
 fn analisar_situacao03(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     let glosar: &str = coluna(Middle, "glosar");
     let cfop: &str = coluna(Right, "cfop");
@@ -251,6 +265,7 @@ fn analisar_situacao03(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     Ok(lf_result)
 }
 
+/// **Situation 04:** Checks if freight was improperly added to the input basis when paid by the sender.
 fn analisar_situacao04(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     let glosar: &str = coluna(Middle, "glosar");
     let valor_total_do_item: &str = coluna(Left, "valor_item"); // "Valor Total do Item"
@@ -374,6 +389,7 @@ fn analisar_situacao05(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     Ok(lf_result)
 }
 
+/// **Situation 06a:** Identifies duplicated keys across different calculation periods.
 fn analisar_situacao06a(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     let glosar: &str = coluna(Middle, "glosar");
     let periodo_de_apuracao: &str = coluna(Left, "pa"); // "Período de Apuração",
@@ -553,6 +569,7 @@ fn analisar_situacao06a(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     Ok(lf_result)
 }
 
+/// **Situation 06b:** Identifies duplicated CNPJ + Document Number across different periods.
 fn analisar_situacao06b(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     let glosar: &str = coluna(Middle, "glosar");
     let periodo_de_apuracao: &str = coluna(Left, "pa"); // "Período de Apuração",
@@ -736,6 +753,7 @@ fn analisar_situacao06b(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     Ok(lf_result)
 }
 
+/// **Situation 07:** Freight on purchases where inputs are not subject to PIS/COFINS.
 fn analisar_situacao07(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     let glosar: &str = coluna(Middle, "glosar");
     let origem_do_item: &str = coluna(Right, "origem"); // "Registro de Origem do Item : NF Item (Todos)"
@@ -833,6 +851,9 @@ fn analisar_situacao07(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     Ok(lf_result)
 }
 
+/// **Situation 08:** Freight on Sales involving internal transfers between company branches.
+///
+/// Based on PN Cosit 05/2018 and IN RFB 2121/2022.
 fn analisar_situacao08(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     let glosar: &str = coluna(Middle, "glosar");
     let contabil: &str = coluna(Left, "contabil");
@@ -875,6 +896,7 @@ fn analisar_situacao08(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     Ok(lf_result)
 }
 
+/// **Situation 09:** Advertising and Marketing services (not considered essential inputs).
 fn analisar_situacao09(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     let glosar: &str = coluna(Middle, "glosar");
     let item_descricao: &str = coluna(Left, "item_desc");
@@ -912,6 +934,7 @@ fn analisar_situacao09(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     Ok(lf_result)
 }
 
+/// **Situation 10:** Disallows credits on Nullification, Samples, Gifts or Return of Containers.
 fn analisar_situacao10(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     let glosar: &str = coluna(Middle, "glosar");
     let origem_do_item: &str = coluna(Right, "origem"); // "Registro de Origem do Item : NF Item (Todos)"
@@ -948,6 +971,7 @@ fn analisar_situacao10(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     Ok(lf_result)
 }
 
+/// **Situation 11:** Labor-related activities (Food, Clothing, Transport for workers).
 fn analisar_situacao11(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     let glosar: &str = coluna(Middle, "glosar");
     let item_descricao: &str = coluna(Left, "item_desc");
@@ -988,6 +1012,7 @@ fn analisar_situacao11(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     Ok(lf_result)
 }
 
+/// **Situation 12:** Checks for non-existent Document Keys.
 fn analisar_situacao12(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     let glosar: &str = coluna(Middle, "glosar");
     let chave: &str = coluna(Left, "chave"); // "Chave do Documento"
@@ -1122,6 +1147,7 @@ fn analisar_situacao14(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     Ok(lf_result)
 }
 
+/// Helper function to update the 'glosar' message column and reset 'valor_bc' if a condition is met.
 fn aplicar_situacao(
     lazyframe: LazyFrame,
     situacao: Expr,
