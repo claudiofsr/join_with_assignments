@@ -389,7 +389,15 @@ fn analisar_situacao05(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     Ok(lf_result)
 }
 
-/// **Situation 06a:** Identifies duplicated keys across different calculation periods.
+/// **Situation 06a:** Identifies Fiscal Documents (Keys) used across multiple accounting periods.
+///
+/// This analysis checks if the same unique access key (from EFD or NF-e) appears in different
+/// months. According to Brazilian tax law, a credit should generally be claimed in the period
+/// of the fiscal event, unless it is a formal extemporaneous credit.
+///
+/// This function unifies EFD and NF-e keys, identifies duplicates across periods,
+/// and disallows the credit in subsequent periods if the sum of items exceeds the total
+/// value of the document.
 fn analisar_situacao06a(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     let glosar: &str = coluna(Middle, "glosar");
     let periodo_de_apuracao: &str = coluna(Left, "pa"); // "Período de Apuração",
@@ -400,7 +408,7 @@ fn analisar_situacao06a(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     let valor_total: &str = coluna(Right, "valor_total"); // "Valor Total : NF (Todos) SOMA"
     let len_min = 10;
 
-    // Define temporary column names
+    // Temporary column names for internal processing
     let chaves_unificadas = "Chaves de Documentos Fiscais";
     let period_count = "Nº de Períodos";
     let periodos = "Períodos de Apuração";
@@ -491,9 +499,9 @@ fn analisar_situacao06a(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
         )
         .collect()?;
 
-    // Early exit if no duplicate keys across periods are found
     let number_of_rows = df_groupby_chaves.height();
 
+    // Early exit: If no duplicates found, only drop the unified key column added at the start
     if number_of_rows == 0 {
         // No início, foi adicionada 'chaves_unificadas' em lazyframe, então só ela existe para ser removida.
         let lazyframe = lazyframe.drop_columns(&[chaves_unificadas])?;
@@ -569,7 +577,12 @@ fn analisar_situacao06a(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     Ok(lf_result)
 }
 
-/// **Situation 06b:** Identifies duplicated CNPJ + Document Number across different periods.
+/// **Situation 06b:** Identifies duplicated CNPJ and Document Number combinations used across multiple periods.
+///
+/// This analysis complements 06a by looking at the combination of the Participant's CNPJ
+/// and the Document Number. This is useful for capturing documents that might not have
+/// a standard electronic key or where the key format differs but the document identity
+/// (Issuer + Number) remains the same.
 fn analisar_situacao06b(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     let glosar: &str = coluna(Middle, "glosar");
     let periodo_de_apuracao: &str = coluna(Left, "pa"); // "Período de Apuração",
@@ -663,9 +676,9 @@ fn analisar_situacao06b(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
         )
         .collect()?;
 
-    // Early exit if no duplicate keys across periods are found
     let number_of_rows = df_groupby_cnpj.height();
 
+    // Early exit: No columns were added to the original lazyframe yet, so just return it
     if number_of_rows == 0 {
         // Na '06b', nao foi executado 'with_column' no lazyframe original antes do agrupamento.
         // Então basta retornar o lazyframe como ele veio.
