@@ -7,12 +7,9 @@ mod error;
 mod excel;
 mod filtros;
 mod glosar_base_de_calculo;
-mod legislacao_aliquota_zero;
-mod legislacao_credito_presumido;
-mod legislacao_incidencia_monofasica;
 mod munkres;
 mod polars_assignments;
-mod regimes_fiscais;
+mod regime_fiscal;
 mod traits;
 
 /// A module that exports the `ExcelWriter` struct which implements the Polars
@@ -49,10 +46,6 @@ pub use self::{
     glosar_base_de_calculo::glosar_bc,
     munkres::{munkres_assignments, try_convert},
     polars_assignments::get_dataframe_after_assignments,
-    regimes_fiscais::{
-        adicionar_coluna_de_aliquota_zero, adicionar_coluna_de_credito_presumido,
-        adicionar_coluna_de_incidencia_monofasica,
-    },
     traits::*,
     write::ExcelWriter,
     xlsx_writer::PolarsXlsxWriter,

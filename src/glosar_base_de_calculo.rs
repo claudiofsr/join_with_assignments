@@ -3,10 +3,10 @@ use std::{env, fs::File, io::Write};
 use crate::{
     Arguments, DataFrameExtension, EXPLODE_OPTIONS, ExprExtension, JoinResult, LazyFrameExtension,
     Side::{Left, Middle, Right},
-    ToLiteralListExpr, adicionar_coluna_de_aliquota_zero, adicionar_coluna_de_credito_presumido,
-    adicionar_coluna_de_incidencia_monofasica,
-    adicionar_coluna_periodo_de_apuracao_inicial_e_final, coluna, configure_the_environment,
-    cst_50_a_56, equal, format_list_dates, operacoes_de_credito, unequal,
+    ToLiteralListExpr, adicionar_coluna_periodo_de_apuracao_inicial_e_final, coluna,
+    configure_the_environment, cst_50_a_56, equal, format_list_dates, operacoes_de_credito,
+    regime_fiscal::*,
+    unequal,
 };
 use polars::prelude::*;
 

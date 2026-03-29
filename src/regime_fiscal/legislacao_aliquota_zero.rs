@@ -440,8 +440,8 @@ fn main() -> Result<()> {
 #[cfg(test)]
 mod tests_aliquota_zero {
     use crate::{
-        JoinResult, adicionar_coluna_de_aliquota_zero, configure_the_environment,
-        get_output_as_int32_fields,
+        JoinResult, configure_the_environment, get_output_as_int32_fields,
+        regime_fiscal::adicionar_coluna_de_aliquota_zero,
     };
     use polars::prelude::*;
 

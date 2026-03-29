@@ -3,11 +3,12 @@ use polars::prelude::*;
 use crate::{
     JoinResult, LazyFrameExtension,
     Side::{Left, Right},
-    coluna, get_output_same_type,
-    legislacao_aliquota_zero::base_legal_de_aliquota_zero,
-    legislacao_credito_presumido::base_legal_de_credito_presumido,
-    legislacao_incidencia_monofasica::base_legal_de_incidencia_monofasica,
-    operacoes_de_entrada_ou_saida,
+    coluna, get_output_same_type, operacoes_de_entrada_ou_saida,
+    regime_fiscal::{
+        legislacao_aliquota_zero::base_legal_de_aliquota_zero,
+        legislacao_credito_presumido::base_legal_de_credito_presumido,
+        legislacao_incidencia_monofasica::base_legal_de_incidencia_monofasica,
+    },
 };
 
 /// Enum representing different fiscal regimes for contributions.
@@ -213,10 +214,7 @@ fn aplicar_regime_fiscal(
 #[cfg(test)]
 mod regime_fiscal_tests {
     use super::*; // Import everything from the parent module
-    use crate::{
-        JoinResult, adicionar_coluna_de_aliquota_zero, adicionar_coluna_de_credito_presumido,
-        adicionar_coluna_de_incidencia_monofasica,
-    };
+    use crate::JoinResult;
 
     // Helper function to create a basic LazyFrame for testing
     fn create_test_dataframe() -> PolarsResult<DataFrame> {
