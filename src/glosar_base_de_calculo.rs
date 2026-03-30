@@ -110,10 +110,8 @@ fn analisar_situacao01(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
         [
             col(glosar),
             lit("Situação 01:"),
-            lit("NF-e/CT-e Cancelada (Cláusula 12ª do Ajuste Sinief 07/2005 e Cláusula 14ª"),
-            lit(
-                "do Ajuste Sinief 09/2007 do CONFAZ e Art. 327 do RIPI - Decreto nº 7.212 de 2010).",
-            ),
+            lit("Documento Fiscal (NFe/CTe) Cancelado"),
+            lit("(Art. 1º, § 3º, inciso V, alínea “a” das Leis nº 10.637/2002 e nº 10.833/2003)."),
             lit("&"),
         ],
         " ",
