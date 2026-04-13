@@ -16,9 +16,9 @@ use crate::{JoinResult, PolarsXlsxWriter, format_dataframe};
 const FONT_SIZE: f64 = 12.0;
 const HEADER_FONT_SIZE: f64 = 11.0;
 const MAX_NUMBER_OF_ROWS: usize = 1_000_000;
-const WIDTH_MIN: usize = 8;
+const WIDTH_MIN: usize = 10;
 const WIDTH_MAX: usize = 140;
-const ADJUSTMENT: f64 = 1.20;
+const ADJUSTMENT: f64 = 1.25;
 
 const COLOR_SOMA: Color = Color::RGB(0xBFBFBF);
 const COLOR_DESCONTO: Color = Color::RGB(0xCCC0DA);
