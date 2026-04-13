@@ -13,8 +13,8 @@ use std::{
 use crate::{JoinResult, PolarsXlsxWriter, format_dataframe};
 
 // --- Constantes Estéticas ---
-const FONT_SIZE: f64 = 11.0;
-const HEADER_FONT_SIZE: f64 = 10.0;
+const FONT_SIZE: f64 = 12.0;
+const HEADER_FONT_SIZE: f64 = 11.0;
 const MAX_NUMBER_OF_ROWS: usize = 1_000_000;
 const WIDTH_MIN: usize = 8;
 const WIDTH_MAX: usize = 140;
