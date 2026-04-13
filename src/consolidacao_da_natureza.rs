@@ -572,12 +572,10 @@ fn analisar_operacoes_de_saida(
         lazy_restante,
     ];
 
-    /*
     if auditar {
         let debitos_omitidos_ncm_2309 = analisar_debitos_omitidos(lazyframe)?;
         partes.push(debitos_omitidos_ncm_2309);
     }
-    */
 
     // https://docs.rs/polars/latest/polars/prelude/fn.concat.html
     let lazy_total: LazyFrame = concat(partes, union_args)?
