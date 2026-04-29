@@ -678,7 +678,7 @@ fn join_with_interline_correlations(
     // Add two empty string columns to lf_a
     let lf_a_prepared = lf_a.with_columns([
         lit(NULL)
-            .alias(coluna(Middle, "verificar"))
+            .alias(coluna(Middle, "verificacao"))
             .cast(DataType::String),
         lit(NULL)
             .alias(coluna(Middle, "glosar"))
@@ -706,7 +706,7 @@ fn check_correlation_between_dataframes(lazyframe: LazyFrame) -> PolarsResult<Da
     let valor_da_bcal_da_efd: &str = coluna(Left, "valor_bc"); // "Valor da Base de Cálculo das Contribuições";
     let valor_do_item_da_efd: &str = coluna(Left, "valor_item"); // "Valor Total do Item",
 
-    let coluna_de_verificacao: &str = coluna(Middle, "verificar"); // "Verificação dos Valores: EFD x Docs Fiscais";
+    let verificacao: &str = coluna(Middle, "verificacao"); // "Verificação dos Valores: EFD x Docs Fiscais";
 
     let valor_da_nota_proporcional_nfe: &str = coluna(Right, "valor_item"); // "Valor da Nota Proporcional : NF Item (Todos) SOMA";
     let valor_da_base_calculo_icms_nfe: &str = coluna(Right, "valor_bc_icms"); // "ICMS: Base de Cálculo : NF Item (Todos) SOMA"
@@ -745,7 +745,7 @@ fn check_correlation_between_dataframes(lazyframe: LazyFrame) -> PolarsResult<Da
                 .when(valores_iguais_item_icms)
                 .then(lit("Valor Total do Item == Base de Cálculo do ICMS"))
                 .otherwise(lit(NULL))
-                .alias(coluna_de_verificacao),
+                .alias(verificacao),
         )
         .collect()?;
 
@@ -944,7 +944,7 @@ mod test_assignments {
 
         // Column names:
         let glosar: &str = coluna(Middle, "glosar");
-        let verificar: &str = coluna(Middle, "verificar");
+        let verificacao: &str = coluna(Middle, "verificacao");
         let valor_bc: &str = coluna(Left, "valor_bc");
 
         let dataframe01: DataFrame = df!(
@@ -956,7 +956,7 @@ mod test_assignments {
         println!("dataframe01: {dataframe01}\n");
 
         let lazyframe: LazyFrame = dataframe01.lazy().with_columns([
-            lit(NULL).alias(verificar).cast(DataType::String),
+            lit(NULL).alias(verificacao).cast(DataType::String),
             lit(NULL).alias(glosar).cast(DataType::String),
         ]);
 

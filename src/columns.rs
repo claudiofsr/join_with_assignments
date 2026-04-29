@@ -316,7 +316,7 @@ impl MyColumn {
         [
             MyColumn {
                 side,
-                nick: "verificar",
+                nick: "verificacao",
                 name: "Verificação dos Valores: EFD x Docs Fiscais",
                 dtype: DataType::String,
             },
