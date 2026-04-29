@@ -703,27 +703,35 @@ fn check_correlation_between_dataframes(lazyframe: LazyFrame) -> PolarsResult<Da
     let delta: f64 = 0.05;
     let chave_is_null: Expr = col(coluna(Right, "chave")).is_null();
 
-    let valor_da_bcal_da_efd: &str = coluna(Left, "valor_bc"); // "Valor da Base de Cálculo das Contribuições";
-    let valor_do_item_da_efd: &str = coluna(Left, "valor_item"); // "Valor Total do Item",
+    // Informações da EFD Contribuições
+    let ncm_efd: &str = coluna(Left, "ncm"); // "Código NCM",
+    let valor_da_bcal_efd: &str = coluna(Left, "valor_bc"); // "Valor da Base de Cálculo das Contribuições";
+    let valor_do_item_efd: &str = coluna(Left, "valor_item"); // "Valor Total do Item",
 
     let verificacao: &str = coluna(Middle, "verificacao"); // "Verificação dos Valores: EFD x Docs Fiscais";
 
+    // Informações de Docs Fiscais NFe/CTe
+    let ncm_nfe: &str = coluna(Right, "ncm"); // "Código NCM : NF Item (Todos)"
     let valor_da_nota_proporcional_nfe: &str = coluna(Right, "valor_item"); // "Valor da Nota Proporcional : NF Item (Todos) SOMA";
     let valor_da_base_calculo_icms_nfe: &str = coluna(Right, "valor_bc_icms"); // "ICMS: Base de Cálculo : NF Item (Todos) SOMA"
 
-    let valores_iguais_base_prop: Expr = (col(valor_da_bcal_da_efd)
+    let ncm_iguais = col(ncm_efd)
+        .is_not_null()
+        .and(col(ncm_efd).eq(col(ncm_nfe)));
+
+    let valores_iguais_base_prop: Expr = (col(valor_da_bcal_efd)
         - col(valor_da_nota_proporcional_nfe))
     .abs()
     .lt(lit(delta));
-    let valores_iguais_base_icms: Expr = (col(valor_da_bcal_da_efd)
+    let valores_iguais_base_icms: Expr = (col(valor_da_bcal_efd)
         - col(valor_da_base_calculo_icms_nfe))
     .abs()
     .lt(lit(delta));
-    let valores_iguais_item_prop: Expr = (col(valor_do_item_da_efd)
+    let valores_iguais_item_prop: Expr = (col(valor_do_item_efd)
         - col(valor_da_nota_proporcional_nfe))
     .abs()
     .lt(lit(delta));
-    let valores_iguais_item_icms: Expr = (col(valor_do_item_da_efd)
+    let valores_iguais_item_icms: Expr = (col(valor_do_item_efd)
         - col(valor_da_base_calculo_icms_nfe))
     .abs()
     .lt(lit(delta));
@@ -744,6 +752,8 @@ fn check_correlation_between_dataframes(lazyframe: LazyFrame) -> PolarsResult<Da
                 .then(lit("Valor Total do Item == Nota Proporcional"))
                 .when(valores_iguais_item_icms)
                 .then(lit("Valor Total do Item == Base de Cálculo do ICMS"))
+                .when(ncm_iguais)
+                .then(lit("Código NCN da EFD == Código NCM do Doc Fiscal"))
                 .otherwise(lit(NULL))
                 .alias(verificacao),
         )
