@@ -37,8 +37,8 @@ pathfinding = "4.15"
 rayon = "1.12"
 regex = "1.12"
 serde = { version = "1.0", features = [ "derive" ] }
-sysinfo = "0.38"
-tabled = { version = "0.20", features = ["ansi"] }
+sysinfo = "0.39"
+tabled = { version = "0.21", features = ["ansi"] }
 thiserror = "2.0"
 toml = "1.1"
 

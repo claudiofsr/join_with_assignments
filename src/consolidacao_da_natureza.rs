@@ -1133,7 +1133,7 @@ fn ordenar_colunas(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
         .then(lit(0.0)) // Atribua 0 (menor valor)
         .when(col(tipo_cred).eq(lit(0))) // TipoCredito::DebitoOmitido = 0
         .then(lit(0.1))
-        .otherwise(col(tipo_cred)); // Senão, mantenha o original (1, 2, 3 ...)    
+        .otherwise(col(tipo_cred)); // Senão, mantenha o original (1, 2, 3 ...)
 
     let lazy_sorted: LazyFrame = lazyframe
         .sort_by_exprs(
