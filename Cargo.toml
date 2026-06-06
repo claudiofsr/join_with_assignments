@@ -99,7 +99,7 @@ features = [
 version = "0.53.0"
 
 [dependencies.rust_xlsxwriter]
-version = "0.94"
+version = "0.95"
 # https://github.com/jmcnamara/rust_xlsxwriter/blob/main/CHANGELOG.md
 # git = "https://github.com/jmcnamara/rust_xlsxwriter.git"
 # Cargo.toml, update polars version
@@ -109,7 +109,7 @@ features = [
     # "constant_memory",
     "chrono",
     "polars",
-    "ryu",
+    "zmij",
     "zlib",
 ]
 
