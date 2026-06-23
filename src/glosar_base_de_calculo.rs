@@ -442,7 +442,7 @@ fn analisar_situacao06a(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     */
 
     // --- Step 1: Unify EFD and NFe keys into a single temporary column ---
-    // Prioriza a chave da EFD se ela for não nula, caso contrário, retém a chave da NFe
+    // Prioritize the EFD key if it is not null, otherwise retain the NFe key
     let lazyframe = lazyframe.with_column(
         when(col(chave_efd).is_not_null())
             .then(col(chave_efd))
@@ -450,7 +450,7 @@ fn analisar_situacao06a(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
             .alias(chaves_unificadas),
     );
 
-    // Selecionar colunas nesta ordem
+    // Select columns in this order
     let selected: [Expr; 3] = [
         col(periodo_de_apuracao),
         col(chaves_unificadas),
@@ -480,7 +480,7 @@ fn analisar_situacao06a(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
                 .alias(period_count),
             col(valor_item).sum().alias(soma_dos_itens),
         ])
-        .filter(col(period_count).gt(1)) // filtar chaves repetidas
+        .filter(col(period_count).gt(1)) // Filter duplicated keys
         // Add a column for the first (smallest) accounting period for each key
         .with_column(
             col(periodos)
@@ -492,8 +492,9 @@ fn analisar_situacao06a(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
         .with_column(
             col(periodos)
                 .list()
-                //.shift(lit(-1))
-                .slice(lit(1), col(period_count) - lit(1)) // Exclude the first period
+                //.tail(col(periodos).list().len() - lit(1)) // Exclude the first period
+                // Slice from index 1 to the end of the list using u32::MAX
+                .slice(lit(1), lit(u32::MAX)) // Exclude the first period
                 .alias(periodos_invalidos),
         )
         // Add a column with all unique periods formatted as a comma-separated string
@@ -669,8 +670,7 @@ fn analisar_situacao06b(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
         .with_column(
             col(periodos)
                 .list()
-                //.shift(lit(-1))
-                .slice(lit(1), col(period_count) - lit(1)) // Exclude the first period
+                .slice(lit(1), lit(u32::MAX)) // Exclude the first period
                 .alias(periodos_invalidos),
         )
         // Add a column with all unique periods formatted as a comma-separated string
@@ -1200,6 +1200,90 @@ fn aplicar_situacao(
 //----------------------------------------------------------------------------//
 //                                   Tests                                    //
 //----------------------------------------------------------------------------//
+
+/// Run tests with:
+/// cargo test -- --show-output tests_slice_list
+#[cfg(test)]
+mod tests_slice_list {
+    use super::*;
+
+    #[test]
+    fn test_slice_list_exclude_first_element() -> PolarsResult<()> {
+        // 1. Criar um construtor de lista
+        let mut builder = ListPrimitiveChunkedBuilder::<Int32Type>::new(
+            "periodos".into(),
+            5,  // Capacidade de linhas
+            10, // Capacidade de elementos
+            DataType::Int32,
+        );
+
+        // Caso comum: [10, 20, 30] -> Esperado: [20, 30]
+        builder.append_slice(&[10, 20, 30]);
+
+        // Elemento único: [40] -> Esperado: []
+        builder.append_slice(&[40]);
+
+        // Lista vazia: [] -> Esperado: []
+        // Usar append_slice direto evita problemas com o trait TrustedLen do std::iter::Empty
+        builder.append_slice(&[] as &[i32]);
+
+        // Caso extremo: Valor nulo global -> Esperado: null
+        builder.append_null();
+
+        // Caso extremo: Lista contendo valores nulos: [50, null, 60] -> Esperado: [null, 60]
+        // Vec::into_iter implementa corretamente o trait TrustedLen necessário pelo Polars
+        builder.append_iter(vec![Some(50), None, Some(60)].into_iter());
+
+        // 2. Criar o DataFrame (Polars 0.54 requer o tamanho e Vec<Column>)
+        let series = builder.finish().into_series();
+        let height = series.len();
+        let df = DataFrame::new(height, vec![series.into()])?;
+
+        println!("df: {df}");
+
+        let lf_result = df.lazy().with_column(
+            col("periodos")
+                .list()
+                .slice(lit(1), lit(u32::MAX))
+                .alias("periodos_invalidos"),
+        );
+
+        // 3. Executar a consulta física
+        let df_final = lf_result.collect()?;
+        println!("df_final: {df_final}");
+
+        let column_out = df_final.column("periodos_invalidos")?.list()?;
+
+        // --- ASSERÇÕES ---
+
+        // Caso comum: [20, 30]
+        // No Polars, utiliza-se get_as_series para extrair a sublista como uma Series
+        let row_0 = column_out.get_as_series(0).unwrap();
+        assert_eq!(row_0.len(), 2);
+        assert_eq!(row_0.get(0)?, AnyValue::Int32(20));
+        assert_eq!(row_0.get(1)?, AnyValue::Int32(30));
+
+        // Elemento único: []
+        let row_1 = column_out.get_as_series(1).unwrap();
+        assert!(row_1.is_empty());
+
+        // Lista vazia: []
+        let row_2 = column_out.get_as_series(2).unwrap();
+        assert!(row_2.is_empty());
+
+        // Valor nulo global: null
+        let row_3 = column_out.get_as_series(3);
+        assert!(row_3.is_none());
+
+        // Lista contendo valores nulos: [null, 60]
+        let row_4 = column_out.get_as_series(4).unwrap();
+        assert_eq!(row_4.len(), 2);
+        assert_eq!(row_4.get(0)?, AnyValue::Null);
+        assert_eq!(row_4.get(1)?, AnyValue::Int32(60));
+
+        Ok(())
+    }
+}
 
 /// Run tests with:
 /// cargo test -- --show-output tests_glosar_base_de_calculo
