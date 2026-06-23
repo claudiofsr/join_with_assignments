@@ -1,7 +1,7 @@
 use std::{env, fs::File, io::Write};
 
 use crate::{
-    Arguments, DataFrameExtension, ExprExtension, JoinResult, LazyFrameExtension, ListNameSpaceExt,
+    Arguments, DataFrameExtension, ExprExtension, JoinResult, LazyFrameExtension,
     Side::{Left, Middle, Right},
     ToLiteralListExpr, adicionar_coluna_periodo_de_apuracao_inicial_e_final, coluna,
     configure_the_environment, cst_50_a_56, equal, format_list_dates, operacoes_de_credito,
@@ -423,16 +423,30 @@ fn analisar_situacao06a(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
         periodos_formatados,
     ];
 
+    /*
     // --- Step 1: Unify EFD and NFe keys into a single temporary column ---
-    // Unificar duas colunas em uma coluna
+    // Unificar duas colunas em uma coluna escalar (String) sem alterar o número de linhas
     let lazyframe = lazyframe.with_column(
         // Criar uma lista com os valores de ambas as chaves para cada linha
         concat_list([col(chave_efd), col(chave_nfe)])?
             .list()
-            .drop_nulls() // Remove nulls da lista (se Strings podem ser nulas)
+            .drop_nulls() // Remove nulls da lista (se Strings forem nulas)
             .list()
-            //.eval(element().unique())
-            .unique() // Aplica a operação unique dentro de cada lista
+            .unique() // Utiliza o Extension Trait para eliminar repetições
+            .list()
+            .sort(SortOptions::default()) // Ordena os elementos de texto alfabeticamente (crescente)
+            .list()
+            .first() // Extrai o primeiro elemento ordenado como String de forma determinística
+            .alias(chaves_unificadas),
+    );
+    */
+
+    // --- Step 1: Unify EFD and NFe keys into a single temporary column ---
+    // Prioriza a chave da EFD se ela for não nula, caso contrário, retém a chave da NFe
+    let lazyframe = lazyframe.with_column(
+        when(col(chave_efd).is_not_null())
+            .then(col(chave_efd))
+            .otherwise(col(chave_nfe))
             .alias(chaves_unificadas),
     );
 
