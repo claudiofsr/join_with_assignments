@@ -8,6 +8,59 @@ use crate::{
     coluna, get_cnpj_base_expr,
 };
 
+/// Extension trait for [`ListNameSpace`] to provide element-wise deduplication.
+pub trait ListNameSpaceExt {
+    /// Evaluates a unique operation on a per-row basis inside the list.
+    ///
+    /// This method removes duplicate values within each individual sublist,
+    /// preserving only the first occurrence of each unique element. It leverages
+    /// `.eval(element().unique())` internally under the lazy evaluation engine.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use polars::prelude::*;
+    /// // Import the extension trait to bring `.unique()` into scope
+    /// use join_with_assignments::ListNameSpaceExt;
+    ///
+    /// # fn main() -> PolarsResult<()> {
+    /// // Create input DataFrame with varying sublist sizes
+    /// let lf = df![
+    ///     "keys" => [
+    ///         Some(Series::from_iter([1, 2, 2, 2, 3])),
+    ///         Some(Series::from_iter([4, 5, 4]))
+    ///     ]
+    /// ]?
+    /// .lazy();
+    ///
+    /// // Deduplicate elements within each list row
+    /// let df_unique = lf
+    ///     .select([col("keys").list().unique()])
+    ///     .collect()?;
+    ///
+    /// // Define the expected deduplicated DataFrame
+    /// let expected = df![
+    ///     "keys" => [
+    ///         Some(Series::from_iter([1, 2, 3])),
+    ///         Some(Series::from_iter([4, 5]))
+    ///     ]
+    /// ]?;
+    ///
+    /// // Verify correctness of the output
+    /// assert_eq!(df_unique, expected);
+    /// # Ok(())
+    /// # }
+    /// ```
+    fn unique(self) -> Expr;
+}
+
+impl ListNameSpaceExt for ListNameSpace {
+    #[inline]
+    fn unique(self) -> Expr {
+        self.eval(element().unique())
+    }
+}
+
 pub trait ExprExtension {
     /// Round to given decimal numbers with RoundMode::HalfAwayFromZero.
     fn round_expr(self, decimals: u32) -> Self;
@@ -387,6 +440,104 @@ impl DataFrameExtension for DataFrame {
 //----------------------------------------------------------------------------//
 //                                   Tests                                    //
 //----------------------------------------------------------------------------//
+
+/// Run tests with:
+/// cargo test -- --show-output tests_list_unique
+#[cfg(test)]
+mod tests_list_unique {
+    use super::*;
+
+    #[test]
+    /// `cargo test -- --show-output test_list_unique_ext`
+    fn test_list_unique_ext() -> PolarsResult<()> {
+        // 1. Cria o DataFrame de teste contendo elementos duplicados dentro das listas
+        let df = df![
+            "A" => [
+                Some(Series::new("row1".into(), &[1, 2, 2, 3])),
+                Some(Series::new("row2".into(), &[4, 4, 5, 5, 6])),
+                None // Garante que nulos também são tratados corretamente
+            ]
+        ]?;
+
+        println!("DataFrame de entrada:\n{}", df);
+
+        // 2. Executa a query utilizando o novo Extension Trait `.unique()`
+        let result = df.lazy().select([col("A").list().unique()]).collect()?;
+
+        println!("DataFrame resultante pós-deduplicação:\n{}", result);
+
+        // 3. Define o resultado esperado
+        let expected = df![
+            "A" => [
+                Some(Series::new("row1".into(), &[1, 2, 3])),
+                Some(Series::new("row2".into(), &[4, 5, 6])),
+                None
+            ]
+        ]?;
+
+        // 4. Valida se o resultado final corresponde exatamente ao esperado
+        assert_eq!(result, expected);
+        Ok(())
+    }
+
+    #[test]
+    /// `cargo test -- --show-output test_pipeline_chaves_unificadas`
+    ///
+    /// Unify EFD and NFe keys into a single temporary column
+    ///
+    /// Unificar duas colunas em uma coluna
+    fn test_pipeline_chaves_unificadas() -> PolarsResult<()> {
+        let chave_efd = "chave_efd";
+        let chave_nfe = "chave_nfe";
+        let chaves_unificadas = "chaves_unificadas";
+
+        // 1. Cria o DataFrame original com 4 registros
+        let df = df![
+            "id" => [1, 2, 3, 4],
+            chave_efd => &[Some("12.345.678/0001-90"), Some("12.ABC.678/0009-23"), None,                       Some("12.FGH.678/1234-23")],
+            chave_nfe => &[None,                       Some("12.ABC.678/0009-23"), Some("12.FGH.678/1234-23"), Some("12.FGH.679/1234-23")]
+        ]?;
+
+        println!("DataFrame original:\n{}", df);
+
+        // 2. Unifica as chaves removendo o .explode() para mantê-las agrupadas na mesma linha
+        let result = df
+            .lazy()
+            .with_column(
+                concat_list([col(chave_efd), col(chave_nfe)])?
+                    .list()
+                    .drop_nulls() // Remove nulls da lista (se Strings podem ser nulas)
+                    .list()
+                    .unique() // Utiliza o nosso Extension Trait
+                    .alias(chaves_unificadas),
+            )
+            .collect()?;
+
+        println!(
+            "DataFrame resultante (pós-unificação sem explosão):\n{}",
+            result
+        );
+
+        // 3. Define o resultado esperado com exatamente 4 linhas para todas as colunas.
+        // A coluna 'chaves_unificadas' é declarada como List contendo Option<Series>.
+        let expected = df![
+            "id" => [1, 2, 3, 4],
+            chave_efd => [Some("12.345.678/0001-90"), Some("12.ABC.678/0009-23"), None, Some("12.FGH.678/1234-23")],
+            chave_nfe => [None, Some("12.ABC.678/0009-23"), Some("12.FGH.678/1234-23"), Some("12.FGH.679/1234-23")],
+            chaves_unificadas => [
+                Some(Series::from_iter(["12.345.678/0001-90"])),
+                Some(Series::from_iter(["12.ABC.678/0009-23"])),
+                Some(Series::from_iter(["12.FGH.678/1234-23"])),
+                // Mantém as duas chaves distintas unificadas na mesma linha
+                Some(Series::from_iter(["12.FGH.678/1234-23", "12.FGH.679/1234-23"]))
+            ]
+        ]?;
+
+        // 4. Validação estrita de dimensões e valores
+        assert_eq!(result, expected);
+        Ok(())
+    }
+}
 
 /// Run tests with:
 /// cargo test -- --show-output tests_drop_columns

@@ -386,9 +386,13 @@ fn replicar_linha_de_soma_da_receita(lazyframe: LazyFrame) -> JoinResult<LazyFra
                 .as_expr()
                 .filter(cst_de_receita_bruta()?)
                 .sum() // soma de valores para cst entre 01 a 09
-                .over(discrimination_window),
+                .over(discrimination_window)?,
         )
-        .otherwise(cols(selected_columns).as_expr().over(discrimination_window))]);
+        .otherwise(
+            cols(selected_columns)
+                .as_expr()
+                .over(discrimination_window)?,
+        )]);
 
     Ok(lazyframe)
 }
@@ -1268,7 +1272,7 @@ mod tests {
                 move |col| {
                     Ok(col
                         .u32()?
-                        .into_iter()
+                        .iter()
                         .map(|opt_u32: Option<u32>| opt_u32.map(|value| value % 2 == 0))
                         .collect::<BooleanChunked>()
                         .into_column())

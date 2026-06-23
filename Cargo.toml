@@ -52,7 +52,7 @@ features = [
 ]
 
 [dependencies.polars]
-version = "0.53.0"
+version = "0.54.4"
 # git = "https://github.com/pola-rs/polars.git"
 # rev = "8a6bf4b"
 # https://github.com/pola-rs/polars/releases/tag/rs-0.51.0
@@ -74,8 +74,8 @@ features = [
     "extract_groups", # Extract all captures groups from a regex pattern as a struct
     "find_many",
     "is_in",        # Check for membership in Series
+    "is_unique",
     "lazy",         # Lazy API
-    "list_any_all",
     "list_count",
     "list_eval",    # Apply expressions over list elements
     "list_gather",  # Take sublist by multiple indices
@@ -85,7 +85,7 @@ features = [
     "regex",        # Use regexes in column selection
     "repeat_by",    # Repeat element in an Array N times, where N is given by another array.
     "round_series", # Round underlying float types of Series
-    "new_streaming",# Be able to process datasets that are larger than RAM.
+    "streaming",    # Be able to process datasets that are larger than RAM.
     "serde",
     "serde-lazy",   # Support for serde serialization and deserialization.
     "strings",      # Extra string utilities for Utf8Chunked
@@ -96,14 +96,14 @@ features = [
 ]
 
 [dependencies.polars-arrow ]
-version = "0.53.0"
+version = "0.54.4"
 
 [dependencies.rust_xlsxwriter]
-version = "0.95"
+# version = "0.95.0"
 # https://github.com/jmcnamara/rust_xlsxwriter/blob/main/CHANGELOG.md
 # git = "https://github.com/jmcnamara/rust_xlsxwriter.git"
 # Cargo.toml, update polars version
-# path = "/home/claudio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rust_xlsxwriter-0.93.0b"
+path = "/home/claudio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rust_xlsxwriter-0.95.0b"
 
 features = [
     # "constant_memory",

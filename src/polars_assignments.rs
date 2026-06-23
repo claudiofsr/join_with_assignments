@@ -471,16 +471,28 @@ fn join_lazyframes(lazyframe_a: LazyFrame, lazyframe_b: LazyFrame) -> PolarsResu
     Ok(dataframe)
 }
 
-/// Aplica a lógica de "Munkres Assignments" entre duas colunas de Series List.
-/// Retorna uma expressão que pode ser usada em `with_column`.
+/// Applies the "Munkres Assignments" logic between two columns of List Series.
+///
+/// This function returns a Polars [`Expr`] that can be used in `.with_column()` or
+/// `.with_columns()` pipelines. It wraps both input columns in a `Struct` to process
+/// them row-by-row inside an element-wise mapping closure.
+///
+/// # Arguments
+///
+/// * `column_name_efd` - The name of the left column (e.g., EFD).
+/// * `column_name_nfe` - The name of the right column (e.g., NFE).
+/// * `output_alias` - The name of the resulting assignment column.
+///
+/// # Returns
+///
+/// A `PolarsResult<Expr>` containing the structured Munkres assignment expression.
 fn apply_munkres_assignments(
     column_name_efd: &str,
     column_name_nfe: &str,
     output_alias: &str,
 ) -> PolarsResult<Expr> {
-    // Clone as strings para que a closure possa possuí-las.
-    // Isso garante que elas estarão disponíveis quando a closure for executada,
-    // mesmo que 'apply_munkres_assignments' já tenha retornado.
+    // Clone the strings so the moving closure can capture and own them safely.
+    // This ensures they remain valid throughout the lazy expression evaluation.
     let col_efd_owned = column_name_efd.to_string();
     let col_nfe_owned = column_name_nfe.to_string();
     let output_alias_owned = output_alias.to_string();
@@ -488,37 +500,50 @@ fn apply_munkres_assignments(
     Ok(
         as_struct([col(column_name_efd), col(column_name_nfe)].to_vec())
             .apply(
-                // Use 'move' para transferir a posse das strings clonadas para a closure.
+                // Use 'move' to transfer ownership of cloned strings into the closure.
                 move |col: Column| -> PolarsResult<Column> {
-                    // Downcast to struct
+                    // Downcast to struct to access individual columns
                     let struct_chunked: &StructChunked = col.struct_()?;
 
-                    // Get the individual Series (columns) from the struct by their names.
+                    // Get the individual Series (columns) from the struct by their names
                     let ser_efd: Series = struct_chunked.field_by_name(&col_efd_owned)?;
                     let ser_nfe: Series = struct_chunked.field_by_name(&col_nfe_owned)?;
 
+                    // Extract list representations
                     let list_efd = ser_efd.list()?;
                     let list_nfe = ser_nfe.list()?;
 
+                    // Capture original column names to preserve schema metadata
+                    let name_efd = ser_efd.name().clone();
+                    let name_nfe = ser_nfe.name().clone();
+
+                    // Map lists row-by-row, pairing elements via Munkres assignment
                     let vec_series: Vec<Option<Series>> = list_efd
-                        .into_iter()
-                        .zip(list_nfe)
-                        .map(
-                            |(opt_ser_efd, opt_ser_nfe)| match (opt_ser_efd, opt_ser_nfe) {
-                                (Some(ser_efd), Some(ser_nfe)) => {
-                                    // If both Series are present, calculate Munkres assignments.
-                                    get_option_assignments(&ser_efd, &ser_nfe)
+                        .iter()
+                        .zip(list_nfe.iter())
+                        .map(|(opt_arr_efd, opt_arr_nfe)| {
+                            match (opt_arr_efd, opt_arr_nfe) {
+                                (Some(arr_efd), Some(arr_nfe)) => {
+                                    // Safe closure to convert Arrow array to Series and calculate
+                                    let run = || -> Option<Series> {
+                                        let s_efd =
+                                            Series::from_arrow(name_efd.clone(), arr_efd).ok()?;
+                                        let s_nfe =
+                                            Series::from_arrow(name_nfe.clone(), arr_nfe).ok()?;
+                                        get_option_assignments(&s_efd, &s_nfe)
+                                    };
+                                    run()
                                 }
                                 _ => None,
-                            },
-                        )
+                            }
+                        })
                         .collect();
 
-                    // Create a new Series from the calculated Munkres assignments.
+                    // Create a new Series from the calculated Munkres assignments
                     let new_series = Series::new("New".into(), vec_series);
                     Ok(new_series.into_column())
                 },
-                // Define the output data type for the new column.
+                // Define the output data type for the new column
                 // GetOutput::from_type(DataType::UInt64),
                 get_output_as_uint64,
             )
@@ -574,18 +599,27 @@ pub fn get_vec_from_assignments(dataframe: &DataFrame) -> PolarsResult<AllCorrel
         .collect();
     */
 
+    // Capture the original column names to preserve logical types and schemas
+    let name_efd = lines_efd_list.name().clone();
+    let name_nfe = lines_nfe_list.name().clone();
+    let name_asg = assignmen_list.name().clone();
+
     // Zip iterators from the Series. This performs a row-wise, sequential iteration.
-    // Each `.into_iter()` on a Polars ChunkedArray returns a boxed iterator (Box<dyn PolarsIterator<Item = Option<T>>>).
-    // The `zip` method is called on these iterators, creating nested tuples for each row.
     let all_correlations: AllCorrelations = aggregation_str
-        .into_iter() // Starts with `Box<dyn PolarsIterator<Item = Option<&str>>>`
-        .zip(lines_efd_list) // Zips with `Box<dyn PolarsIterator<Item = Option<Series>>>`
-        .zip(lines_nfe_list) // Zips with another `Box<dyn PolarsIterator<Item = Option<Series>>>`
-        .zip(assignmen_list) // Zips with the last `Box<dyn PolarsIterator<Item = Option<Series>>>`
-        .map(|(((opt_key, opt_efd_ser), opt_nfe_ser), opt_asg_ser)| {
+        .iter() // Starts with `impl PolarsIterator<Item = Option<&str>>`
+        .zip(lines_efd_list.iter()) // Zips with `impl PolarsIterator<Item = Option<Box<dyn Array>>>`
+        .zip(lines_nfe_list.iter()) // Zips with another `impl PolarsIterator<Item = Option<Box<dyn Array>>>`
+        .zip(assignmen_list.iter()) // Zips with the last `impl PolarsIterator<Item = Option<Box<dyn Array>>>`
+        .map(|(((opt_key, opt_efd_arr), opt_nfe_arr), opt_asg_arr)| {
+            // Safely convert Arrow arrays back to Polars logical Series
+            let opt_efd_ser =
+                opt_efd_arr.and_then(|arr| Series::from_arrow(name_efd.clone(), arr).ok());
+            let opt_nfe_ser =
+                opt_nfe_arr.and_then(|arr| Series::from_arrow(name_nfe.clone(), arr).ok());
+            let opt_asg_ser =
+                opt_asg_arr.and_then(|arr| Series::from_arrow(name_asg.clone(), arr).ok());
+
             // For each row, call the helper function to process the optional Series data.
-            // Note: `get_opt_vectuples` from the previous context is assumed to be
-            // `get_opt_correlated_tuples_for_row` in the refactored versions.
             get_opt_vectuples(opt_key, opt_efd_ser, opt_nfe_ser, opt_asg_ser)
         })
         .collect();
@@ -839,7 +873,7 @@ mod test_assignments {
         let new_col: Vec<u32> = dataframe_02
             .column("count lines")?
             .u32()?
-            .into_iter()
+            .iter()
             .map(|opt_u32| opt_u32.unwrap())
             .collect();
 
@@ -1125,7 +1159,7 @@ mod test_assignments {
         let values_pa: &Column = df_a.column(value_p)?;
 
         // Get columns with into_iter()
-        let vec_a: Vec<f64> = values_pa.f64()?.into_iter().flatten().collect();
+        let vec_a: Vec<f64> = values_pa.f64()?.iter().flatten().collect();
         println!("values_pa: {vec_a:?}");
 
         // --- with_schema --- //
@@ -1193,7 +1227,7 @@ mod test_assignments {
         let values_pb: &Column = df_b.column(value_p)?;
 
         // Get columns with into_iter()
-        let vec_b: Vec<f64> = values_pb.f64()?.into_iter().flatten().collect();
+        let vec_b: Vec<f64> = values_pb.f64()?.iter().flatten().collect();
         println!("values_pb: {vec_b:?}");
 
         assert_eq!(vec_a, [3623.56, 7379.51, 6783.56, 106.34, 828.98]);
@@ -1241,7 +1275,7 @@ mod test_assignments {
         let values_pa: &Column = df_a.column(valor_item)?;
 
         // Get columns with into_iter()
-        let vec_a: Vec<f64> = values_pa.f64()?.into_iter().flatten().collect();
+        let vec_a: Vec<f64> = values_pa.f64()?.iter().flatten().collect();
         println!("values_pa: {vec_a:?}\n");
 
         // --- with_schema --- //
@@ -1258,7 +1292,7 @@ mod test_assignments {
         let values_pb: &Column = df_b.column(valor_item)?;
 
         // Get columns with into_iter()
-        let vec_b: Vec<f64> = values_pb.f64()?.into_iter().flatten().collect();
+        let vec_b: Vec<f64> = values_pb.f64()?.iter().flatten().collect();
         println!("values_pb: {vec_b:?}");
 
         assert_eq!(vec_a, [3623.56, 7379.51, 6783.56, 106.34, 828.98]);

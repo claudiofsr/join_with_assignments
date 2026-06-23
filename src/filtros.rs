@@ -173,7 +173,7 @@ fn new_series() -> PolarsResult<()> {
 
     let values: Vec<u32> = series
         .u32()?
-        .into_iter()
+        .iter()
         .flatten()
         .collect();
 

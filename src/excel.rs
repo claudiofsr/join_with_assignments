@@ -307,7 +307,7 @@ fn apply_conditional_styles(
 
     let ca = df.columns()[nature_idx].as_materialized_series().str()?;
 
-    ca.into_iter()
+    ca.iter()
         .enumerate()
         .try_for_each(|(i, opt_val)| -> JoinResult<()> {
             let style = match opt_val {

@@ -452,7 +452,7 @@ mod tests_aliquota_zero {
     #[test]
     /// cargo test -- --show-output test_apply_multiple_columns
     /// - Fonte: ~/.cargo/registry/src/index.crates.io-6f17d22bba15001f/polars-0.30.0/tests/it/lazy/queries.rs
-    fn test_apply_multiple_columns() -> Result<(), PolarsError> {
+    fn test_apply_multiple_columns() -> PolarsResult<()> {
         let df: DataFrame = df!(
             "A"=> [1, 2, 3, 4, 5],
             "fruits"=> ["banana", "banana", "apple", "apple", "banana"],
@@ -498,7 +498,6 @@ mod tests_aliquota_zero {
         */
 
         let df: DataFrame = df
-            .clone()
             .lazy()
             .with_columns([map_multiple(
                 multiply,
@@ -512,12 +511,7 @@ mod tests_aliquota_zero {
 
         println!("dataframe 2: {df}\n");
 
-        let out: Vec<i32> = df
-            .column("Map Multiple")?
-            .i32()?
-            .into_iter()
-            .flatten()
-            .collect();
+        let out: Vec<i32> = df.column("Map Multiple")?.i32()?.iter().flatten().collect();
 
         println!("out: {out:?}\n");
         assert_eq!(out, &[3, 8, 9, 0, -25]);
@@ -538,17 +532,45 @@ mod tests_aliquota_zero {
 
         println!("groupby: {groupby}\n");
 
-        let vec_series: Vec<Series> = groupby.column("A")?.list()?.into_iter().flatten().collect();
+        /*
+        let list_ca = groupby.column("A")?.list()?;
+        let vec_series: Vec<Series> = (0..list_ca.len())
+            .filter_map(|i| list_ca.get_as_series(i))
+            .collect();
 
         let vec_vec_i32: Vec<Vec<i32>> = vec_series
             .into_iter()
-            .map(|series| {
-                series
+            .filter_map(|series| {
+                let v = series
                     .i32()
-                    .unwrap()
-                    .into_iter()
+                    .ok()?
+                    .iter()
                     .flatten()
-                    .collect::<Vec<_>>()
+                    .collect::<Vec<_>>();
+                Some(v)
+            })
+            .collect();
+        */
+
+        /*
+        // Mapeamento direto de ListChunked para Vec<Vec<i32>> sem alocações intermediárias
+        let list_ca = groupby.column("A")?.list()?;
+        let vec_vec_i32: Vec<Vec<i32>> = (0..list_ca.len())
+            .filter_map(|i| Some(list_ca.get_as_series(i)?.i32().ok()?.iter().flatten().collect()))
+            .collect();
+        */
+
+        let vec_vec_i32: Vec<Vec<i32>> = groupby
+            .column("A")?
+            .as_materialized_series()
+            .iter() // Produz AnyValue
+            .filter_map(|any_val| match any_val {
+                AnyValue::List(series) => {
+                    let ca = series.i32().ok()?;
+                    let vec_i32: Vec<i32> = ca.iter().flatten().collect();
+                    Some(vec_i32)
+                }
+                _ => None,
             })
             .collect();
 
@@ -591,7 +613,7 @@ mod tests_aliquota_zero {
         let cst_values: &Column = dataframe02.column(columns[0])?;
 
         // Get columns values with into_iter()
-        let vec_opt_str: Vec<Option<&str>> = cst_values.str()?.into_iter().collect();
+        let vec_opt_str: Vec<Option<&str>> = cst_values.str()?.iter().collect();
 
         println!("vec_opt_str: {vec_opt_str:#?}");
 

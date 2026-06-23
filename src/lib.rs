@@ -1046,7 +1046,7 @@ pub fn format_list_dates(column_name: &str) -> Expr {
     lit("[")
     + col(column_name)
         .list()
-        .eval(col("").dt().strftime("%d/%m/%Y")) // Format inner dates
+        .eval(element().dt().strftime("%d/%m/%Y")) // Format inner dates
         .list()
         .join(lit(", "), true) // Join formatted dates
     + lit("]")

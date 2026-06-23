@@ -1,7 +1,7 @@
 use std::{env, fs::File, io::Write};
 
 use crate::{
-    Arguments, DataFrameExtension, EXPLODE_OPTIONS, ExprExtension, JoinResult, LazyFrameExtension,
+    Arguments, DataFrameExtension, ExprExtension, JoinResult, LazyFrameExtension, ListNameSpaceExt,
     Side::{Left, Middle, Right},
     ToLiteralListExpr, adicionar_coluna_periodo_de_apuracao_inicial_e_final, coluna,
     configure_the_environment, cst_50_a_56, equal, format_list_dates, operacoes_de_credito,
@@ -431,8 +431,8 @@ fn analisar_situacao06a(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
             .list()
             .drop_nulls() // Remove nulls da lista (se Strings podem ser nulas)
             .list()
+            //.eval(element().unique())
             .unique() // Aplica a operação unique dentro de cada lista
-            .explode(EXPLODE_OPTIONS)
             .alias(chaves_unificadas),
     );
 
@@ -1256,7 +1256,7 @@ mod tests_glosar_base_de_calculo {
         println!("result:\n{result:?}\n");
 
         let col: &Column = result.column(glosar)?;
-        let vec_option: Vec<Option<&str>> = col.str()?.into_iter().collect();
+        let vec_option: Vec<Option<&str>> = col.str()?.iter().collect();
 
         assert_eq!(
             vec_option,
@@ -1385,11 +1385,11 @@ mod tests_glosar_base_de_calculo {
         let bcal_values: &Column = dataframe02.column(valor_bc)?;
 
         // Get columns with into_iter()
-        let vec_bcal_values: Vec<f64> = bcal_values.f64()?.into_iter().flatten().collect();
+        let vec_bcal_values: Vec<f64> = bcal_values.f64()?.iter().flatten().collect();
 
         // Get columns from dataframe
         let glosar: &Column = dataframe02.column(glosar)?;
-        let glosar_col: Vec<&str> = glosar.str()?.into_iter().flatten().collect();
+        let glosar_col: Vec<&str> = glosar.str()?.iter().flatten().collect();
 
         println!("glosar_col: {glosar_col:#?}\n");
 
@@ -1437,13 +1437,13 @@ mod tests_glosar_base_de_calculo {
         let bcal_values: &Column = df_itens_de_docs_fiscais_result.column(valor_bc)?;
 
         // Get columns with into_iter()
-        let vec_opt_bcal_values: Vec<Option<f64>> = bcal_values.f64()?.into_iter().collect();
+        let vec_opt_bcal_values: Vec<Option<f64>> = bcal_values.f64()?.iter().collect();
 
         println!("vec_opt_bcal_values: {vec_opt_bcal_values:?}\n");
 
         // Get columns from dataframe
         let glosar: &Column = df_itens_de_docs_fiscais_result.column(glosar)?;
-        let glosar_values: Vec<Option<&str>> = glosar.str()?.into_iter().collect();
+        let glosar_values: Vec<Option<&str>> = glosar.str()?.iter().collect();
         println!("glosar_values: {glosar_values:#?}\n");
 
         assert_eq!(

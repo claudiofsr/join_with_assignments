@@ -179,8 +179,8 @@ fn aplicar_regime_fiscal(
 
     // Iterate over NCM and description, apply base_legal function
     let new_col: Column = ca_str_ncm
-        .into_iter()
-        .zip(ca_str_dsc)
+        .iter()
+        .zip(ca_str_dsc.iter())
         .map(
             |(opt_ncm_str, opt_desc_str)| match (opt_ncm_str, opt_desc_str) {
                 (Some(ncm_str), Some(desc_str)) => {
