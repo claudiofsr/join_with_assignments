@@ -4,26 +4,25 @@ use clap::{
     Command,
     CommandFactory,
     Parser,
+    builder::{
+        Styles,
+        styling::{AnsiColor, Effects},
+    },
 };
 use serde::{Deserialize, Serialize};
 use std::{default, path::PathBuf};
 
-// https://stackoverflow.com/questions/74068168/clap-rs-not-printing-colors-during-help
-pub fn get_styles() -> clap::builder::Styles {
-    let cyan = anstyle::Color::Ansi(anstyle::AnsiColor::Cyan);
-    let green = anstyle::Color::Ansi(anstyle::AnsiColor::Green);
-    let yellow = anstyle::Color::Ansi(anstyle::AnsiColor::Yellow);
+/// Custom Clap styling to mimic a beautiful colored help menu.
+fn get_styles() -> Styles {
+    let cyan = AnsiColor::Cyan.on_default();
+    let green = AnsiColor::Green.on_default();
+    let yellow = AnsiColor::Yellow.on_default();
 
-    clap::builder::Styles::styled()
-        .placeholder(anstyle::Style::new().fg_color(Some(yellow)))
-        .usage(anstyle::Style::new().fg_color(Some(cyan)).bold())
-        .header(
-            anstyle::Style::new()
-                .fg_color(Some(cyan))
-                .bold()
-                .underline(),
-        )
-        .literal(anstyle::Style::new().fg_color(Some(green)))
+    Styles::styled()
+        .header(yellow | Effects::BOLD)
+        .usage(yellow | Effects::BOLD)
+        .literal(green)
+        .placeholder(cyan)
 }
 
 /*

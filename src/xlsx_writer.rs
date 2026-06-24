@@ -7,11 +7,8 @@
 use std::io::{Seek, Write};
 use std::path::Path;
 
+use chrono::{DateTime, NaiveDate, NaiveDateTime};
 use polars::prelude::*;
-use polars_arrow::temporal_conversions::{
-    date32_to_date, time64ns_to_time, timestamp_ms_to_datetime, timestamp_ns_to_datetime,
-    timestamp_us_to_datetime,
-};
 use rust_xlsxwriter::{Format, Table, Workbook, Worksheet};
 
 pub struct PolarsXlsxWriter {
@@ -258,8 +255,7 @@ impl PolarsXlsxWriter {
             for (row_num, data) in column.as_materialized_series().iter().enumerate() {
                 let row_num = header_offset + row_offset + row_num as u32;
 
-                // Map the Polars Series AnyValue types to Excel/rust_xlsxwriter
-                // types.
+                // Map the Polars Series AnyValue types to Excel/rust_xlsxwriter types.
                 match data {
                     AnyValue::Int8(value) => {
                         worksheet.write_number(row_num, col_num, value)?;
@@ -448,4 +444,69 @@ impl WriterOptions {
             top_cell: (0, 0),
         }
     }
+}
+
+// -----------------------------------------------------------------------
+// Helper functions for temporal conversions.
+// -----------------------------------------------------------------------
+
+/// Converts a Polars Date32 value (days since 1970-01-01) to a `chrono::NaiveDate`.
+///
+/// If the conversion fails due to out-of-bounds dates, it falls back to the Unix Epoch
+/// (1970-01-01) via `unwrap_or_default()`.
+#[inline]
+fn date32_to_date(days: i32) -> NaiveDate {
+    NaiveDate::from_epoch_days(days).unwrap_or_default()
+}
+
+/// Converts a Polars Time64 value (nanoseconds since midnight) to a `chrono::NaiveTime`.
+///
+/// This implementation safely wraps any negative or overflow values into a 24-hour cycle.
+#[inline]
+fn time64ns_to_time(nanos: i64) -> chrono::NaiveTime {
+    const NANOS_PER_DAY: i64 = 24 * 60 * 60 * 1_000_000_000;
+
+    // rem_euclid guarantees a positive modulo within the [0, NANOS_PER_DAY) range.
+    let normalized_nanos = nanos.rem_euclid(NANOS_PER_DAY);
+
+    let seconds = (normalized_nanos / 1_000_000_000) as u32;
+    let nanoseconds = (normalized_nanos % 1_000_000_000) as u32;
+
+    chrono::NaiveTime::from_num_seconds_from_midnight_opt(seconds, nanoseconds).unwrap_or_default()
+}
+
+/// Converts a Polars Timestamp value in nanoseconds to a `chrono::NaiveDateTime`.
+///
+/// Uses Euclidean division to safely support negative values (times preceding 1970).
+#[inline]
+fn timestamp_ns_to_datetime(ns: i64) -> NaiveDateTime {
+    let seconds = ns.div_euclid(1_000_000_000);
+    let nanoseconds = ns.rem_euclid(1_000_000_000) as u32;
+    DateTime::from_timestamp(seconds, nanoseconds)
+        .map(|dt| dt.naive_utc())
+        .unwrap_or_default()
+}
+
+/// Converts a Polars Timestamp value in microseconds to a `chrono::NaiveDateTime`.
+///
+/// Uses Euclidean division to safely support negative values (times preceding 1970).
+#[inline]
+fn timestamp_us_to_datetime(us: i64) -> NaiveDateTime {
+    let seconds = us.div_euclid(1_000_000);
+    let nanoseconds = (us.rem_euclid(1_000_000) * 1_000) as u32;
+    DateTime::from_timestamp(seconds, nanoseconds)
+        .map(|dt| dt.naive_utc())
+        .unwrap_or_default()
+}
+
+/// Converts a Polars Timestamp value in milliseconds to a `chrono::NaiveDateTime`.
+///
+/// Uses Euclidean division to safely support negative values (times preceding 1970).
+#[inline]
+fn timestamp_ms_to_datetime(ms: i64) -> NaiveDateTime {
+    let seconds = ms.div_euclid(1_000);
+    let nanoseconds = (ms.rem_euclid(1_000) * 1_000_000) as u32;
+    DateTime::from_timestamp(seconds, nanoseconds)
+        .map(|dt| dt.naive_utc())
+        .unwrap_or_default()
 }

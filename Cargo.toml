@@ -26,7 +26,6 @@ readme = "README.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anstyle = "1.0"
 cc = { version = "1.2", features = ["parallel"] }
 chrono = { version = "0.4", features = [ "serde" ] }
 claudiofsr_lib = "0.19"
@@ -95,16 +94,12 @@ features = [
     "timezones",
 ]
 
-[dependencies.polars-arrow ]
-version = "0.54.4"
-
 [dependencies.rust_xlsxwriter]
 # version = "0.95.0"
 # https://github.com/jmcnamara/rust_xlsxwriter/blob/main/CHANGELOG.md
 # git = "https://github.com/jmcnamara/rust_xlsxwriter.git"
 # Cargo.toml, update polars version
 path = "/home/claudio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rust_xlsxwriter-0.95.0b"
-
 features = [
     # "constant_memory",
     "chrono",
