@@ -199,8 +199,11 @@ fn analisar_situacao03(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     // Estes serviços são insumos com direito à crédito das Contribuições que devem ser excluídos das glosas.
     let cfop_de_insumos: Expr = col(cfop).is_in(literal_series, true);
 
-    // Alíquotas de PIS/PASEP e de COFINS iguais a Zero
-    let aliquotas_zero: Expr = col(aliq_pis).eq(lit(0)).and(col(aliq_cof).eq(lit(0)));
+    // Alíquotas de PIS/PASEP e de COFINS com valores não positivos
+    let aliquotas_pis_sem_valor: Expr = col(aliq_pis).is_null().or(col(aliq_pis).eq(lit(0)));
+    let aliquotas_cof_sem_valor: Expr = col(aliq_cof).is_null().or(col(aliq_cof).eq(lit(0)));
+
+    let aliquotas_sem_valor: Expr = aliquotas_pis_sem_valor.and(aliquotas_cof_sem_valor);
 
     // No Regime Monofásico não é permitida a constituição de créditos sobre o custo
     // de aquisição de bens sujeitos à tributação monofásica quando destinados à revenda.
@@ -216,7 +219,7 @@ fn analisar_situacao03(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
         .and(col(origem_do_item).is_null().or(nfe))
         .and(col(cfop).is_null().or(cfop_de_insumos.not()))
         .and(col(verificacao).is_not_null())
-        .and(aliquotas_zero);
+        .and(aliquotas_sem_valor);
 
     // Adicionar coluna temporária
     let lazyframe: LazyFrame = lazyframe
