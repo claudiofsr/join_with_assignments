@@ -76,6 +76,12 @@ impl GrupoRateio {
             Self::Exportacao | Self::TribExportacao | Self::NTribExportacao | Self::Global
         )
     }
+
+    /// Retorna se o grupo representa um crédito de apropriação direta (exclusivo).
+    #[inline]
+    pub fn eh_exclusivo(&self) -> bool {
+        matches!(self, Self::Trib | Self::NTrib | Self::Exportacao)
+    }
 }
 
 /// Estrutura para processar o rateio proporcional de créditos comuns e exclusivos.
@@ -193,10 +199,81 @@ impl RateioDosCreditos {
         self.valor_bc.clone() * self.fator_rbnc.clone() * proporcao
     }
 
+    /// Centraliza a lógica de rateios gerando uma expressão condicional unificada.
+    ///
+    /// Esta função utiliza a operação de acumulação [`Iterator::fold`] para construir de forma
+    /// declarativa uma árvore de expressões aninhadas (`when / then / otherwise`). Em tempo de
+    /// execução, o motor do Polars avalia esse conjunto de condições para cada linha do DataFrame.
+    ///
+    /// ### Exclusividade das Condições
+    ///
+    /// As verificações de grupo são baseadas no dígito final do CST (`cst % 10`), o que torna as
+    /// condições de enquadramento dos grupos ([`GrupoRateio`]) mutuamente excludentes.
+    /// Como uma linha da tabela possui um único CST e, portanto, atende a apenas um grupo por vez:
+    ///
+    /// 1. Não existe o risco de uma linha satisfazer duas condições simultaneamente.
+    /// 2. A ordem em que o `fold` aninha as ramificações de fallback no parâmetro `otherwise`
+    ///    não interfere na exatidão do resultado numérico final.
+    /// 3. Em tempo de execução, o Polars avalia as ramificações e interrompe a verificação
+    ///    (*short-circuit*) assim que o grupo correspondente à linha é localizado.
+    fn aplicar_rateios(&self, col_destino: &str, grupos: &[GrupoRateio]) -> Expr {
+        grupos.iter().fold(lit(NULL), |acumulador, &grupo| {
+            let valor_calculado = if grupo.eh_exclusivo() {
+                self.valor_bc.clone()
+            } else {
+                self.ratear_comum(col_destino, grupo)
+            };
+
+            when(self.condicao_grupo(grupo))
+                .then(valor_calculado)
+                .otherwise(acumulador)
+        })
+    }
+
     // =========================================================================
     // Projeções Individuais de Colunas de Crédito (Retornam Expr Pura)
     // =========================================================================
 
+    /// Retorna a expressão de rateio para a parcela atribuída a receitas tributadas no mercado interno.
+    pub fn rbnc_tributada(&self) -> Expr {
+        self.aplicar_rateios(
+            COL_TRIB,
+            &[
+                GrupoRateio::Trib,
+                GrupoRateio::TribNTrib,
+                GrupoRateio::TribExportacao,
+                GrupoRateio::Global,
+            ],
+        )
+    }
+
+    /// Retorna a expressão de rateio para a parcela atribuída a receitas desoneradas no mercado interno.
+    pub fn rbnc_ntributada(&self) -> Expr {
+        self.aplicar_rateios(
+            COL_NTRIB,
+            &[
+                GrupoRateio::NTrib,
+                GrupoRateio::TribNTrib,
+                GrupoRateio::NTribExportacao,
+                GrupoRateio::Global,
+            ],
+        )
+    }
+
+    /// Retorna a expressão de rateio para a parcela atribuída a receitas de exportação direta.
+    pub fn rbnc_exportacao(&self) -> Expr {
+        self.aplicar_rateios(
+            COL_EXP,
+            &[
+                GrupoRateio::Exportacao,
+                GrupoRateio::TribExportacao,
+                GrupoRateio::NTribExportacao,
+                GrupoRateio::Global,
+            ],
+        )
+    }
+
+    /*
     /// Retorna a expressão de rateio para a parcela atribuída a receitas tributadas no mercado interno.
     pub fn rbnc_tributada(&self) -> Expr {
         when(self.condicao_grupo(GrupoRateio::Trib))
@@ -235,6 +312,7 @@ impl RateioDosCreditos {
             .then(self.ratear_comum(COL_EXP, GrupoRateio::Global))
             .otherwise(lit(NULL))
     }
+    */
 
     /// Consolida a base de cálculo total atribuível à totalidade do regime não cumulativo.
     pub fn rec_bruta_ncumulativa(&self) -> Expr {
