@@ -1,0 +1,6 @@
+Número da Nota : NF Item (Todos);Dia da Emissão : NF Item (Todos);Código CFOP : NF Item (Todos);COFINS: Alíquota ad valorem - Atributo : NF Item (Todos);PIS: Alíquota ad valorem - Atributo : NF Item (Todos);CST COFINS Descrição : NF Item (Todos);CST PIS Descrição : NF Item (Todos);Valor Total : NF (Todos) SOMA;Valor da Nota Proporcional : NF Item (Todos) SOMA
+12;21/12/2021;6932;0;0;<N/D>;<N/D>;3873.56;3623.56
+17;31/12/2019;4253;0;0;<N/D>;<N/D>;2929.51;7379.51
+10;01/12/2021;6932;0;0;<N/D> [foobar];<N/D> [foobar 2];8203.56;6783.56
+843;31/12/2021;6352;0;0;<N/D> [foobar];<N/D> [foobar 2];1666.34;106.34
+32;03/02/2023;5331;0;0;<N/D> [foobar];<N/D> [foobar 2];88.98;828.98
