@@ -90,51 +90,61 @@ impl RateioDosCreditos {
         self.valor_bc.clone() * col(col_dest.as_str()) / col(Coluna::RBTotal.as_str())
     }
 
+    /// Verifica se o dígito final do CST é igual ao valor fornecido.
+    #[inline]
+    fn cst_eq(&self, valor: i64) -> Expr {
+        self.cst_decimal.clone().eq(lit(valor))
+    }
+
+    /// Verifica se o dígito final do CST é menor que o valor fornecido.
+    #[inline]
+    fn cst_lt(&self, valor: i64) -> Expr {
+        self.cst_decimal.clone().lt(lit(valor))
+    }
+
     // =========================================================================
     // Gerador Unificado de Expressões (Ponto de Entrada Único do Rust)
     // =========================================================================
 
     fn ratear_coluna(&self, col_tipo: Coluna) -> Expr {
-        // SIMPLIFICAÇÃO: Extração de clones redundantes para variáveis locais de escopo curto
-        let cst = self.cst_decimal.clone();
         let bc = self.valor_bc.clone();
 
         match col_tipo {
-            Coluna::Trib => when(cst.clone().eq(lit(0)))
+            Coluna::Trib => when(self.cst_eq(0))
                 .then(bc)
-                .when(cst.clone().eq(lit(3)))
+                .when(self.cst_eq(3))
                 .then(self.ratear_parcial(Coluna::Trib, Coluna::Trib, Coluna::NTrib))
-                .when(cst.clone().eq(lit(4)))
+                .when(self.cst_eq(4))
                 .then(self.ratear_parcial(Coluna::Trib, Coluna::Trib, Coluna::Export))
-                .when(cst.clone().eq(lit(6)))
+                .when(self.cst_eq(6))
                 .then(self.ratear_global(Coluna::Trib))
                 .otherwise(lit(NULL)),
 
-            Coluna::NTrib => when(cst.clone().eq(lit(1)))
+            Coluna::NTrib => when(self.cst_eq(1))
                 .then(bc)
-                .when(cst.clone().eq(lit(3)))
+                .when(self.cst_eq(3))
                 .then(self.ratear_parcial(Coluna::NTrib, Coluna::Trib, Coluna::NTrib))
-                .when(cst.clone().eq(lit(5)))
+                .when(self.cst_eq(5))
                 .then(self.ratear_parcial(Coluna::NTrib, Coluna::NTrib, Coluna::Export))
-                .when(cst.clone().eq(lit(6)))
+                .when(self.cst_eq(6))
                 .then(self.ratear_global(Coluna::NTrib))
                 .otherwise(lit(NULL)),
 
-            Coluna::Export => when(cst.clone().eq(lit(2)))
+            Coluna::Export => when(self.cst_eq(2))
                 .then(bc)
-                .when(cst.clone().eq(lit(4)))
+                .when(self.cst_eq(4))
                 .then(self.ratear_parcial(Coluna::Export, Coluna::Trib, Coluna::Export))
-                .when(cst.clone().eq(lit(5)))
+                .when(self.cst_eq(5))
                 .then(self.ratear_parcial(Coluna::Export, Coluna::NTrib, Coluna::Export))
-                .when(cst.clone().eq(lit(6)))
+                .when(self.cst_eq(6))
                 .then(self.ratear_global(Coluna::Export))
                 .otherwise(lit(NULL)),
 
-            Coluna::RBNCum => when(cst.clone().lt(lit(3)))
+            Coluna::RBNCum => when(self.cst_lt(3))
                 .then(bc.clone())
                 .otherwise(bc * self.fator_rbnc.clone()),
 
-            Coluna::RBCum => when(cst.clone().lt(lit(3)))
+            Coluna::RBCum => when(self.cst_lt(3))
                 .then(lit(NULL))
                 .otherwise(bc * self.fator_rbc.clone()),
 
