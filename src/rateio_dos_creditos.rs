@@ -298,6 +298,61 @@ mod tests_ratear_creditos {
     // =========================================================================
 
     #[test]
+    /// Realiza um teste de regressão estrito, comparando os resultados finais obtidos
+    /// entre o novo algoritmo estruturado (`gerar_colunas_rateio`) e o algoritmo legado
+    /// baseado em strings (`ratear_bc_dos_creditos_conforme_receita_segregada_legacy`).
+    ///
+    /// Garante que ambas as implementações comportam-se de forma idêntica do ponto de vista funcional.
+    fn test_comparativo_regressao_algoritmos() -> JoinResult<()> {
+        configure_the_environment();
+
+        let cst_col = coluna(Left, "cst");
+        let valor_bc_col = coluna(Left, "valor_bc");
+
+        let rbnc_tributada_val = 14_300.00;
+        let rbnc_ntributada_val = 34_500.00;
+        let rbnc_exportacao_val = 26_200.00;
+        let rec_bruta_nc_val = rbnc_tributada_val + rbnc_ntributada_val + rbnc_exportacao_val;
+        let rec_bruta_cum_val = 25_000.00;
+        let rec_bruta_total_val = rec_bruta_nc_val + rec_bruta_cum_val;
+
+        let df_input = df![
+            cst_col => [50i64, 51i64, 52i64, 53i64, 54i64, 55i64, 56i64],
+            valor_bc_col => [100_000.00, 200_000.00, 300_000.00, 100_000.00, 100_000.00, 100_000.00, 100_000.00],
+            "RBNC_Tributada" => [rbnc_tributada_val; 7],
+            "RBNC_NTributada" => [rbnc_ntributada_val; 7],
+            "RBNC_Exportação" => [rbnc_exportacao_val; 7],
+            "RecBrutaNCumulativa" => [rec_bruta_nc_val; 7],
+            "RecBrutaCumulativa" => [rec_bruta_cum_val; 7],
+            "ReceitaBrutaTotal" => [rec_bruta_total_val; 7],
+        ]?;
+
+        // 1. Processamento pelo novo algoritmo estruturado
+        let rateador_novo = RateioDosCreditos::new();
+        let result_novo = df_input
+            .clone()
+            .lazy()
+            .with_columns(rateador_novo.gerar_colunas_rateio()?)
+            .round_float_columns(2)
+            .collect()?;
+
+        println!("result_novo: {result_novo}");
+
+        // 2. Processamento pelo algoritmo legado baseado em strings
+        let result_legacy =
+            ratear_bc_dos_creditos_conforme_receita_segregada_legacy(df_input.lazy())?
+                .round_float_columns(2)
+                .collect()?;
+
+        println!("result_legacy: {result_legacy}");
+
+        // Assegura comportamento idêntico
+        assert_eq!(result_novo, result_legacy);
+
+        Ok(())
+    }
+
+    #[test]
     /// Valida o rateio proporcional de créditos comuns (parciais e globais) e apropriações diretas
     /// utilizando parâmetros didáticos com Receita Total de R$ 100.000,00 (Fator RBNC de 90%).
     ///
@@ -544,7 +599,7 @@ mod tests_ratear_creditos {
     /// * Tributada = 100.000,00 * 0,00 * (0,00 / 0,00) -> Converge de forma segura para 0,00
     /// * Não Tributada = 100.000,00 * 0,00 * (0,00 / 0,00) -> Converge de forma segura para 0,00
     /// * Exportação = 100.000,00 * 0,00 * (0,00 / 0,00) -> Converge de forma segura para 0,00
-    fn test_divisao_por_zero() -> JoinResult<()> {
+    fn test_divisao_por_zero_rbnc_nula() -> JoinResult<()> {
         // Configura o ambiente de exibição do console para depuração
         configure_the_environment();
 
@@ -621,24 +676,30 @@ mod tests_ratear_creditos {
     }
 
     #[test]
-    /// Realiza um teste de regressão estrito, comparando os resultados finais obtidos
-    /// entre o novo algoritmo estruturado (`gerar_colunas_rateio`) e o algoritmo legado
-    /// baseado em strings (`ratear_bc_dos_creditos_conforme_receita_segregada_legacy`).
+    /// Valida o comportamento do rateador quando todas as receitas do período são nulas ou zeradas
+    /// (Receita Bruta Total igual a R$ 0,00).
     ///
-    /// Garante que ambas as implementações comportam-se de forma idêntica do ponto de vista funcional.
-    fn test_comparativo_regressao_algoritmos() -> JoinResult<()> {
+    /// ### Demonstração Lógica (Cenário de Exceção)
+    ///
+    /// Sob este cenário extremo, a condição de segurança `receita_nao_nula()` retorna falso para todas as
+    /// linhas. O motor de execução desvia o processamento para a cláusula `.otherwise(...)` do
+    /// gerador central de projeção, mantendo inalterados os valores originais das colunas de receita.
+    fn test_divisao_por_zero_rb_nula() -> JoinResult<()> {
+        // Configura o ambiente de exibição do console para depuração
         configure_the_environment();
 
         let cst_col = coluna(Left, "cst");
         let valor_bc_col = coluna(Left, "valor_bc");
 
-        let rbnc_tributada_val = 14_300.00;
-        let rbnc_ntributada_val = 34_500.00;
-        let rbnc_exportacao_val = 26_200.00;
-        let rec_bruta_nc_val = rbnc_tributada_val + rbnc_ntributada_val + rbnc_exportacao_val;
-        let rec_bruta_cum_val = 25_000.00;
-        let rec_bruta_total_val = rec_bruta_nc_val + rec_bruta_cum_val;
+        // Valores consolidados de Receita Bruta simulando ausência total de receitas (Fator RBNC = 0/0)
+        let rbnc_tributada_val = 0.00;
+        let rbnc_ntributada_val = 0.00;
+        let rbnc_exportacao_val = 0.00;
+        let rec_bruta_nc_val = rbnc_tributada_val + rbnc_ntributada_val + rbnc_exportacao_val; // R$ 0,00
+        let rec_bruta_cum_val = 0.00;
+        let rec_bruta_total_val = rec_bruta_nc_val + rec_bruta_cum_val; // R$ 0,00
 
+        // 1. Cria o DataFrame de entrada contendo as linhas de aquisições (Entradas) para cada CST:
         let df_input = df![
             cst_col => [50i64, 51i64, 52i64, 53i64, 54i64, 55i64, 56i64],
             valor_bc_col => [100_000.00, 200_000.00, 300_000.00, 100_000.00, 100_000.00, 100_000.00, 100_000.00],
@@ -650,27 +711,37 @@ mod tests_ratear_creditos {
             "ReceitaBrutaTotal" => [rec_bruta_total_val; 7],
         ]?;
 
-        // 1. Processamento pelo novo algoritmo estruturado
-        let rateador_novo = RateioDosCreditos::new();
-        let result_novo = df_input
-            .clone()
+        println!("df_input:\n{}", df_input);
+
+        // 2. Executa as projeções matemáticas através da struct RateioDosCreditos
+        let rateador = RateioDosCreditos::new();
+        let result_df = df_input
             .lazy()
-            .with_columns(rateador_novo.gerar_colunas_rateio()?)
+            .with_columns(rateador.gerar_colunas_rateio()?)
+            // Arredonda para 2 casas decimais para validação de centavos
             .round_float_columns(2)
             .collect()?;
 
-        println!("result_novo: {result_novo}");
+        println!(
+            "Resultado Obtido (Casos Extremos - Receitas Totais Zeradas):\n{}",
+            result_df
+        );
 
-        // 2. Processamento pelo algoritmo legado baseado em strings
-        let result_legacy =
-            ratear_bc_dos_creditos_conforme_receita_segregada_legacy(df_input.lazy())?
-                .round_float_columns(2)
-                .collect()?;
+        // 3. Cria o DataFrame esperado
+        // Como o rateio de créditos não é acionado sob receitas totais zeradas, os valores originais das colunas de receita (0,00) são preservados.
+        let df_expected = df![
+            cst_col => [50i64, 51i64, 52i64, 53i64, 54i64, 55i64, 56i64],
+            valor_bc_col => [100_000.00, 200_000.00, 300_000.00, 100_000.00, 100_000.00, 100_000.00, 100_000.00],
+            "RBNC_Tributada" => [Some(0.00); 7],
+            "RBNC_NTributada" => [Some(0.00); 7],
+            "RBNC_Exportação" => [Some(0.00); 7],
+            "RecBrutaNCumulativa" => [Some(0.00); 7],
+            "RecBrutaCumulativa" => [Some(0.00); 7],
+            "ReceitaBrutaTotal" => [Some(0.00); 7],
+        ]?;
 
-        println!("result_legacy: {result_legacy}");
-
-        // Assegura comportamento idêntico
-        assert_eq!(result_novo, result_legacy);
+        // 4. Compara os DataFrames para garantir exatidão absoluta
+        assert_eq!(result_df, df_expected);
 
         Ok(())
     }
