@@ -369,8 +369,8 @@ mod tests_ratear_creditos {
         let result_df = df_input
             .lazy()
             .with_columns(rateador.gerar_colunas_rateio()?)
-            // Arredonda para 2 casas decimais para validação de centavos idêntica à planilha
-            .round_float_columns(2)
+            // Arredonda para 4 casas decimais
+            .round_float_columns(4)
             .collect()?;
 
         println!("Resultado Obtido:\n{}", result_df);
@@ -387,8 +387,8 @@ mod tests_ratear_creditos {
         let df_expected = df![
             cst_col => [50i64, 51i64, 52i64, 53i64, 54i64, 55i64, 56i64],
             valor_bc_col => [100_000.00, 200_000.00, 300_000.00, 100_000.00, 100_000.00, 100_000.00, 100_000.00],
-            "RBNC_Tributada" => [Some(100_000.00), None, None, Some(51_428.57), Some(60_000.00), None, Some(40_000.00)],
-            "RBNC_NTributada" => [None, Some(200_000.00), None, Some(38_571.43), None, Some(54_000.00), Some(30_000.00)],
+            "RBNC_Tributada" => [Some(100_000.00), None, None, Some(51428.5714), Some(60_000.00), None, Some(40_000.00)],
+            "RBNC_NTributada" => [None, Some(200_000.00), None, Some(38571.4286), None, Some(54_000.00), Some(30_000.00)],
             "RBNC_Exportação" => [None::<f64>, None, Some(300_000.00), None, Some(30_000.00), Some(36_000.00), Some(20_000.00)],
             "RecBrutaNCumulativa" => [Some(100_000.00), Some(200_000.00), Some(300_000.00), Some(90_000.00), Some(90_000.00), Some(90_000.00), Some(90_000.00)],
             "RecBrutaCumulativa" => [None, None, None, Some(10_000.00), Some(10_000.00), Some(10_000.00), Some(10_000.00)],
