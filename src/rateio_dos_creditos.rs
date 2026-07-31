@@ -505,10 +505,10 @@ mod tests_ratear_creditos {
     /// * Exportação = 100.000,00 * 0,75 * (25.000,00 / 62.000,00) ≈ 30.241,94
     ///
     /// #### CST 56 (Comum Global)
-    /// * Subgrupo de rateio: RecBrutaNCumulativa = 75.000,00
-    /// * Tributada = 100.000,00 * 0,75 * (13.000,00 / 75.000,00) = 13.000,00
-    /// * Não Tributada = 100.000,00 * 0,75 * (37.000,00 / 75.000,00) = 37.000,00
-    /// * Exportação = 100.000,00 * 0,75 * (25.000,00 / 75.000,00) = 25.000,00
+    /// * Subgrupo de rateio: RecBrutaNCumulativa = 150.000,00
+    /// * Tributada = 200.000,00 * 0,75 * (26.000,00 / 150.000,00) = 26.000,00
+    /// * Não Tributada = 200.000,00 * 0,75 * (74.000,00 / 150.000,00) = 74.000,00
+    /// * Exportação = 200.000,00 * 0,75 * (50.000,00 / 150.000,00) = 50.000,00
     fn test_creditos_regime_misto() -> JoinResult<()> {
         // Configura o ambiente de exibição do console para depuração
         configure_the_environment();
@@ -531,10 +531,10 @@ mod tests_ratear_creditos {
         // - CST 53 (Comum Parcial - Trib + NT): BC de R$ 100.000,00
         // - CST 54 (Comum Parcial - Trib + Exp): BC de R$ 100.000,00
         // - CST 55 (Comum Parcial - NT + Exp): BC de R$ 100.000,00
-        // - CST 56 (Comum Global): BC de R$ 100.000,00
+        // - CST 56 (Comum Global): BC de R$ 200.000,00
         let df_input = df![
             cst_col => [50i64, 51i64, 52i64, 53i64, 54i64, 55i64, 56i64],
-            valor_bc_col => [100_000.00, 200_000.00, 300_000.00, 100_000.00, 100_000.00, 100_000.00, 100_000.00],
+            valor_bc_col => [100_000.00, 200_000.00, 300_000.00, 100_000.00, 100_000.00, 100_000.00, 200_000.00],
             "RBNC_Tributada" => [rbnc_tributada_val; 7],
             "RBNC_NTributada" => [rbnc_ntributada_val; 7],
             "RBNC_Exportação" => [rbnc_exportacao_val; 7],
@@ -564,16 +564,16 @@ mod tests_ratear_creditos {
         // - CST 53: Trib = 100k * 0.75 * (13/50) = 19.500,00 | NT = 100k * 0.75 * (37/50) = 55.500,00
         // - CST 54: Trib = 100k * 0.75 * (13/38) = 25.657,89 | Exp = 100k * 0.75 * (25/38) = 49.342,11
         // - CST 55: NT = 100k * 0.75 * (37/62) = 44.758,06   | Exp = 100k * 0.75 * (25/62) = 30.241,94
-        // - CST 56: Trib = 100k * 0.75 * (13/75) = 13.000,00 | NT = 37.000,00 | Exp = 25.000,00
+        // - CST 56: Trib = 200k * 0.75 * (13/75) = 26.000,00 | NT = 74.000,00 | Exp = 50.000,00
         let df_expected = df![
             cst_col => [50i64, 51i64, 52i64, 53i64, 54i64, 55i64, 56i64],
-            valor_bc_col => [100_000.00, 200_000.00, 300_000.00, 100_000.00, 100_000.00, 100_000.00, 100_000.00],
-            "RBNC_Tributada" => [Some(100_000.00), None, None, Some(19_500.00), Some(25_657.89), None, Some(13_000.00)],
-            "RBNC_NTributada" => [None, Some(200_000.00), None, Some(55_500.00), None, Some(44_758.06), Some(37_000.00)],
-            "RBNC_Exportação" => [None::<f64>, None, Some(300_000.00), None, Some(49_342.11), Some(30_241.94), Some(25_000.00)],
-            "RecBrutaNCumulativa" => [Some(100_000.00), Some(200_000.00), Some(300_000.00), Some(75_000.00), Some(75_000.00), Some(75_000.00), Some(75_000.00)],
-            "RecBrutaCumulativa" => [None, None, None, Some(25_000.00), Some(25_000.00), Some(25_000.00), Some(25_000.00)],
-            "ReceitaBrutaTotal" => [Some(100_000.00), Some(200_000.00), Some(300_000.00), Some(100_000.00), Some(100_000.00), Some(100_000.00), Some(100_000.00)],
+            valor_bc_col => [100_000.00, 200_000.00, 300_000.00, 100_000.00, 100_000.00, 100_000.00, 200_000.00],
+            "RBNC_Tributada" => [Some(100_000.00), None, None, Some(19_500.00), Some(25_657.89), None, Some(26_000.00)],
+            "RBNC_NTributada" => [None, Some(200_000.00), None, Some(55_500.00), None, Some(44_758.06), Some(74_000.00)],
+            "RBNC_Exportação" => [None::<f64>, None, Some(300_000.00), None, Some(49_342.11), Some(30_241.94), Some(50_000.00)],
+            "RecBrutaNCumulativa" => [Some(100_000.00), Some(200_000.00), Some(300_000.00), Some(75_000.00), Some(75_000.00), Some(75_000.00), Some(150_000.00)],
+            "RecBrutaCumulativa" => [None, None, None, Some(25_000.00), Some(25_000.00), Some(25_000.00), Some(50_000.00)],
+            "ReceitaBrutaTotal" => [Some(100_000.00), Some(200_000.00), Some(300_000.00), Some(100_000.00), Some(100_000.00), Some(100_000.00), Some(200_000.00)],
         ]?;
 
         assert_eq!(result_df, df_expected);
