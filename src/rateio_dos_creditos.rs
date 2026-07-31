@@ -369,9 +369,7 @@ mod tests_ratear_creditos {
         let result_df = df_input
             .lazy()
             .with_columns(rateador.gerar_colunas_rateio()?)
-            .collect()?
             // Arredonda para 2 casas decimais para validação de centavos idêntica à planilha
-            .lazy()
             .round_float_columns(2)
             .collect()?;
 
@@ -475,9 +473,7 @@ mod tests_ratear_creditos {
         let result_df = df_input
             .lazy()
             .with_columns(rateador.gerar_colunas_rateio()?)
-            .collect()?
             // Arredonda para 2 casas decimais para validação de centavos idêntica à planilha
-            .lazy()
             .round_float_columns(2)
             .collect()?;
 
@@ -589,9 +585,7 @@ mod tests_ratear_creditos {
         let result_df = df_input
             .lazy()
             .with_columns(rateador.gerar_colunas_rateio()?)
-            .collect()?
             // Arredonda para 2 casas decimais para validação de centavos idêntica à planilha
-            .lazy()
             .round_float_columns(2)
             .collect()?;
 
@@ -662,8 +656,6 @@ mod tests_ratear_creditos {
             .clone()
             .lazy()
             .with_columns(rateador_novo.gerar_colunas_rateio()?)
-            .collect()?
-            .lazy()
             .round_float_columns(2)
             .collect()?;
 
