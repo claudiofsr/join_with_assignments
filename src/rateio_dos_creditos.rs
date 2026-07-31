@@ -73,6 +73,18 @@ impl RateioDosCreditos {
     // Lógica Matemática e Métodos Auxiliares
     // =========================================================================
 
+    /// Verifica se o dígito final do CST é igual ao valor fornecido.
+    #[inline]
+    fn cst_eq(&self, valor: i64) -> Expr {
+        self.cst_decimal.clone().eq(lit(valor))
+    }
+
+    /// Verifica se o dígito final do CST é menor que o valor fornecido.
+    #[inline]
+    fn cst_lt(&self, valor: i64) -> Expr {
+        self.cst_decimal.clone().lt(lit(valor))
+    }
+
     /// Rateio comum parcial entre duas colunas de receita do subgrupo.
     #[inline]
     fn ratear_parcial(&self, col_dest: Coluna, col_outro: Coluna) -> Expr {
@@ -88,18 +100,6 @@ impl RateioDosCreditos {
     #[inline]
     fn ratear_global(&self, col_dest: Coluna) -> Expr {
         self.valor_bc.clone() * col(col_dest.as_str()) / col(Coluna::RBTotal.as_str())
-    }
-
-    /// Verifica se o dígito final do CST é igual ao valor fornecido.
-    #[inline]
-    fn cst_eq(&self, valor: i64) -> Expr {
-        self.cst_decimal.clone().eq(lit(valor))
-    }
-
-    /// Verifica se o dígito final do CST é menor que o valor fornecido.
-    #[inline]
-    fn cst_lt(&self, valor: i64) -> Expr {
-        self.cst_decimal.clone().lt(lit(valor))
     }
 
     // =========================================================================
