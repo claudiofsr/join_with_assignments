@@ -1,119 +1,49 @@
-//! # Rateio Proporcional de Créditos de PIS/COFINS
-//!
-//! Este módulo gerencia o particionamento e a alocação dos créditos apurados no regime
-//! não cumulativo (CSTs 50 a 66) entre os diferentes grupos de receita (tributada,
-//! não tributada e exportação), conforme as regras estabelecidas pelo art. 3º, § 8º,
-//! inciso II da Lei nº 10.833/2003 e pela Instrução Normativa RFB nº 2.121/2022.
-//!
-//! ## Sistemática de Rateio
-//!
-//! A segregação de créditos comuns utiliza duas etapas proporcionais consecutivas:
-//!
-//! 1. **Fator de Rateio Global (Misto):** Identifica a parcela do insumo comum atribuível
-//!    à apuração não cumulativa frente à receita bruta total do período:
-//!    Fator RBNC = RecBrutaNCumulativa / ReceitaBrutaTotal
-//!
-//! 2. **Fator de Rateio de Subgrupo:** Para CSTs de uso comum parcial ou global,
-//!    aplica a proporção interna da receita vinculada sobre o somatório do subgrupo:
-//!    Proporção = Receita Destino / Soma(Receitas do Subgrupo)
-
 use crate::{Side::Left, coluna, cst_50_a_66, receita_nao_nula};
 use polars::prelude::*;
 
 // ============================================================================
-// CONSTANTES DE COLUNAS (Prevenção de Typos)
+// ENUMS DE DOMÍNIO
 // ============================================================================
-const COL_TRIB: &str = "RBNC_Tributada";
-const COL_NTRIB: &str = "RBNC_NTributada";
-const COL_EXP: &str = "RBNC_Exportação";
-const COL_REC_BRUTA_NCUM: &str = "RecBrutaNCumulativa";
-const COL_REC_BRUTA_CUM: &str = "RecBrutaCumulativa";
-const COL_REC_BRUTA_TOTAL: &str = "ReceitaBrutaTotal";
 
-/// Define de forma estrita as combinações de rateio de créditos comuns permitidas pela legislação.
+/// Colunas que sofrem o processo de rateio proporcional de créditos comuns.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum GrupoRateio {
-    /// CST 50/60: Crédito Exclusivo de Mercado Interno Tributado.
+enum Coluna {
     Trib,
-    /// CST 51/61: Crédito Exclusivo de Mercado Interno Não Tributado.
     NTrib,
-    /// CST 52/62: Crédito Exclusivo de Exportação.
-    Exportacao,
-    /// CST 53/63: Comum entre Mercado Interno Tributado e Não Tributado.
-    TribNTrib,
-    /// CST 54/64: Comum entre Mercado Interno Tributado e Exportação.
-    TribExportacao,
-    /// CST 55/65: Comum entre Mercado Interno Não Tributado e Exportação.
-    NTribExportacao,
-    /// CST 56/66: Comum Global (Vinculado a todas as frentes).
-    Global,
+    Export,
+    RBNCum,
+    RBCum,
+    RBTotal,
 }
 
-impl GrupoRateio {
-    /// Retorna se a frente tributada está ativa neste grupo de rateio.
+impl Coluna {
+    /// Retorna o nome físico da coluna na tabela de dados.
     #[inline]
-    pub fn eh_tributada(&self) -> bool {
-        matches!(
-            self,
-            Self::Trib | Self::TribNTrib | Self::TribExportacao | Self::Global
-        )
-    }
-
-    /// Retorna se a frente não tributada está ativa neste grupo de rateio.
-    #[inline]
-    pub fn eh_ntributada(&self) -> bool {
-        matches!(
-            self,
-            Self::NTrib | Self::TribNTrib | Self::NTribExportacao | Self::Global
-        )
-    }
-
-    /// Retorna se a frente de exportação está ativa neste grupo de rateio.
-    #[inline]
-    pub fn eh_exportacao(&self) -> bool {
-        matches!(
-            self,
-            Self::Exportacao | Self::TribExportacao | Self::NTribExportacao | Self::Global
-        )
-    }
-
-    /// Retorna se o grupo representa um crédito de apropriação direta (exclusivo).
-    #[inline]
-    pub fn eh_exclusivo(&self) -> bool {
-        matches!(self, Self::Trib | Self::NTrib | Self::Exportacao)
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Trib => "RBNC_Tributada",
+            Self::NTrib => "RBNC_NTributada",
+            Self::Export => "RBNC_Exportação",
+            Self::RBNCum => "RecBrutaNCumulativa",
+            Self::RBCum => "RecBrutaCumulativa",
+            Self::RBTotal => "ReceitaBrutaTotal",
+        }
     }
 }
+
+// ============================================================================
+// ESTRUTURA PRINCIPAL
+// ============================================================================
 
 /// Estrutura para processar o rateio proporcional de créditos comuns e exclusivos.
-///
-/// # Diagrama de Fluxo do Rateio
-///
-/// ```text
-///                       [ Base de Cálculo (CST 50 a 66) ]
-///                                       │
-///                       ┌───────────────┴───────────────┐
-///                       ▼                               ▼
-///             [ Insumo Exclusivo ]            [ Insumo Comum Geral ]
-///             (Apropriação Direta)              (Fator de Rateio)
-///                       │                               │
-///                       ▼                               ▼
-///               (Aplica 100% na)             (Multiplica a Base por:)
-///             (coluna correspondente)          RecBrutaNCumulativa
-///                                              ───────────────────
-///                                              ReceitaBrutaTotal
-/// ```
-///
-/// # Classificação Didática dos Créditos (CSTs 50 a 66):
-///
-/// * **Apropriação Direta (Exclusivo):** Créditos vinculados integralmente a um tipo de receita (Tributada, NT ou Exportação).
-/// * **Rateio Proporcional Parcial:** Créditos vinculados a mais de um tipo de receita, exigindo subdivisão interna.
-/// * **Rateio Proporcional Geral (Global):** Créditos comuns que devem ser distribuídos sobre a totalidade das receitas do regime.
 pub struct RateioDosCreditos {
-    /// Expressão que aponta para a coluna de Base de Cálculo original.
+    /// Base de Cálculo original das contribuições.
     valor_bc: Expr,
-    /// Fator de proporcionalidade não cumulativo (Regime Misto).
+    /// Dígito final do CST (`cst % 10`), utilizado como identificador mútuo exclusivo.
+    codigo_cst: Expr,
+    /// Fator de proporcionalidade não cumulativo (RBNC / Total).
     fator_rbnc: Expr,
-    /// Fator de proporcionalidade cumulativo (Regime Misto).
+    /// Fator de proporcionalidade cumulativo (RBC / Total).
     fator_rbc: Expr,
 }
 
@@ -124,14 +54,16 @@ impl Default for RateioDosCreditos {
 }
 
 impl RateioDosCreditos {
-    /// Instancia o rateio configurando os seletores de colunas e condições fiscais.
+    /// Instancia o rateador configurando as expressões fundamentais.
     pub fn new() -> Self {
         let valor_bc = col(coluna(Left, "valor_bc"));
-        let fator_rbnc = col(COL_REC_BRUTA_NCUM) / col(COL_REC_BRUTA_TOTAL);
-        let fator_rbc = col(COL_REC_BRUTA_CUM) / col(COL_REC_BRUTA_TOTAL);
+        let codigo_cst = col(coluna(Left, "cst")) % lit(10);
+        let fator_rbnc = col(Coluna::RBNCum.as_str()) / col(Coluna::RBTotal.as_str());
+        let fator_rbc = col(Coluna::RBCum.as_str()) / col(Coluna::RBTotal.as_str());
 
         Self {
             valor_bc,
+            codigo_cst,
             fator_rbnc,
             fator_rbc,
         }
@@ -141,227 +73,98 @@ impl RateioDosCreditos {
     // Lógica Matemática e Métodos Auxiliares
     // =========================================================================
 
-    /// Retorna a expressão de verificação do CST com base nas propriedades aritméticas de sua terminação.
-    fn condicao_grupo(&self, grupo: GrupoRateio) -> Expr {
-        let digito = match grupo {
-            GrupoRateio::Trib => 0,
-            GrupoRateio::NTrib => 1,
-            GrupoRateio::Exportacao => 2,
-            GrupoRateio::TribNTrib => 3,
-            GrupoRateio::TribExportacao => 4,
-            GrupoRateio::NTribExportacao => 5,
-            GrupoRateio::Global => 6,
-        };
-        (col(coluna(Left, "cst")) % lit(10)).eq(lit(digito))
-    }
+    /// Rateio comum parcial entre duas colunas de receita do subgrupo.
+    #[inline]
+    fn ratear_parcial(&self, col_dest: Coluna, col_soma1: Coluna, col_soma2: Coluna) -> Expr {
+        let soma_denominador = col(col_soma1.as_str()) + col(col_soma2.as_str());
+        let proporcao = when(soma_denominador.clone().gt(lit(0.0)))
+            .then(col(col_dest.as_str()) / soma_denominador)
+            .otherwise(lit(0.0));
 
-    /// Filtro auxiliar para identificar se a linha corresponde a qualquer crédito de apropriação direta.
-    fn condicao_exclusivo(&self) -> Expr {
-        self.condicao_grupo(GrupoRateio::Trib)
-            .or(self.condicao_grupo(GrupoRateio::NTrib))
-            .or(self.condicao_grupo(GrupoRateio::Exportacao))
-    }
-
-    /// Filtro auxiliar para identificar se a linha corresponde a qualquer crédito de rateio comum.
-    fn condicao_comum(&self) -> Expr {
-        self.condicao_grupo(GrupoRateio::TribNTrib)
-            .or(self.condicao_grupo(GrupoRateio::TribExportacao))
-            .or(self.condicao_grupo(GrupoRateio::NTribExportacao))
-            .or(self.condicao_grupo(GrupoRateio::Global))
-    }
-
-    /// Calcula a proporção de uma receita destino específica sobre o somatório das frentes ativas.
-    fn calcular_proporcao_interna(&self, col_dest: &str, grupo: GrupoRateio) -> Expr {
-        let soma_denominador = if grupo == GrupoRateio::Global {
-            col(COL_REC_BRUTA_NCUM)
-        } else {
-            let mut soma = lit(0.0);
-            if grupo.eh_tributada() {
-                soma = soma + col(COL_TRIB);
-            }
-            if grupo.eh_ntributada() {
-                soma = soma + col(COL_NTRIB);
-            }
-            if grupo.eh_exportacao() {
-                soma = soma + col(COL_EXP);
-            }
-            soma
-        };
-
-        when(soma_denominador.clone().gt(lit(0.0)))
-            .then(col(col_dest) / soma_denominador)
-            .otherwise(lit(0.0))
-    }
-
-    /// Executa o cálculo proporcional de rateio de crédito comum.
-    fn ratear_comum(&self, col_dest: &str, grupo: GrupoRateio) -> Expr {
-        let proporcao = self.calcular_proporcao_interna(col_dest, grupo);
         self.valor_bc.clone() * self.fator_rbnc.clone() * proporcao
     }
 
-    /// Centraliza a lógica de rateios gerando uma expressão condicional unificada.
-    ///
-    /// Esta função utiliza a operação de acumulação [`Iterator::fold`] para construir de forma
-    /// declarativa uma árvore de expressões aninhadas (`when / then / otherwise`). Em tempo de
-    /// execução, o motor do Polars avalia esse conjunto de condições para cada linha do DataFrame.
-    ///
-    /// ### Exclusividade das Condições
-    ///
-    /// As verificações de grupo são baseadas no dígito final do CST (`cst % 10`), o que torna as
-    /// condições de enquadramento dos grupos ([`GrupoRateio`]) mutuamente excludentes.
-    /// Como uma linha da tabela possui um único CST e, portanto, atende a apenas um grupo por vez:
-    ///
-    /// 1. Não existe o risco de uma linha satisfazer duas condições simultaneamente.
-    /// 2. A ordem em que o `fold` aninha as ramificações de fallback no parâmetro `otherwise`
-    ///    não interfere na exatidão do resultado numérico final.
-    /// 3. Em tempo de execução, o Polars avalia as ramificações e interrompe a verificação
-    ///    (*short-circuit*) assim que o grupo correspondente à linha é localizado.
-    fn aplicar_rateios(&self, col_destino: &str, grupos: &[GrupoRateio]) -> Expr {
-        grupos.iter().fold(lit(NULL), |acumulador, &grupo| {
-            let valor_calculado = if grupo.eh_exclusivo() {
-                self.valor_bc.clone()
-            } else {
-                self.ratear_comum(col_destino, grupo)
-            };
-
-            when(self.condicao_grupo(grupo))
-                .then(valor_calculado)
-                .otherwise(acumulador)
-        })
+    /// Rateio comum global (Dígito 6: CSTs 56 e 66).
+    #[inline]
+    fn ratear_global(&self, col_dest: Coluna) -> Expr {
+        self.valor_bc.clone() * col(col_dest.as_str()) / col(Coluna::RBTotal.as_str())
     }
 
     // =========================================================================
-    // Projeções Individuais de Colunas de Crédito (Retornam Expr Pura)
+    // Gerador Unificado de Expressões (Ponto de Entrada Único do Rust)
     // =========================================================================
 
-    /// Retorna a expressão de rateio para a parcela atribuída a receitas tributadas no mercado interno.
-    pub fn rbnc_tributada(&self) -> Expr {
-        self.aplicar_rateios(
-            COL_TRIB,
-            &[
-                GrupoRateio::Trib,
-                GrupoRateio::TribNTrib,
-                GrupoRateio::TribExportacao,
-                GrupoRateio::Global,
-            ],
-        )
-    }
+    fn ratear_coluna(&self, col_tipo: Coluna) -> Expr {
+        // SIMPLIFICAÇÃO: Extração de clones redundantes para variáveis locais de escopo curto
+        let cst = self.codigo_cst.clone();
+        let bc = self.valor_bc.clone();
 
-    /// Retorna a expressão de rateio para a parcela atribuída a receitas desoneradas no mercado interno.
-    pub fn rbnc_ntributada(&self) -> Expr {
-        self.aplicar_rateios(
-            COL_NTRIB,
-            &[
-                GrupoRateio::NTrib,
-                GrupoRateio::TribNTrib,
-                GrupoRateio::NTribExportacao,
-                GrupoRateio::Global,
-            ],
-        )
-    }
+        match col_tipo {
+            Coluna::Trib => when(cst.clone().eq(lit(0)))
+                .then(bc)
+                .when(cst.clone().eq(lit(3)))
+                .then(self.ratear_parcial(Coluna::Trib, Coluna::Trib, Coluna::NTrib))
+                .when(cst.clone().eq(lit(4)))
+                .then(self.ratear_parcial(Coluna::Trib, Coluna::Trib, Coluna::Export))
+                .when(cst.clone().eq(lit(6)))
+                .then(self.ratear_global(Coluna::Trib))
+                .otherwise(lit(NULL)),
 
-    /// Retorna a expressão de rateio para a parcela atribuída a receitas de exportação direta.
-    pub fn rbnc_exportacao(&self) -> Expr {
-        self.aplicar_rateios(
-            COL_EXP,
-            &[
-                GrupoRateio::Exportacao,
-                GrupoRateio::TribExportacao,
-                GrupoRateio::NTribExportacao,
-                GrupoRateio::Global,
-            ],
-        )
-    }
+            Coluna::NTrib => when(cst.clone().eq(lit(1)))
+                .then(bc)
+                .when(cst.clone().eq(lit(3)))
+                .then(self.ratear_parcial(Coluna::NTrib, Coluna::Trib, Coluna::NTrib))
+                .when(cst.clone().eq(lit(5)))
+                .then(self.ratear_parcial(Coluna::NTrib, Coluna::NTrib, Coluna::Export))
+                .when(cst.clone().eq(lit(6)))
+                .then(self.ratear_global(Coluna::NTrib))
+                .otherwise(lit(NULL)),
 
-    /*
-    /// Retorna a expressão de rateio para a parcela atribuída a receitas tributadas no mercado interno.
-    pub fn rbnc_tributada(&self) -> Expr {
-        when(self.condicao_grupo(GrupoRateio::Trib))
-            .then(self.valor_bc.clone())
-            .when(self.condicao_grupo(GrupoRateio::TribNTrib))
-            .then(self.ratear_comum(COL_TRIB, GrupoRateio::TribNTrib))
-            .when(self.condicao_grupo(GrupoRateio::TribExportacao))
-            .then(self.ratear_comum(COL_TRIB, GrupoRateio::TribExportacao))
-            .when(self.condicao_grupo(GrupoRateio::Global))
-            .then(self.ratear_comum(COL_TRIB, GrupoRateio::Global))
-            .otherwise(lit(NULL))
-    }
+            Coluna::Export => when(cst.clone().eq(lit(2)))
+                .then(bc)
+                .when(cst.clone().eq(lit(4)))
+                .then(self.ratear_parcial(Coluna::Export, Coluna::Trib, Coluna::Export))
+                .when(cst.clone().eq(lit(5)))
+                .then(self.ratear_parcial(Coluna::Export, Coluna::NTrib, Coluna::Export))
+                .when(cst.clone().eq(lit(6)))
+                .then(self.ratear_global(Coluna::Export))
+                .otherwise(lit(NULL)),
 
-    /// Retorna a expressão de rateio para a parcela atribuída a receitas desoneradas no mercado interno.
-    pub fn rbnc_ntributada(&self) -> Expr {
-        when(self.condicao_grupo(GrupoRateio::NTrib))
-            .then(self.valor_bc.clone())
-            .when(self.condicao_grupo(GrupoRateio::TribNTrib))
-            .then(self.ratear_comum(COL_NTRIB, GrupoRateio::TribNTrib))
-            .when(self.condicao_grupo(GrupoRateio::NTribExportacao))
-            .then(self.ratear_comum(COL_NTRIB, GrupoRateio::NTribExportacao))
-            .when(self.condicao_grupo(GrupoRateio::Global))
-            .then(self.ratear_comum(COL_NTRIB, GrupoRateio::Global))
-            .otherwise(lit(NULL))
-    }
+            Coluna::RBNCum => when(cst.clone().lt(lit(3)))
+                .then(bc.clone())
+                .otherwise(bc * self.fator_rbnc.clone()),
 
-    /// Retorna a expressão de rateio para a parcela atribuída a receitas de exportação direta.
-    pub fn rbnc_exportacao(&self) -> Expr {
-        when(self.condicao_grupo(GrupoRateio::Exportacao))
-            .then(self.valor_bc.clone())
-            .when(self.condicao_grupo(GrupoRateio::TribExportacao))
-            .then(self.ratear_comum(COL_EXP, GrupoRateio::TribExportacao))
-            .when(self.condicao_grupo(GrupoRateio::NTribExportacao))
-            .then(self.ratear_comum(COL_EXP, GrupoRateio::NTribExportacao))
-            .when(self.condicao_grupo(GrupoRateio::Global))
-            .then(self.ratear_comum(COL_EXP, GrupoRateio::Global))
-            .otherwise(lit(NULL))
-    }
-    */
+            Coluna::RBCum => when(cst.clone().lt(lit(3)))
+                .then(lit(NULL))
+                .otherwise(bc * self.fator_rbc.clone()),
 
-    /// Consolida a base de cálculo total atribuível à totalidade do regime não cumulativo.
-    pub fn rec_bruta_ncumulativa(&self) -> Expr {
-        when(self.condicao_exclusivo())
-            .then(self.valor_bc.clone())
-            .when(self.condicao_comum())
-            .then(self.valor_bc.clone() * self.fator_rbnc.clone())
-            .otherwise(lit(NULL))
-    }
-
-    /// Identifica e quantifica os valores expurgados da base de créditos por estarem associados
-    /// às saídas sujeitas ao regime cumulativo (expurgo obrigatório).
-    pub fn rec_bruta_cumulativa(&self) -> Expr {
-        when(self.condicao_exclusivo())
-            .then(lit(NULL)) // Créditos exclusivos de RBNC não possuem parcela de expurgo cumulativo
-            .when(self.condicao_comum())
-            .then(self.valor_bc.clone() * self.fator_rbc.clone())
-            .otherwise(lit(NULL))
-    }
-
-    /// Retorna a base de cálculo total unificada (100% da linha do insumo).
-    pub fn receita_bruta_total(&self) -> Expr {
-        self.valor_bc.clone()
+            Coluna::RBTotal => bc,
+        }
     }
 
     // =========================================================================
     // Orquestração de Projeção com Envelopamento Único de Segurança
     // =========================================================================
 
-    /// Consolida as expressões de todas as colunas aplicando a verificação de segurança de forma centralizada.
+    /// Consolida as expressões aplicando a verificação de segurança de forma centralizada.
     pub fn gerar_colunas_rateio(&self) -> PolarsResult<[Expr; 6]> {
-        // Avalia a condição de segurança apenas uma vez
         let condicao = cst_50_a_66()?.and(receita_nao_nula());
 
-        // Envelopador reutilizável para aplicar a validação e fallback individual
-        let wrap = |expr_calculada: Expr, nome_coluna: &str| {
+        let ratear_creditos = |col_tipo: Coluna| {
+            let nome_coluna = col_tipo.as_str();
             when(condicao.clone())
-                .then(expr_calculada)
+                .then(self.ratear_coluna(col_tipo))
                 .otherwise(col(nome_coluna))
                 .alias(nome_coluna)
         };
 
         Ok([
-            wrap(self.rbnc_tributada(), COL_TRIB),
-            wrap(self.rbnc_ntributada(), COL_NTRIB),
-            wrap(self.rbnc_exportacao(), COL_EXP),
-            wrap(self.rec_bruta_ncumulativa(), COL_REC_BRUTA_NCUM),
-            wrap(self.rec_bruta_cumulativa(), COL_REC_BRUTA_CUM),
-            wrap(self.receita_bruta_total(), COL_REC_BRUTA_TOTAL),
+            ratear_creditos(Coluna::Trib),
+            ratear_creditos(Coluna::NTrib),
+            ratear_creditos(Coluna::Export),
+            ratear_creditos(Coluna::RBNCum),
+            ratear_creditos(Coluna::RBCum),
+            ratear_creditos(Coluna::RBTotal),
         ])
     }
 }
