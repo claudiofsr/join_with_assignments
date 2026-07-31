@@ -38,7 +38,7 @@ impl Coluna {
 /// Estrutura para processar o rateio proporcional de créditos comuns e exclusivos.
 pub struct RateioDosCreditos {
     /// Dígito final do CST (`cst % 10`), utilizado como identificador mútuo exclusivo.
-    cst_decimal: Expr,
+    cst_digito: Expr,
     /// Fator de proporcionalidade não cumulativo (RBNC / Total).
     fator_rbnc: Expr,
     /// Fator de proporcionalidade cumulativo (RBC / Total).
@@ -54,15 +54,16 @@ impl Default for RateioDosCreditos {
 }
 
 impl RateioDosCreditos {
-    /// Instancia o rateador configurando as expressões fundamentais.
+    /// Inicializa as expressões básicas do rateador.
     pub fn new() -> Self {
-        let cst_decimal = col(coluna(Left, "cst")) % lit(10);
+        let cst_digito = col(coluna(Left, "cst")) % lit(10);
         let valor_bc = col(coluna(Left, "valor_bc"));
+
         let fator_rbnc = col(Coluna::RBNCum.as_str()) / col(Coluna::RBTotal.as_str());
         let fator_rbc = col(Coluna::RBCum.as_str()) / col(Coluna::RBTotal.as_str());
 
         Self {
-            cst_decimal,
+            cst_digito,
             fator_rbnc,
             fator_rbc,
             valor_bc,
@@ -76,19 +77,21 @@ impl RateioDosCreditos {
     /// Verifica se o dígito final do CST é igual ao valor fornecido.
     #[inline]
     fn cst_eq(&self, valor: i64) -> Expr {
-        self.cst_decimal.clone().eq(lit(valor))
+        self.cst_digito.clone().eq(lit(valor))
     }
 
     /// Verifica se o dígito final do CST é menor que o valor fornecido.
     #[inline]
     fn cst_lt(&self, valor: i64) -> Expr {
-        self.cst_decimal.clone().lt(lit(valor))
+        self.cst_digito.clone().lt(lit(valor))
     }
 
-    /// Rateio comum parcial entre duas colunas de receita do subgrupo.
+    /// Rateio proporcional entre duas receitas do subgrupo do CST.
     #[inline]
     fn ratear_parcial(&self, col_dest: Coluna, col_outro: Coluna) -> Expr {
         let denominador = col(col_dest.as_str()) + col(col_outro.as_str());
+
+        // Evita divisão por zero retornando 0.0 se a soma das receitas do subgrupo for nula
         let proporcao = when(denominador.clone().gt(lit(0.0)))
             .then(col(col_dest.as_str()) / denominador)
             .otherwise(lit(0.0));
@@ -96,10 +99,12 @@ impl RateioDosCreditos {
         self.valor_bc.clone() * self.fator_rbnc.clone() * proporcao
     }
 
-    /// Rateio comum global (Dígito 6: CSTs 56 e 66).
+    /// Rateio global (CSTs de dígito final 6: CSTs 56 e 66).
     #[inline]
     fn ratear_global(&self, col_dest: Coluna) -> Expr {
         let denominador = col(Coluna::RBTotal.as_str());
+
+        // Evita divisão por zero retornando 0.0 se a receita total for nula
         when(denominador.clone().gt(lit(0.0)))
             .then(self.valor_bc.clone() * col(col_dest.as_str()) / denominador)
             .otherwise(lit(0.0))
