@@ -75,8 +75,8 @@ impl RateioDosCreditos {
 
     /// Rateio comum parcial entre duas colunas de receita do subgrupo.
     #[inline]
-    fn ratear_parcial(&self, col_dest: Coluna, col_soma1: Coluna, col_soma2: Coluna) -> Expr {
-        let soma_denominador = col(col_soma1.as_str()) + col(col_soma2.as_str());
+    fn ratear_parcial(&self, col_dest: Coluna, col_outro: Coluna) -> Expr {
+        let soma_denominador = col(col_dest.as_str()) + col(col_outro.as_str());
         let proporcao = when(soma_denominador.clone().gt(lit(0.0)))
             .then(col(col_dest.as_str()) / soma_denominador)
             .otherwise(lit(0.0));
@@ -113,9 +113,9 @@ impl RateioDosCreditos {
             Coluna::Trib => when(self.cst_eq(0))
                 .then(bc)
                 .when(self.cst_eq(3))
-                .then(self.ratear_parcial(Coluna::Trib, Coluna::Trib, Coluna::NTrib))
+                .then(self.ratear_parcial(Coluna::Trib, Coluna::NTrib))
                 .when(self.cst_eq(4))
-                .then(self.ratear_parcial(Coluna::Trib, Coluna::Trib, Coluna::Export))
+                .then(self.ratear_parcial(Coluna::Trib, Coluna::Export))
                 .when(self.cst_eq(6))
                 .then(self.ratear_global(Coluna::Trib))
                 .otherwise(lit(NULL)),
@@ -123,9 +123,9 @@ impl RateioDosCreditos {
             Coluna::NTrib => when(self.cst_eq(1))
                 .then(bc)
                 .when(self.cst_eq(3))
-                .then(self.ratear_parcial(Coluna::NTrib, Coluna::Trib, Coluna::NTrib))
+                .then(self.ratear_parcial(Coluna::NTrib, Coluna::Trib))
                 .when(self.cst_eq(5))
-                .then(self.ratear_parcial(Coluna::NTrib, Coluna::NTrib, Coluna::Export))
+                .then(self.ratear_parcial(Coluna::NTrib, Coluna::Export))
                 .when(self.cst_eq(6))
                 .then(self.ratear_global(Coluna::NTrib))
                 .otherwise(lit(NULL)),
@@ -133,9 +133,9 @@ impl RateioDosCreditos {
             Coluna::Export => when(self.cst_eq(2))
                 .then(bc)
                 .when(self.cst_eq(4))
-                .then(self.ratear_parcial(Coluna::Export, Coluna::Trib, Coluna::Export))
+                .then(self.ratear_parcial(Coluna::Export, Coluna::Trib))
                 .when(self.cst_eq(5))
-                .then(self.ratear_parcial(Coluna::Export, Coluna::NTrib, Coluna::Export))
+                .then(self.ratear_parcial(Coluna::Export, Coluna::NTrib))
                 .when(self.cst_eq(6))
                 .then(self.ratear_global(Coluna::Export))
                 .otherwise(lit(NULL)),
