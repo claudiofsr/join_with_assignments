@@ -37,14 +37,14 @@ impl Coluna {
 
 /// Estrutura para processar o rateio proporcional de créditos comuns e exclusivos.
 pub struct RateioDosCreditos {
-    /// Base de Cálculo original das contribuições.
-    valor_bc: Expr,
     /// Dígito final do CST (`cst % 10`), utilizado como identificador mútuo exclusivo.
-    codigo_cst: Expr,
+    cst_decimal: Expr,
     /// Fator de proporcionalidade não cumulativo (RBNC / Total).
     fator_rbnc: Expr,
     /// Fator de proporcionalidade cumulativo (RBC / Total).
     fator_rbc: Expr,
+    /// Base de Cálculo original das contribuições.
+    valor_bc: Expr,
 }
 
 impl Default for RateioDosCreditos {
@@ -56,16 +56,16 @@ impl Default for RateioDosCreditos {
 impl RateioDosCreditos {
     /// Instancia o rateador configurando as expressões fundamentais.
     pub fn new() -> Self {
+        let cst_decimal = col(coluna(Left, "cst")) % lit(10);
         let valor_bc = col(coluna(Left, "valor_bc"));
-        let codigo_cst = col(coluna(Left, "cst")) % lit(10);
         let fator_rbnc = col(Coluna::RBNCum.as_str()) / col(Coluna::RBTotal.as_str());
         let fator_rbc = col(Coluna::RBCum.as_str()) / col(Coluna::RBTotal.as_str());
 
         Self {
-            valor_bc,
-            codigo_cst,
+            cst_decimal,
             fator_rbnc,
             fator_rbc,
+            valor_bc,
         }
     }
 
@@ -96,7 +96,7 @@ impl RateioDosCreditos {
 
     fn ratear_coluna(&self, col_tipo: Coluna) -> Expr {
         // SIMPLIFICAÇÃO: Extração de clones redundantes para variáveis locais de escopo curto
-        let cst = self.codigo_cst.clone();
+        let cst = self.cst_decimal.clone();
         let bc = self.valor_bc.clone();
 
         match col_tipo {
