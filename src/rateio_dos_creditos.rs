@@ -88,9 +88,9 @@ impl RateioDosCreditos {
     /// Rateio comum parcial entre duas colunas de receita do subgrupo.
     #[inline]
     fn ratear_parcial(&self, col_dest: Coluna, col_outro: Coluna) -> Expr {
-        let soma_denominador = col(col_dest.as_str()) + col(col_outro.as_str());
-        let proporcao = when(soma_denominador.clone().gt(lit(0.0)))
-            .then(col(col_dest.as_str()) / soma_denominador)
+        let denominador = col(col_dest.as_str()) + col(col_outro.as_str());
+        let proporcao = when(denominador.clone().gt(lit(0.0)))
+            .then(col(col_dest.as_str()) / denominador)
             .otherwise(lit(0.0));
 
         self.valor_bc.clone() * self.fator_rbnc.clone() * proporcao
@@ -99,7 +99,10 @@ impl RateioDosCreditos {
     /// Rateio comum global (Dígito 6: CSTs 56 e 66).
     #[inline]
     fn ratear_global(&self, col_dest: Coluna) -> Expr {
-        self.valor_bc.clone() * col(col_dest.as_str()) / col(Coluna::RBTotal.as_str())
+        let denominador = col(Coluna::RBTotal.as_str());
+        when(denominador.clone().gt(lit(0.0)))
+            .then(self.valor_bc.clone() * col(col_dest.as_str()) / denominador)
+            .otherwise(lit(0.0))
     }
 
     // =========================================================================
