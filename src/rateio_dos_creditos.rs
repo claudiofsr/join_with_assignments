@@ -118,45 +118,49 @@ impl RateioDosCreditos {
         let bc = self.valor_bc.clone();
 
         match col_tipo {
-            Coluna::Trib => when(self.cst_eq(0))
-                .then(bc)
-                .when(self.cst_eq(3))
-                .then(self.ratear_parcial(Coluna::Trib, Coluna::NTrib))
-                .when(self.cst_eq(4))
-                .then(self.ratear_parcial(Coluna::Trib, Coluna::Export))
-                .when(self.cst_eq(6))
-                .then(self.ratear_global(Coluna::Trib))
+            Coluna::Trib => when(self.cst_eq(0)) // Se CST 50 ou 60
+                .then(bc) // Crédito vinculado exclusivamente a receita tributada, alocação direta.
+                .when(self.cst_eq(3)) // Se CST 53 ou 63
+                .then(self.ratear_parcial(Coluna::Trib, Coluna::NTrib)) // Ratear Crédito entre Receita BNC Tributada e Não Tributada
+                .when(self.cst_eq(4)) // Se CST 54 ou 64
+                .then(self.ratear_parcial(Coluna::Trib, Coluna::Export)) // Ratear Crédito entre Receita BNC Tributada e Exportação
+                .when(self.cst_eq(6)) // Se CST 56 ou 66
+                .then(self.ratear_global(Coluna::Trib)) // Ratear Crédito entre as 3 colunas de Receita BNC
                 .otherwise(lit(NULL)),
 
-            Coluna::NTrib => when(self.cst_eq(1))
-                .then(bc)
-                .when(self.cst_eq(3))
-                .then(self.ratear_parcial(Coluna::NTrib, Coluna::Trib))
-                .when(self.cst_eq(5))
-                .then(self.ratear_parcial(Coluna::NTrib, Coluna::Export))
-                .when(self.cst_eq(6))
-                .then(self.ratear_global(Coluna::NTrib))
+            Coluna::NTrib => when(self.cst_eq(1)) // Se CST 51 ou 61
+                .then(bc) // Crédito vinculado exclusivamente a receita não tributada, alocação direta.
+                .when(self.cst_eq(3)) // Se CST 53 ou 63
+                .then(self.ratear_parcial(Coluna::NTrib, Coluna::Trib)) // Ratear Crédito entre Receita BNC Não Tributada e Tributada
+                .when(self.cst_eq(5)) // Se CST 55 ou 65
+                .then(self.ratear_parcial(Coluna::NTrib, Coluna::Export)) // Ratear Crédito entre Receita BNC Não Tributada e Exportação
+                .when(self.cst_eq(6)) // Se CST 56 ou 66
+                .then(self.ratear_global(Coluna::NTrib)) // Ratear Crédito entre as 3 colunas de Receita BNC
                 .otherwise(lit(NULL)),
 
-            Coluna::Export => when(self.cst_eq(2))
-                .then(bc)
-                .when(self.cst_eq(4))
-                .then(self.ratear_parcial(Coluna::Export, Coluna::Trib))
-                .when(self.cst_eq(5))
-                .then(self.ratear_parcial(Coluna::Export, Coluna::NTrib))
-                .when(self.cst_eq(6))
-                .then(self.ratear_global(Coluna::Export))
+            Coluna::Export => when(self.cst_eq(2)) // Se CST 52 ou 62
+                .then(bc) // Crédito vinculado exclusivamente a exportação, alocação direta.
+                .when(self.cst_eq(4)) // Se CST 54 ou 64
+                .then(self.ratear_parcial(Coluna::Export, Coluna::Trib)) // Ratear Crédito entre Receita BNC Exportação e Tributada
+                .when(self.cst_eq(5)) // Se CST 55 ou 65
+                .then(self.ratear_parcial(Coluna::Export, Coluna::NTrib)) // Ratear Crédito entre Receita BNC Exportação e Não Tributada
+                .when(self.cst_eq(6)) // Se CST 56 ou 66
+                .then(self.ratear_global(Coluna::Export)) // Ratear Crédito entre as 3 colunas de Receita BNC
                 .otherwise(lit(NULL)),
 
-            Coluna::RBNCum => when(self.cst_lt(3))
-                .then(bc.clone())
-                .otherwise(bc * self.fator_rbnc.clone()),
+            Coluna::RBNCum => {
+                when(self.cst_lt(3)) // Se CST de apropriação direta (50 a 52 ou 60 a 62)
+                    .then(bc.clone()) // Alocação direta integral na Receita Bruta Não Cumulativa.
+                    .otherwise(bc * self.fator_rbnc.clone())
+            } // Se CST de rateio (53 a 56 ou 63 a 66), aplicar proporcionalidade da Receita Não Cumulativa.
 
-            Coluna::RBCum => when(self.cst_lt(3))
-                .then(lit(NULL))
-                .otherwise(bc * self.fator_rbc.clone()),
+            Coluna::RBCum => {
+                when(self.cst_lt(3)) // Se CST de apropriação direta (50 a 52 ou 60 a 62)
+                    .then(lit(NULL)) // Não há destinação de crédito para o regime cumulativo.
+                    .otherwise(bc * self.fator_rbc.clone())
+            } // Se CST de rateio (53 a 56 ou 63 a 66), aplicar proporcionalidade da Receita Cumulativa.
 
-            Coluna::RBTotal => bc,
+            Coluna::RBTotal => bc, // Alocação integral do valor da Base de Cálculo na Receita Bruta Total.
         }
     }
 
