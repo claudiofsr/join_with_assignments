@@ -15,6 +15,8 @@ use polars::prelude::*;
 use rust_xlsxwriter::worksheet::IntoExcelData;
 use rust_xlsxwriter::{Format, Formula, Table, TableColumn, Url, Workbook, Worksheet};
 
+use crate::format::{FormatKey, FormatRegistry, RowStyle}; // Importações de estilo
+
 pub struct PolarsExcelWriter {
     pub(crate) workbook: Workbook,
     pub(crate) options: WriterOptions,
@@ -288,6 +290,22 @@ impl PolarsExcelWriter {
         Ok(worksheet)
     }
 
+    // Métodos encadeados de Configuração Visual em Linha Única
+    pub fn set_row_styles(&mut self, row_styles: Vec<RowStyle>) -> &mut Self {
+        self.options.row_styles = row_styles;
+        self
+    }
+
+    pub fn set_col_configs(&mut self, col_configs: Vec<FormatKey>) -> &mut Self {
+        self.options.col_configs = col_configs;
+        self
+    }
+
+    pub fn set_format_registry(&mut self, registry: FormatRegistry) -> &mut Self {
+        self.options.registry = Some(registry);
+        self
+    }
+
     // -----------------------------------------------------------------------
     // Backward compatibility helper methods for SerWriter
     // -----------------------------------------------------------------------
@@ -330,7 +348,9 @@ impl PolarsExcelWriter {
         }
 
         let header_offset = u32::from(options.table.has_header_row());
-        let mut table_columns = vec![];
+        let num_rows = df.height();
+        let num_cols = df.width();
+        let columns = df.columns();
 
         if let Some(nan_value) = &options.nan_value {
             worksheet.set_nan_value(nan_value);
@@ -342,35 +362,97 @@ impl PolarsExcelWriter {
             worksheet.set_neg_infinity_value(neg_infinity_value);
         }
 
-        for (col_num, column) in df.columns().iter().enumerate() {
-            let col = col_offset + col_num as u16;
+        // 1. Pré-calcular as colunas da tabela com seus nomes de cabeçalho e formatos de base
+        let mut table_columns = vec![];
+        let mut col_formats = Vec::with_capacity(num_cols);
+        let mut col_string_types = Vec::with_capacity(num_cols);
+
+        for column in columns {
             let column_name = column.name().to_string();
 
+            // Define o nome do cabeçalho diretamente na estrutura TableColumn da tabela
+            let mut table_column = TableColumn::new().set_header(column_name.clone());
             if let Some(header_format) = &options.header_format {
-                let table_column = TableColumn::new().set_header_format(header_format);
-                table_columns.push(table_column);
+                table_column = table_column.set_header_format(header_format);
             }
-
-            if options.table.has_header_row() {
-                worksheet.write(row_offset, col, &column_name)?;
-            }
+            table_columns.push(table_column);
 
             let mut format = None;
             if let Some(dtype_format) = options.dtype_formats.get(column.dtype()) {
                 format = Some(dtype_format);
             }
-
             if let Some(column_format) = options.column_formats.get(&column_name) {
                 format = Some(column_format);
             }
+            col_formats.push(format);
 
             let string_type = options
                 .column_string_types
                 .get(&column_name)
                 .unwrap_or(&ColumnStringType::Default);
+            col_string_types.push(string_type.clone());
+        }
 
-            for (row_num, any_value) in column.as_materialized_series().iter().enumerate() {
-                let row = header_offset + row_offset + row_num as u32;
+        // Calcular as dimensões da tabela antes de escrever
+        let (mut max_row, max_col) = df.shape();
+        if !options.table.has_header_row() {
+            max_row -= 1;
+        }
+        if options.table.has_total_row() {
+            max_row += 1;
+        }
+
+        let mut table = options.table.clone();
+        if !table_columns.is_empty() {
+            table = table.set_columns(&table_columns);
+        }
+
+        // 2. Adicionar a tabela ANTES de escrever os dados (Exigido pelo rust_xlsxwriter em modo sequencial)
+        // Isso grava a linha 0 de cabeçalho no disco de forma irreversível e sem erros
+        worksheet.add_table(
+            row_offset,
+            col_offset,
+            row_offset + max_row as u32,
+            col_offset + max_col as u16 - 1,
+            &table,
+        )?;
+
+        // 3. Gravação de dados orientada por linhas (Row-major order) com injeção de estilo em tempo real
+        // O cursor agora avança estritamente das linhas 1 até N sem reescrever na linha 0
+        for row_num in 0..num_rows {
+            let row = header_offset + row_offset + row_num as u32;
+
+            // Extrai o estilo lógico da linha atual para mesclar com os formatos das colunas
+            let row_style = options
+                .row_styles
+                .get(row_num)
+                .copied()
+                .unwrap_or(RowStyle::Normal);
+
+            for col_idx in 0..num_cols {
+                let col = col_offset + col_idx as u16;
+                let column = &columns[col_idx];
+
+                let any_value = column.as_materialized_series().get(row_num)?;
+                let string_type = &col_string_types[col_idx];
+
+                // Otimização de Tamanho de Arquivo: Se a linha for normal, usamos None
+                // para que a célula herde nativamente o formato padrão definido na coluna.
+                // Isso evita a escrita redundante de metadados XML por célula, reduzindo o arquivo.
+                let format = if row_style != RowStyle::Normal {
+                    if let Some(ref registry) = options.registry {
+                        let f_key = options
+                            .col_configs
+                            .get(col_idx)
+                            .copied()
+                            .unwrap_or(FormatKey::Default);
+                        registry.get_format(f_key, row_style)
+                    } else {
+                        col_formats[col_idx]
+                    }
+                } else {
+                    None
+                };
 
                 match any_value {
                     AnyValue::Int8(value) => write_value(worksheet, row, col, value, format)?,
@@ -420,14 +502,14 @@ impl PolarsExcelWriter {
                         };
 
                         write_value(worksheet, row, col, &value, format)?;
-                        worksheet.set_column_width(col, 18)?;
+                        worksheet.set_column_width(col, 22)?;
                     }
 
                     AnyValue::Date(value) => {
                         let value = date32_to_date(value);
 
                         write_value(worksheet, row, col, &value, format)?;
-                        worksheet.set_column_width(col, 10)?;
+                        worksheet.set_column_width(col, 14)?;
                     }
 
                     AnyValue::Time(value) => {
@@ -456,27 +538,6 @@ impl PolarsExcelWriter {
                 }
             }
         }
-
-        let (mut max_row, max_col) = df.shape();
-        if !options.table.has_header_row() {
-            max_row -= 1;
-        }
-        if options.table.has_total_row() {
-            max_row += 1;
-        }
-
-        let mut table = options.table.clone();
-        if !table_columns.is_empty() {
-            table = table.set_columns(&table_columns);
-        }
-
-        worksheet.add_table(
-            row_offset,
-            col_offset,
-            row_offset + max_row as u32,
-            col_offset + max_col as u16 - 1,
-            &table,
-        )?;
 
         if options.use_autofit {
             worksheet.set_autofit_max_width(options.autofit_max_width);
@@ -538,6 +599,10 @@ pub(crate) struct WriterOptions {
     pub(crate) column_formats: HashMap<String, Format>,
     pub(crate) dtype_formats: HashMap<DataType, Format>,
     pub(crate) column_string_types: HashMap<String, ColumnStringType>,
+    // Adicionado ao suporte a estilos em linha de dados
+    pub(crate) row_styles: Vec<RowStyle>,
+    pub(crate) col_configs: Vec<FormatKey>,
+    pub(crate) registry: Option<FormatRegistry>,
 }
 
 impl Default for WriterOptions {
@@ -580,6 +645,9 @@ impl WriterOptions {
                     "yyyy\\-mm\\-dd\\ hh:mm:ss".into(),
                 ),
             ]),
+            row_styles: Vec::new(),
+            col_configs: Vec::new(),
+            registry: None,
         }
     }
 }

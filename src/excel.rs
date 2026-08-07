@@ -1,7 +1,7 @@
 //! # Excel Worksheet Generation Module
 //!
 //! Este módulo lida com a exportação de DataFrames estruturados para arquivos Excel formatados,
-//! oferecendo diferentes estratégias de processamento de acordo com o limite de memória do sistema.
+//! oferecendo estratégias de processamento flexíveis de acordo com a memória do sistema.
 
 use clap::ValueEnum;
 use claudiofsr_lib::Colors;
@@ -32,10 +32,12 @@ static REGEX_CNPJ_CPF: LazyLock<Regex> =
 pub enum ExcelMemoryMode {
     /// Perfil de memória constante que grava progressivamente os dados em disco.
     ConstantMemory,
+
     /// Perfil de baixa memória com uso de strings compartilhadas.
-    LowMemory,
-    /// Processa todo o Workbook em memória através de execução paralela do Rayon.
     #[default]
+    LowMemory,
+
+    /// Processa todo o Workbook em memória através de execução paralela do Rayon.
     InMemory,
 }
 
@@ -69,8 +71,6 @@ impl SheetContext {
     }
 
     /// Returns the static, unquoted string representation of this context.
-    ///
-    /// This is a zero-cost compiler-optimized mapping that requires no serialization libraries.
     #[inline]
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -81,9 +81,6 @@ impl SheetContext {
     }
 
     /// Resolves the context from a raw worksheet name.
-    ///
-    /// This searches for mapped strings as substrings within the input,
-    /// making it robust against split-sheet indexes (e.g., "Itens de Docs Fiscais 2").
     pub fn from_name(name: &str) -> JoinResult<Self> {
         if name.contains(Self::Itens.as_str()) {
             Ok(Self::Itens)
@@ -255,25 +252,47 @@ pub fn populate_worksheet_data(
 
     let registry = FormatRegistry::new(context.balance_color());
 
-    // Apply primary style overrides down respective column blocks.
+    // 1. Pré-definir os formatos padrão na própria coluna (Otimização de herança de formato)
     for (i, &f_key) in col_configs.iter().enumerate() {
         if let Some(fmt) = registry.get_format(f_key, RowStyle::Normal) {
             worksheet.set_column_format(i as u16, fmt)?;
         }
     }
 
-    // 2. Write structural contents via specialized Polars writer wrapper.
-    let mut writer = PolarsExcelWriter::new();
-
-    if let Some(date_format) = registry.get_format(FormatKey::Date, RowStyle::Normal) {
-        writer.set_date_format(date_format);
+    // 2. Pré-calcular os estilos de realce de linha em tempo real
+    let mut row_styles = vec![RowStyle::Normal; df_to_excel.height()];
+    if let Some(nature_idx) = df_to_excel.get_column_names().iter().position(|n| {
+        n.as_str()
+            .contains("Natureza da Base de Cálculo dos Créditos")
+    }) {
+        let ca = df_to_excel.columns()[nature_idx]
+            .as_materialized_series()
+            .str()?;
+        for (i, opt_val) in ca.iter().enumerate() {
+            let style = match opt_val {
+                Some(s) if s.contains("(Soma)") => RowStyle::Soma,
+                Some(s) if s.contains("Crédito Disponível após Descontos") => RowStyle::Desconto,
+                Some(s) if s.contains("Saldo de Crédito Passível") => RowStyle::Saldo,
+                _ => RowStyle::Normal,
+            };
+            row_styles[i] = style;
+        }
     }
 
-    writer.set_freeze_panes(1, 0);
-    writer.write_dataframe_to_worksheet(&df_to_excel, worksheet, 0, 0)?;
+    // 3. Configura o escritor sequencial row-major integrado com as referências de estilo
+    let mut writer = PolarsExcelWriter::new();
+    writer
+        .set_col_configs(col_configs)
+        .set_row_styles(row_styles)
+        .set_format_registry(registry);
 
-    apply_conditional_styles(&df_to_excel, worksheet, &registry, &col_configs)?;
+    writer.set_freeze_panes(1, 0);
+
+    // O auto-fit em paralelo é seguro para todos os modos antes de persistir os dados no disco
     auto_fit(&df_to_excel, worksheet)?;
+
+    // 4. Executa a gravação de passo único para dados e estilos simultaneamente
+    writer.write_dataframe_to_worksheet(&df_to_excel, worksheet, 0, 0)?;
 
     Ok(())
 }
@@ -336,51 +355,6 @@ fn get_format_key(name: &str, context: SheetContext) -> FormatKey {
     }
 
     FormatKey::Default
-}
-
-/// Aplica cores de fundo condicionalmente (Totais, Saldos e Descontos).
-fn apply_conditional_styles(
-    df: &DataFrame,
-    worksheet: &mut Worksheet,
-    registry: &FormatRegistry,
-    col_keys: &[FormatKey],
-) -> JoinResult<()> {
-    let nature_idx = df.get_column_names().iter().position(|n| {
-        n.as_str()
-            .contains("Natureza da Base de Cálculo dos Créditos")
-    });
-
-    let nature_idx = match nature_idx {
-        Some(idx) => idx,
-        None => return Ok(()),
-    };
-
-    let ca = df.columns()[nature_idx].as_materialized_series().str()?;
-
-    ca.iter()
-        .enumerate()
-        .try_for_each(|(i, opt_val)| -> JoinResult<()> {
-            let style = match opt_val {
-                Some(s) if s.contains("(Soma)") => RowStyle::Soma,
-                Some(s) if s.contains("Crédito Disponível após Descontos") => RowStyle::Desconto,
-                Some(s) if s.contains("Saldo de Crédito Passível") => RowStyle::Saldo,
-                _ => RowStyle::Normal,
-            };
-
-            if style != RowStyle::Normal {
-                let row_idx = (i + 1) as u32;
-                for (col_idx, &f_key) in col_keys.iter().enumerate() {
-                    if let Some(fmt) = registry.get_format(f_key, style) {
-                        // Apply custom row background based on row classification
-                        // while maintaining custom numeric formats and column alignments.
-                        worksheet.set_cell_format(row_idx, col_idx as u16, fmt)?;
-                    }
-                }
-            }
-            Ok(())
-        })?;
-
-    Ok(())
 }
 
 /// Executa o cálculo de largura aproximada de coluna em paralelo sem concorrência de travas.

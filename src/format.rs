@@ -59,7 +59,7 @@ impl RowStyle {
 }
 
 /// Registro que gerencia e preestabelece as combinações de formatos de célula.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct FormatRegistry {
     matrix: HashMap<(FormatKey, RowStyle), Format>,
 }
