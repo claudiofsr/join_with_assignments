@@ -62,7 +62,7 @@ pub fn obter_consolidacao_nat(dataframe: &DataFrame, auditar: bool) -> JoinResul
 /// Reter apenas as colunas de interesse.
 ///
 /// Em seguida, aplicar filtros.
-fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame, _auditar: bool) -> JoinResult<LazyFrame> {
+fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame, auditar: bool) -> JoinResult<LazyFrame> {
     //let pa_ano: i32 = 2015;
     //let pa_trimestres = Series::from_iter([1, 2, 3, 4]);
 
@@ -80,6 +80,9 @@ fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame, _auditar: bool) -> Join
     // 5: Desconto da Contribuição Apurada no Próprio Período;
     // 6: Desconto Efetuado em Período Posterior; 7: Detalhamento.
     let operacoes_desejadas: Expr = col(top).is_not_null().and(col(top).neq(lit(7)));
+
+    // Definição da condição para identificar Devolução de Vendas (item 12)
+    let devolucoes_de_vendas: Expr = col(nat).is_not_null().and(col(nat).eq(lit(12)));
 
     // Natureza: '01 - Aquisição de Bens para Revenda' and CST neq 50
     let _bens_para_revenda: Expr = col(nat)
@@ -144,13 +147,31 @@ fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame, _auditar: bool) -> Join
                 .otherwise(lit(false))
                 .cast(DataType::Boolean)
                 .alias("RecBrutaTotal"),
-            get_cnpj_base_expr(contribuinte_cnpj).alias("CNPJ Base"),
+        ])
+        .with_columns([
+            // 1. Correção de CST: Natureza 12 -> CST 50 (se auditar for true)
+            // Regra de Auditoria: Qualquer CST sob a Natureza 12 é convertido para 50
+            when(devolucoes_de_vendas.clone().and(lit(auditar)))
+                .then(lit(50))
+                .otherwise(col(cst))
+                .cast(DataType::Int64)
+                .alias(cst),
+            // 2. Correção de Código de Tipo de Crédito: Natureza 12 -> Código 101 (se auditar for true)
+            when(
+                devolucoes_de_vendas
+                    .and(col(cod).neq(101))
+                    .and(lit(auditar)),
+            )
+            .then(lit(101))
+            .otherwise(col(cod))
+            .cast(DataType::Int64)
+            .alias(cod),
         ])
         /*
         // Se Natureza: '01 - Aquisição de Bens para Revenda' and CST neq 50
         // Correção de CST: XX -> 50
         .with_column(
-            when(bens_para_revenda.clone().and(auditar))
+            when(bens_para_revenda.clone().and(lit(auditar)))
                 .then(lit(50))
                 .otherwise(col(cst))
                 .cast(DataType::Int64)
@@ -162,7 +183,7 @@ fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame, _auditar: bool) -> Join
                 bens_para_revenda
                     .and(col(cod).is_not_null())
                     .and(col(cod).neq(101))
-                    .and(auditar),
+                    .and(lit(auditar)),
             )
             .then(lit(101))
             .otherwise(col(cod))
@@ -173,7 +194,7 @@ fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame, _auditar: bool) -> Join
         /*
         // Correção: CST 9 && Registro C170 --> "valor_item" = 0.0
         .with_column(
-            //when(col(cst).eq(9).and(registros_selecionados).and(auditar))
+            //when(col(cst).eq(9).and(registros_selecionados).and(lit(auditar)))
             when(col(cst).eq(9).and(registros_selecionados))
                 .then(lit(0.0))
                 .otherwise(col(val))
@@ -189,7 +210,7 @@ fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame, _auditar: bool) -> Join
                 col(cst)
                     .neq(61)
                     .and(col(tcr).eq(6)) // Presumido da Agroindústria
-                    .and(auditar),
+                    .and(lit(auditar)),
             )
             .then(lit(61))
             .otherwise(col(cst))
@@ -198,7 +219,7 @@ fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame, _auditar: bool) -> Join
         )
         // Correção de 'Código do Tipo de Crédito': 106 -> 206
         .with_column(
-            when(col(cod).eq(106).and(auditar))
+            when(col(cod).eq(106).and(lit(auditar)))
                 .then(lit(206))
                 .otherwise(col(cod))
                 .cast(DataType::Int64)
