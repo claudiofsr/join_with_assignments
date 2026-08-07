@@ -429,9 +429,8 @@ impl PolarsExcelWriter {
                 .copied()
                 .unwrap_or(RowStyle::Normal);
 
-            for col_idx in 0..num_cols {
+            for (col_idx, column) in columns.iter().enumerate() {
                 let col = col_offset + col_idx as u16;
-                let column = &columns[col_idx];
 
                 let any_value = column.as_materialized_series().get(row_num)?;
                 let string_type = &col_string_types[col_idx];
@@ -440,6 +439,7 @@ impl PolarsExcelWriter {
                 // para que a célula herde nativamente o formato padrão definido na coluna.
                 // Isso evita a escrita redundante de metadados XML por célula, reduzindo o arquivo.
                 let format = if row_style != RowStyle::Normal {
+                    // ... resolve formato complexo apenas para Soma/Saldo/Desconto ...
                     if let Some(ref registry) = options.registry {
                         let f_key = options
                             .col_configs
@@ -451,6 +451,7 @@ impl PolarsExcelWriter {
                         col_formats[col_idx]
                     }
                 } else {
+                    // herança nativa da coluna
                     None
                 };
 
