@@ -1,3 +1,4 @@
+mod all_data;
 mod analise_do_periodo_de_apuracao;
 mod args;
 mod columns;
@@ -6,6 +7,7 @@ mod descricoes;
 mod error;
 mod excel;
 mod filtros;
+mod format;
 mod glosar_base_de_calculo;
 mod munkres;
 mod polars_assignments;
@@ -21,6 +23,7 @@ mod excel_writer;
 use crate::descricoes::descricao_do_cst;
 
 pub use self::{
+    all_data::*,
     analise_do_periodo_de_apuracao::adicionar_coluna_periodo_de_apuracao_inicial_e_final,
     args::*,
     columns::{
@@ -37,6 +40,7 @@ pub use self::{
     excel::*,
     excel_writer::PolarsExcelWriter,
     filtros::*,
+    format::*,
     glosar_base_de_calculo::glosar_bc,
     munkres::{munkres_assignments, try_convert},
     polars_assignments::get_dataframe_after_assignments,

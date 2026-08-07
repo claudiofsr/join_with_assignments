@@ -1,36 +1,45 @@
-//! This module handles exporting structured Polars DataFrames to formatted Excel files.
+//! # Excel Worksheet Generation Module
 //!
-//! It organizes worksheet creation by executing operations concurrently via `rayon`,
-//! mapping column values to standardized styles, and implementing custom row styling.
+//! Este módulo lida com a exportação de DataFrames estruturados para arquivos Excel formatados,
+//! oferecendo diferentes estratégias de processamento de acordo com o limite de memória do sistema.
 
+use clap::ValueEnum;
+use claudiofsr_lib::Colors;
 use polars::prelude::*;
 use rayon::prelude::*;
 use regex::Regex;
-use rust_xlsxwriter::{Color, Format, FormatAlign, Workbook, Worksheet};
-use std::{collections::HashMap, sync::LazyLock};
+use rust_xlsxwriter::{Color, Workbook, Worksheet};
+use serde::{Deserialize, Serialize};
+use std::sync::LazyLock;
 
-use crate::{JoinError, JoinResult, PolarsExcelWriter, format_dataframe};
+use crate::{
+    JoinError, JoinResult, PolarsExcelWriter,
+    all_data::AllData,
+    format::{COLOR_SALDO_GREEN, COLOR_SALDO_RED, FormatKey, FormatRegistry, RowStyle},
+    format_dataframe,
+};
 
-// --- Aesthetic Constants ---
-const FONT_SIZE: f64 = 14.0;
-const HEADER_FONT_SIZE: f64 = 12.0;
 const MAX_NUMBER_OF_ROWS: usize = 1_000_000;
 const WIDTH_MIN: usize = 10;
 const WIDTH_MAX: usize = 140;
 const ADJUSTMENT: f64 = 1.45;
 
-const COLOR_SOMA: Color = Color::RGB(0xBFBFBF);
-const COLOR_DESCONTO: Color = Color::RGB(0xCCC0DA);
-const COLOR_SALDO_RED: Color = Color::RGB(0xE6B8B7);
-const COLOR_SALDO_GREEN: Color = Color::RGB(0xC4D79B);
-
-// Thread-safe regular expression to identify CNPJ/CPF columns with minimized allocation overhead.
 static REGEX_CNPJ_CPF: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?ix)^(:?CNPJ|CPF)").unwrap());
 
-// --- Enums and Context Management ---
+/// Estratégias de consumo de memória para a geração do documento Excel.
+#[derive(Default, ValueEnum, Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ExcelMemoryMode {
+    /// Perfil de memória constante que grava progressivamente os dados em disco.
+    ConstantMemory,
+    /// Perfil de baixa memória com uso de strings compartilhadas.
+    LowMemory,
+    /// Processa todo o Workbook em memória através de execução paralela do Rayon.
+    #[default]
+    InMemory,
+}
 
-/// Defines the semantic category of a worksheet, determining its layout behavior and visual presentation.
+/// Define a categoria e o comportamento visual de cada aba de dados.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SheetContext {
     /// Associated with item-level fiscal documents, applying layout shifts for CST identifiers.
@@ -90,151 +99,12 @@ impl SheetContext {
     }
 }
 
-/// Identifiers for column formatting styles.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-enum FormatKey {
-    Default,
-    Center,
-    Value,
-    Aliquota,
-    Date,
-}
-
-impl FormatKey {
-    /// Returns default definitions mapping layout variants to formatting rules.
-    pub fn new() -> [(FormatKey, FormatAlign, Option<&'static str>); 5] {
-        [
-            (FormatKey::Default, FormatAlign::Left, None),
-            (FormatKey::Center, FormatAlign::Center, None),
-            (FormatKey::Value, FormatAlign::Right, Some("#,##0.00")),
-            (FormatKey::Aliquota, FormatAlign::Center, Some("0.0000")),
-            (FormatKey::Date, FormatAlign::Center, Some("dd/mm/yyyy")),
-        ]
-    }
-}
-
-/// Logical row styles representing standard entries or special computed summaries.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-enum RowStyle {
-    Normal,
-    Soma,
-    Desconto,
-    Saldo,
-}
-
-impl RowStyle {
-    /// Maps each logical state to its respective background highlight color.
-    pub fn styles_with_colors(color_saldo: Color) -> [(RowStyle, Option<Color>); 4] {
-        [
-            (RowStyle::Normal, None),
-            (RowStyle::Soma, Some(COLOR_SOMA)),
-            (RowStyle::Desconto, Some(COLOR_DESCONTO)),
-            (RowStyle::Saldo, Some(color_saldo)),
-        ]
-    }
-}
-
-/// A cache registry managing structural permutations of cell styles.
-///
-/// Pre-computes cell configurations to avoid expensive reallocation during row formatting iterations.
-#[derive(Debug, Default)]
-pub struct FormatRegistry {
-    matrix: HashMap<(FormatKey, RowStyle), Format>,
-}
-
-impl FormatRegistry {
-    /// Instantiates a new registry mapping all permutations of column key types and row highlights.
-    pub fn new(color_saldo: Color) -> Self {
-        let mut matrix = HashMap::new();
-        let keys = FormatKey::new();
-        let styles = RowStyle::styles_with_colors(color_saldo);
-
-        for (f_key, align, num_fmt) in keys {
-            for (r_style, color) in styles {
-                let mut f = Format::new()
-                    .set_align(align)
-                    .set_align(FormatAlign::VerticalCenter)
-                    .set_font_size(FONT_SIZE);
-
-                if let Some(fmt) = num_fmt {
-                    f = f.set_num_format(fmt);
-                }
-                if let Some(c) = color {
-                    f = f.set_background_color(c);
-                }
-
-                matrix.insert((f_key, r_style), f);
-            }
-        }
-        Self { matrix }
-    }
-
-    /// Retrieves the reference to a registered cell format match.
-    #[inline]
-    fn get_format(&self, f_key: FormatKey, r_style: RowStyle) -> Option<&Format> {
-        self.matrix.get(&(f_key, r_style))
-    }
-
-    /// Provides standard header row formatting styles.
-    pub fn header() -> Format {
-        Format::new()
-            .set_text_wrap()
-            .set_align(FormatAlign::Center)
-            .set_align(FormatAlign::VerticalCenter)
-            .set_font_size(HEADER_FONT_SIZE)
-    }
-}
-
-/// Container struct designed to hold properties for concurrent sheet construction.
-struct WorksheetTask {
-    slice: DataFrame,
-    sheet_name: String,
-}
-
-impl WorksheetTask {
-    /// Partitions a source `DataFrame` into multiple `WorksheetTask` segments based on the
-    /// maximum structural rows allowed per Excel sheet.
-    pub fn partition(df: &DataFrame, context: SheetContext) -> Vec<Self> {
-        let number_of_rows = df.height();
-        let number_of_sheets = number_of_rows.div_ceil(MAX_NUMBER_OF_ROWS);
-        let base_name = context.as_str();
-
-        eprintln!(
-            "Info: Dataset '{}' contains {} rows. Partitioning into {} worksheet chunk(s)...",
-            base_name, number_of_rows, number_of_sheets
-        );
-
-        let mut tasks = Vec::with_capacity(number_of_sheets);
-
-        for i in 0..number_of_sheets {
-            let offset = (i * MAX_NUMBER_OF_ROWS) as i64;
-            let slice = df.slice(offset, MAX_NUMBER_OF_ROWS);
-            let sheet_name = determine_sheet_name(base_name, i);
-
-            tasks.push(Self { slice, sheet_name });
-        }
-
-        tasks
-    }
-}
-
-// --- Main Structural Functions ---
-
-/// Orchestrates formatting DataFrames and generating target Excel worksheets.
-///
-/// This coordinator validates that exactly three DataFrames are provided, mapping each to its
-/// designated structural context. It uses Rayon to prepare, split, and format data chunks
-/// across multiple CPU threads before sequentially writing them to a single workbook.
-///
-/// # Errors
-///
-/// Returns a [`JoinError::InvalidDataFrameCount`] if the slice does not contain exactly
-/// 3 DataFrames. Also returns standard inner formatting and IO errors.
-pub fn write_xlsx(dfs: &[DataFrame]) -> JoinResult<()> {
+/// Orquestra a geração final do arquivo Excel, distribuindo conforme a estratégia de memória.
+pub fn write_xlsx(dfs: &[DataFrame], memory_mode: Option<ExcelMemoryMode>) -> JoinResult<()> {
     let output = "EFD Contribuicoes x Documentos Fiscais.xlsx";
     println!("Generating Excel file: {output}\n");
 
-    // Perform an explicit check to avoid out-of-bounds panics on the configs array layout.
+    // Validação estrita para evitar pânico de índice fora dos limites
     if dfs.len() != 3 {
         return Err(JoinError::InvalidDataFrameCount {
             expected: 3,
@@ -243,72 +113,143 @@ pub fn write_xlsx(dfs: &[DataFrame]) -> JoinResult<()> {
     }
 
     let mut workbook = Workbook::new();
+    let all_data = AllData::new(&dfs[0], &dfs[1], &dfs[2]);
 
-    // Map each dataframe to its corresponding sheet context based on its static position.
-    let configs = [
-        (&dfs[0], SheetContext::Itens),
-        (&dfs[1], SheetContext::EfdOriginal),
-        (&dfs[2], SheetContext::EfdAuditoria),
-    ];
+    match memory_mode.unwrap_or_default() {
+        ExcelMemoryMode::InMemory => {
+            eprintln!("Info: Starting concurrent worksheet generation across thread pool...");
 
-    // Partition all dataframes into a unified list of tasks.
-    eprintln!("Info: Preparing worksheet tasks...");
-    let tasks: Vec<WorksheetTask> = configs
-        .iter()
-        .flat_map(|(df, context)| WorksheetTask::partition(df, *context))
-        .collect();
+            all_data
+                .generate_worksheets_in_parallel()?
+                .into_iter()
+                .for_each(|worksheet| {
+                    workbook.push_worksheet(worksheet);
+                });
+        }
+        mode => {
+            eprintln!(
+                "Info: Starting sequential worksheet generation (memory mode: {:?})...",
+                mode
+            );
 
-    // Process worksheet configurations in parallel using Rayon.
-    eprintln!("Info: Starting concurrent worksheet generation across thread pool...");
-    let worksheets_result: Result<Vec<Worksheet>, JoinError> = tasks
-        .into_par_iter()
-        .map(|task| {
-            eprintln!("Info: Thread working on worksheet '{}'...", task.sheet_name);
-            make_worksheet(&task.slice, &task.sheet_name)
-        })
-        .collect();
-
-    let worksheets = worksheets_result.map_err(|err| {
-        eprintln!("Error occurred during concurrent worksheet formatting: {err}");
-        err
-    })?;
-
-    eprintln!("Info: Consolidating generated sheets into the final workbook registry...");
-    for worksheet in worksheets {
-        workbook.push_worksheet(worksheet);
+            all_data.write_sequentially_to_workbook(&mut workbook, mode)?;
+        }
     }
 
-    eprintln!("Info: Writing workbook data to disk...");
-    workbook.save(output).map_err(|err| {
-        eprintln!("Error: Failed to write Excel file to target path '{output}': {err}");
-        JoinError::from(err)
-    })?;
+    eprintln!("Info: Writing workbook data to disk...\n");
 
-    eprintln!("Success: Excel document successfully generated and saved to '{output}'\n");
+    workbook
+        .save(output)
+        .map_err(|err| JoinError::ExcelWriteError {
+            path: output.to_string(),
+            source: err,
+        })?;
+
+    eprintln!(
+        "{}: Excel document saved to '{}'\n",
+        "Success".green(),
+        output.blue()
+    );
     Ok(())
 }
 
-/// Generates and styles a worksheet from a target DataFrame chunk.
-///
-/// The function parses the worksheet name to establish context, formats cell transitions,
-/// executes background auto-fits, and styles rows safely inside worker threads.
-pub fn make_worksheet(df: &DataFrame, sheet_name: &str) -> JoinResult<Worksheet> {
-    // 1. Resolve context and format the data-frame.
+/// Processa um DataFrame de origem para criar coleções de Worksheets em paralelo.
+pub fn process_sheet_type(df: &DataFrame, context: SheetContext) -> JoinResult<Vec<Worksheet>> {
+    // df.is_empty()
+    if df.height() == 0 || df.width() == 0 {
+        return Ok(Vec::new());
+    }
+
+    let number_of_rows = df.height();
+    let number_of_sheets = number_of_rows.div_ceil(MAX_NUMBER_OF_ROWS);
+    let base_name = context.as_str();
+
+    eprintln!(
+        "Info: Dataset '{}' contains {} rows. Partitioning into {} worksheet chunk(s)...",
+        base_name, number_of_rows, number_of_sheets
+    );
+
+    let worksheets = (0..number_of_sheets)
+        .into_par_iter()
+        .map(|k| {
+            let offset = (k * MAX_NUMBER_OF_ROWS) as i64;
+            let slice = df.slice(offset, MAX_NUMBER_OF_ROWS);
+            let name = determine_sheet_name(context.as_str(), k);
+            // Log informativo de execução paralela
+            eprintln!("Info: Thread working on worksheet '{}'...", name);
+            generate_worksheet(&slice, &name)
+        })
+        .collect::<JoinResult<Vec<_>>>()?;
+
+    Ok(worksheets)
+}
+
+/// Processa um DataFrame sequencialmente, escrevendo blocos de dados em disco sob demanda.
+pub fn process_sheet_type_sequential(
+    workbook: &mut Workbook,
+    df: &DataFrame,
+    context: SheetContext,
+    memory_mode: ExcelMemoryMode,
+) -> JoinResult<()> {
+    // df.is_empty()
+    if df.height() == 0 || df.width() == 0 {
+        return Ok(());
+    }
+
+    let number_of_rows = df.height();
+    let number_of_sheets = number_of_rows.div_ceil(MAX_NUMBER_OF_ROWS);
+    let base_name = context.as_str();
+
+    eprintln!(
+        "Info: Dataset '{}' contains {} rows. Partitioning into {} worksheet chunk(s)...",
+        base_name, number_of_rows, number_of_sheets
+    );
+
+    for k in 0..number_of_sheets {
+        let offset = (k * MAX_NUMBER_OF_ROWS) as i64;
+        let slice = df.slice(offset, MAX_NUMBER_OF_ROWS);
+        let name = determine_sheet_name(context.as_str(), k);
+
+        // Log informativo de execução sequencial
+        eprintln!("Info: Writing worksheet '{}' sequentially...", name);
+
+        let worksheet = match memory_mode {
+            ExcelMemoryMode::ConstantMemory => workbook.add_worksheet_with_constant_memory(),
+            ExcelMemoryMode::LowMemory => workbook.add_worksheet_with_low_memory(),
+            ExcelMemoryMode::InMemory => workbook.add_worksheet(),
+        };
+
+        worksheet.set_name(&name)?;
+        populate_worksheet_data(worksheet, &slice, &name)?;
+    }
+
+    Ok(())
+}
+
+/// Inicialização de worksheet isolada.
+pub fn generate_worksheet(df: &DataFrame, sheet_name: &str) -> JoinResult<Worksheet> {
+    let mut worksheet = Worksheet::new();
+    worksheet.set_name(sheet_name)?;
+    populate_worksheet_data(&mut worksheet, df, sheet_name)?;
+    Ok(worksheet)
+}
+
+/// Preenche a planilha de destino aplicando regras de formatação de colunas e estilos de realce.
+pub fn populate_worksheet_data(
+    worksheet: &mut Worksheet,
+    df: &DataFrame,
+    sheet_name: &str,
+) -> JoinResult<()> {
     let context = SheetContext::from_name(sheet_name)?;
     let df_formatted: DataFrame = format_dataframe(df, context.is_itens())?;
     let df_to_excel: DataFrame = format_to_excel(&df_formatted)?;
 
-    let mut worksheet = Worksheet::new();
     let headers = df_to_excel.get_column_names();
-
-    // Pre-calculate column style configurations to avoid nested loops.
     let col_configs: Vec<FormatKey> = headers
         .iter()
         .map(|&name| get_format_key(name, context))
         .collect();
 
-    // Configure structural baseline row formats and names.
-    worksheet.set_name(sheet_name)?;
     worksheet.set_row_height(0, 64)?;
     worksheet.set_row_format(0, &FormatRegistry::header())?;
 
@@ -329,25 +270,17 @@ pub fn make_worksheet(df: &DataFrame, sheet_name: &str) -> JoinResult<Worksheet>
     }
 
     writer.set_freeze_panes(1, 0);
-    writer.write_dataframe_to_worksheet(&df_to_excel, &mut worksheet, 0, 0)?;
+    writer.write_dataframe_to_worksheet(&df_to_excel, worksheet, 0, 0)?;
 
-    // 3. Evaluate row contents and apply custom summary styles.
-    apply_conditional_styles(&df_to_excel, &mut worksheet, &registry, &col_configs)?;
+    apply_conditional_styles(&df_to_excel, worksheet, &registry, &col_configs)?;
+    auto_fit(&df_to_excel, worksheet)?;
 
-    // 4. Calculate dynamic column widths inside worker threads.
-    auto_fit(&df_to_excel, &mut worksheet)?;
-
-    Ok(worksheet)
+    Ok(())
 }
 
-// --- Pure Helper Functions ---
-
-/// Computes a unique name for a worksheet chunk based on its slice index.
-///
-/// Indexes are 0-based. The first chunk (index 0) retains the base name.
-/// Subsequent chunks append the 1-based index suffix.
+/// Define o nome de cada bloco/aba baseado em um índice de divisão.
 #[inline]
-fn determine_sheet_name(base_name: &str, chunk_index: usize) -> String {
+pub fn determine_sheet_name(base_name: &str, chunk_index: usize) -> String {
     if chunk_index == 0 {
         base_name.to_string()
     } else {
@@ -355,7 +288,7 @@ fn determine_sheet_name(base_name: &str, chunk_index: usize) -> String {
     }
 }
 
-/// Decides column alignment and styling keys based on header name matches and context.
+/// Resolve a chave de formatação correspondente ao cabeçalho.
 fn get_format_key(name: &str, context: SheetContext) -> FormatKey {
     if context.is_itens() && (name.contains("CST") || name.contains("Situação Tributária")) {
         return FormatKey::Default;
@@ -405,7 +338,7 @@ fn get_format_key(name: &str, context: SheetContext) -> FormatKey {
     FormatKey::Default
 }
 
-/// Applies contextual row backgrounds matching metadata keywords like totals or balances.
+/// Aplica cores de fundo condicionalmente (Totais, Saldos e Descontos).
 fn apply_conditional_styles(
     df: &DataFrame,
     worksheet: &mut Worksheet,
@@ -450,10 +383,7 @@ fn apply_conditional_styles(
     Ok(())
 }
 
-/// Estimates appropriate character column widths to prevent text clipping.
-///
-/// This calculates character lengths across columns in parallel. Since column tasks
-/// are mapped directly, no thread synchronization (`AtomicUsize`) is needed.
+/// Executa o cálculo de largura aproximada de coluna em paralelo sem concorrência de travas.
 fn auto_fit(df: &DataFrame, worksheet: &mut Worksheet) -> JoinResult<()> {
     let widths: Vec<usize> = df
         .columns()
@@ -500,7 +430,7 @@ fn auto_fit(df: &DataFrame, worksheet: &mut Worksheet) -> JoinResult<()> {
     Ok(())
 }
 
-/// Adjusts column datatypes and truncates text values to fit Excel cell character limits.
+/// Trunca dados extensos de texto e redefine os tipos de inteiro mapeados para o Excel.
 fn format_to_excel(df: &DataFrame) -> PolarsResult<DataFrame> {
     let exprs: Vec<Expr> = df
         .get_column_names()

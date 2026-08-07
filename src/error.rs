@@ -37,6 +37,13 @@ pub enum JoinError {
     #[error("CSV parsing error: {0} for file {1:?}")] // Adicionado PathBuf para contexto
     CSVReadError(PolarsError, PathBuf), // Alterado para PolarsError e PathBuf
 
+    #[error("Failed to write Excel file to target path '{path}': {source}")]
+    ExcelWriteError {
+        path: String,
+        #[source]
+        source: rust_xlsxwriter::XlsxError,
+    },
+
     // Adicione esta variante para capturar erros de formatação do write!
     #[error("Format error: {0}")]
     Fmt(#[from] std::fmt::Error),

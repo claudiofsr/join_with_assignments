@@ -112,7 +112,7 @@ fn run() -> JoinResult<()> {
     }
 
     if args.print_xlsx == Some(true) {
-        write_xlsx(&dataframes)?;
+        write_xlsx(&dataframes, args.memory_mode)?;
     }
 
     let dt_local_now: DateTime<Local> = Local::now();

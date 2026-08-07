@@ -1,4 +1,4 @@
-use crate::JoinResult;
+use crate::{ExcelMemoryMode, JoinResult};
 use clap::{
     //ArgAction,
     Command,
@@ -112,6 +112,12 @@ pub struct Arguments {
     #[arg(short('e'), long, required = false)]
     pub excluir_saidas: Option<bool>,
 
+    /// Seleciona o modo de consumo de memória para a geração da planilha Excel.
+    ///
+    /// Select the memory consumption mode for generating the Excel spreadsheet.
+    #[arg(short('m'), long("memory_mode"), value_enum, verbatim_doc_comment)]
+    pub memory_mode: Option<ExcelMemoryMode>, // Alterado para Option
+
     /// Apply filter: Retain only credit entries (50 <= CST <= 66)
     ///
     /// Reter apenas operações de crédito
@@ -156,6 +162,7 @@ impl default::Default for Arguments {
             date_start: None,
             date_final: None,
             excluir_saidas: Some(false),
+            memory_mode: Some(ExcelMemoryMode::default()), // Usa o padrão do enum automaticamente
             operacoes_de_creditos: Some(false),
             print_csv: Some(false),
             print_xlsx: Some(true),
@@ -195,6 +202,7 @@ impl Arguments {
         self.date_final = self.date_final.or(config_file.date_final);
         self.remove_null_columns = self.remove_null_columns.or(config_file.remove_null_columns);
         self.verbose = self.verbose.or(config_file.verbose);
+        self.memory_mode = self.memory_mode.or(config_file.memory_mode);
 
         Ok(self)
     }
@@ -242,6 +250,7 @@ mod tests {
             date_start: None,
             date_final: None,
             excluir_saidas: Some(false),
+            memory_mode: None,
             operacoes_de_creditos: Some(false),
             print_csv: Some(false),
             print_xlsx: Some(true),
@@ -260,6 +269,7 @@ mod tests {
             delimiter_input_2: Some(';'),
             delimiter_output: Some(';'),
             excluir_saidas: Some(false),
+            memory_mode: None,
             operacoes_de_creditos: Some(false),
             print_csv: Some(false),
             print_xlsx: Some(true),
