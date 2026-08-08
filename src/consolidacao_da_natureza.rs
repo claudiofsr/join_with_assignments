@@ -3,9 +3,10 @@ use std::ops::Neg;
 
 use crate::{
     ExprExtension, JoinResult, LazyFrameExtension, RateioDosCreditos, Side::Left,
-    ToLiteralListExpr, cfop_de_exportacao, coluna, cst_50_a_66, cst_de_receita_bruta, csts,
-    csts_nao_tributados, entrada_de_credito, get_cnpj_base_expr, operacoes_de_ajustes_ou_descontos,
-    operacoes_de_saida, receita_bruta_cumulativa, receita_bruta_nao_cumulativa, receita_nao_nula,
+    ToLiteralListExpr, cfop_de_exportacao_expansivo, cfop_de_exportacao_restritivo, coluna,
+    cst_50_a_66, cst_de_receita_bruta, csts, csts_nao_tributados, entrada_de_credito,
+    get_cnpj_base_expr, operacoes_de_ajustes_ou_descontos, operacoes_de_saida,
+    receita_bruta_cumulativa, receita_bruta_nao_cumulativa, receita_nao_nula,
     saida_de_receita_bruta,
 };
 
@@ -272,22 +273,26 @@ fn groupby_and_agg_values(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     let valor_item: &str = coluna(Left, "valor_item"); // "Valor Total do Item"
     let valor_bc: &str = coluna(Left, "valor_bc"); // "Valor da Base de Cálculo das Contribuições"
 
-    /*
     let range_a: [u32; 4] = [1, 2, 3, 5]; // RBNC_Tributada
-    let range_b: [u32; 5] = [4, 6, 7, 9, 49]; // RBNC_NTributada
-    let range_c: [u32; 1] = [8]; // RBNC_Exportação
+    let range_b: [u32; 5] = [4, 6, 7, 9, 49]; // RBNC_NTributada or RBNC_Exportação
+    let range_c: [u32; 1] = [8]; // RBNC_NTributada or RBNC_Exportação
 
-    let filter_a = csts(range_a);
-    let filter_b = csts(range_b).or(csts(range_c).and(cfop_de_exportacao().not()));
-    let filter_c = csts(range_c).and(cfop_de_exportacao());
-    */
-
-    let range_a: [u32; 4] = [1, 2, 3, 5]; // RBNC_Tributada
-    let range_b: [u32; 6] = [4, 6, 7, 8, 9, 49]; // RBNC_NTributada or RBNC_Exportação
-
+    // 1. RbnTrmi: Apenas CSTs 1, 2, 3, 5
     let filter_a = csts(range_a)?;
-    let filter_b = csts(range_b)?.and(cfop_de_exportacao()?.not());
-    let filter_c = csts(range_b)?.and(cfop_de_exportacao()?);
+
+    // 2. RbnNtmi (Não Tributada no Mercado Interno):
+    // - CSTs 4, 6, 7, 9, 49 quando NÃO atenderem ao critério de exportação restritivo
+    // - OU CST 8 quando NÃO atender ao critério de exportação expansivo
+    let filter_b = csts(range_b)?
+        .and(cfop_de_exportacao_restritivo()?.not())
+        .or(csts(range_c)?.and(cfop_de_exportacao_expansivo()?.not()));
+
+    // 3. RbnExpo (Receita de Exportação):
+    // - CSTs 4, 6, 7, 9, 49 quando atenderem ao critério de exportação restritivo
+    // - OU CST 8 quando atender ao critério de exportação expansivo
+    let filter_c = csts(range_b)?
+        .and(cfop_de_exportacao_restritivo()?)
+        .or(csts(range_c)?.and(cfop_de_exportacao_expansivo()?));
 
     let condition_a = filter_a.or(col("RBNC_Tributada").is_not_null());
     let condition_b = filter_b.or(col("RBNC_NTributada").is_not_null());
@@ -555,7 +560,7 @@ fn analisar_debitos_omitidos(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     let debitos_omitidos_ncm_2309: LazyFrame = lazyframe
         .filter(operacoes_de_saida()?)
         .filter(csts_nao_tributados()?)
-        .filter(cfop_de_exportacao()?.not()) // excluir operações de exportação
+        .filter(cfop_de_exportacao_restritivo()?.not()) // excluir operações de exportação
         .filter(ncm_2309)
         .group_by([
             col("CNPJ Base"),

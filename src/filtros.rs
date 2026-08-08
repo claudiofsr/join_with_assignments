@@ -232,7 +232,28 @@ CFOP de Exportacao:
 
 . Fim específico de exportação.
 */
-pub fn cfop_de_exportacao() -> PolarsResult<Expr> {
+pub fn cfop_de_exportacao_restritivo() -> PolarsResult<Expr> {
+    // "Código Fiscal de Operações e Prestações (CFOP)"
+    let cfop: &str = coluna(Left, "cfop");
+    let series: Series = get_series(CFOP_DE_EXPORTACAO);
+    let literal_series: Expr = series.to_list_expr()?;
+
+    let expr = col(cfop)
+        .is_not_null()
+        .and(col(cfop).is_in(literal_series, true));
+
+    Ok(expr)
+}
+
+/**
+CFOP de Exportacao:
+
+. Grupo 7:
+    valores entre 7000 e 7999;
+
+. Fim específico de exportação.
+*/
+pub fn cfop_de_exportacao_expansivo() -> PolarsResult<Expr> {
     // "Código Fiscal de Operações e Prestações (CFOP)"
     let cfop: &str = coluna(Left, "cfop");
     let series: Series = get_series(CFOP_DE_EXPORTACAO);
