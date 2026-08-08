@@ -54,9 +54,9 @@ features = [
 version = "0.55.2"
 # git = "https://github.com/pola-rs/polars.git"
 # rev = "8a6bf4b"
-# https://github.com/pola-rs/polars/releases/tag/rs-0.51.0
+# https://github.com/pola-rs/polars/releases/tag/rs-0.55.2
 # git clone https://github.com/pola-rs/polars.git
-# path = "/home/claudio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/polars-0.51.0"
+# path = "/home/claudio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/polars-0.55.2"
 features = [
     "abs",        # Convert all values to their absolute/positive value.
     "concat_str", # Concat string data in linear time
