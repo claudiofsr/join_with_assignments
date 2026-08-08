@@ -334,6 +334,8 @@ impl PolarsExcelWriter {
     // Internal functions/methods.
     // -----------------------------------------------------------------------
 
+    // Write the dataframe to a `rust_xlsxwriter` Worksheet. It is structured as
+    // an associated method to allow it to handle external worksheets.
     #[allow(clippy::too_many_lines)]
     fn write_dataframe_internal(
         df: &DataFrame,
@@ -342,6 +344,8 @@ impl PolarsExcelWriter {
         col_offset: u16,
         options: &WriterOptions,
     ) -> Result<(), PolarsError> {
+        // Ensure single-chunk DataFrame for iteration. This handles DataFrames
+        // from parquet or other lazy sources that may have multiple chunks.
         let mut df: Cow<'_, DataFrame> = Cow::Borrowed(df);
         if df.first_col_n_chunks() > 1 {
             df.to_mut().rechunk_mut();
@@ -352,6 +356,7 @@ impl PolarsExcelWriter {
         let num_cols = df.width();
         let columns = df.columns();
 
+        // Set NaN and Infinity values, if required.
         if let Some(nan_value) = &options.nan_value {
             worksheet.set_nan_value(nan_value);
         }
@@ -367,25 +372,29 @@ impl PolarsExcelWriter {
         let mut col_formats = Vec::with_capacity(num_cols);
         let mut col_string_types = Vec::with_capacity(num_cols);
 
+        // Iterate through the dataframe column by column.
         for column in columns {
             let column_name = column.name().to_string();
 
-            // Define o nome do cabeçalho diretamente na estrutura TableColumn da tabela
+            // Add the header format to the table columns
             let mut table_column = TableColumn::new().set_header(column_name.clone());
             if let Some(header_format) = &options.header_format {
                 table_column = table_column.set_header_format(header_format);
             }
             table_columns.push(table_column);
 
+            // Check for a custom dtype or column format.
             let mut format = None;
             if let Some(dtype_format) = options.dtype_formats.get(column.dtype()) {
                 format = Some(dtype_format);
             }
+            // Column format takes precedence over dtype format since it is more specific.
             if let Some(column_format) = options.column_formats.get(&column_name) {
                 format = Some(column_format);
             }
             col_formats.push(format);
 
+            // Check if a string column needs to be treated as urls or formulas.
             let string_type = options
                 .column_string_types
                 .get(&column_name)
@@ -402,6 +411,7 @@ impl PolarsExcelWriter {
             max_row += 1;
         }
 
+        // Add a column header format via table columns.
         let mut table = options.table.clone();
         if !table_columns.is_empty() {
             table = table.set_columns(&table_columns);
@@ -409,6 +419,7 @@ impl PolarsExcelWriter {
 
         // 2. Adicionar a tabela ANTES de escrever os dados (Exigido pelo rust_xlsxwriter em modo sequencial)
         // Isso grava a linha 0 de cabeçalho no disco de forma irreversível e sem erros
+        // Add the table to the worksheet.
         worksheet.add_table(
             row_offset,
             col_offset,
@@ -455,7 +466,9 @@ impl PolarsExcelWriter {
                     None
                 };
 
+                // Map Polars AnyValue types to Excel/rust_xlsxwriter types.
                 match any_value {
+                    // Write the number types to the worksheet.
                     AnyValue::Int8(value) => write_value(worksheet, row, col, value, format)?,
                     AnyValue::Int16(value) => write_value(worksheet, row, col, value, format)?,
                     AnyValue::Int32(value) => write_value(worksheet, row, col, value, format)?,
@@ -467,6 +480,8 @@ impl PolarsExcelWriter {
                     AnyValue::Float32(value) => write_value(worksheet, row, col, value, format)?,
                     AnyValue::Float64(value) => write_value(worksheet, row, col, value, format)?,
 
+                    // Write string type to the worksheet. Depending on the user
+                    // options this may need to be handled as a formula or url.
                     AnyValue::String(value) => match string_type {
                         ColumnStringType::Formula => {
                             let mut formula = Formula::new(value);
@@ -519,12 +534,16 @@ impl PolarsExcelWriter {
                         write_value(worksheet, row, col, &value, format)?;
                     }
 
+                    // Write the boolean type to the worksheet.
                     AnyValue::Boolean(value) => write_value(worksheet, row, col, value, format)?,
 
+                    // Write null type to the worksheet.
                     AnyValue::Null => {
                         if let Some(value) = &options.null_value {
+                            // Use user defined null value.
                             write_value(worksheet, row, col, value, format)?;
                         } else if format.is_some() {
+                            // If a format is set then write a blank cell.
                             write_value(worksheet, row, col, "", format)?;
                         }
                     }
@@ -540,15 +559,21 @@ impl PolarsExcelWriter {
             }
         }
 
+        // Autofit the columns. Add default, or user defined, limits to avoid
+        // performance and display issues.
         if options.use_autofit {
             worksheet.set_autofit_max_width(options.autofit_max_width);
             worksheet.set_autofit_max_row(options.autofit_max_row);
             worksheet.autofit();
         }
 
+        // Set the zoom level.
         worksheet.set_zoom(options.zoom);
+
+        // Set the screen gridlines.
         worksheet.set_screen_gridlines(options.screen_gridlines);
 
+        // Set the worksheet panes.
         worksheet.set_freeze_panes(options.freeze_cell.0, options.freeze_cell.1)?;
         worksheet.set_freeze_panes_top_cell(options.top_cell.0, options.top_cell.1)?;
 
