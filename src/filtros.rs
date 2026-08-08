@@ -239,8 +239,8 @@ pub fn cfop_de_exportacao() -> PolarsResult<Expr> {
     let literal_series: Expr = series.to_list_expr()?;
 
     let expr = col(cfop)
-        .is_not_null()
-        .and(col(cfop).is_in(literal_series, true));
+        .is_null()
+        .or(col(cfop).is_in(literal_series, true));
 
     Ok(expr)
 }
