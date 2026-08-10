@@ -7,7 +7,7 @@ use polars::prelude::*;
 /*
 Example of use:
     // Padronizar dados iniciais:
-    unique -eitwcdknv 'Info da Receita sobre o Contribuinte.csv' > nfe_float64.csv
+    unique -meitwcdkfv 'Info da Receita sobre o Contribuinte.csv' > nfe_float64.csv
 
     clear && cargo test -- --nocapture
     clear && cargo run -- --help
