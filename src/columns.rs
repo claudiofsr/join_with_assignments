@@ -751,6 +751,14 @@ impl MyColumn {
             .map(|col| (col.name, col.dtype.clone()))
             .collect()
     }
+
+    /// Retorna um mapeamento associando o nome de cada coluna ao seu respectivo `Side`.
+    pub fn get_side_map() -> HashMap<&'static str, Side> {
+        Self::get_columns()
+            .into_iter()
+            .map(|col| (col.name, col.side))
+            .collect()
+    }
 }
 
 pub trait ColumnExtension {

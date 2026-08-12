@@ -262,6 +262,11 @@ impl PolarsExcelWriter {
         self
     }
 
+    pub fn set_add_table(&mut self, enable: bool) -> &mut Self {
+        self.options.add_table = enable;
+        self
+    }
+
     pub fn set_worksheet_name(
         &mut self,
         name: impl Into<String>,
@@ -420,13 +425,15 @@ impl PolarsExcelWriter {
         // 2. Adicionar a tabela ANTES de escrever os dados (Exigido pelo rust_xlsxwriter em modo sequencial)
         // Isso grava a linha 0 de cabeçalho no disco de forma irreversível e sem erros
         // Add the table to the worksheet.
-        worksheet.add_table(
-            row_offset,
-            col_offset,
-            row_offset + max_row as u32,
-            col_offset + max_col as u16 - 1,
-            &table,
-        )?;
+        if options.add_table {
+            worksheet.add_table(
+                row_offset,
+                col_offset,
+                row_offset + max_row as u32,
+                col_offset + max_col as u16 - 1,
+                &table,
+            )?;
+        }
 
         // 3. Gravação de dados orientada por linhas (Row-major order) com injeção de estilo em tempo real
         // O cursor agora avança estritamente das linhas 1 até N sem reescrever na linha 0
@@ -617,6 +624,7 @@ pub(crate) struct WriterOptions {
     pub(crate) infinity_value: Option<String>,
     pub(crate) neg_infinity_value: Option<String>,
     pub(crate) table: Table,
+    pub(crate) add_table: bool,
     pub(crate) zoom: u16,
     pub(crate) screen_gridlines: bool,
     pub(crate) freeze_cell: (u32, u16),
@@ -648,6 +656,7 @@ impl WriterOptions {
             infinity_value: None,
             neg_infinity_value: None,
             table: Table::new(),
+            add_table: true,
             zoom: 100,
             screen_gridlines: true,
             freeze_cell: (0, 0),

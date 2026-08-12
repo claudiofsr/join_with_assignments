@@ -8,12 +8,12 @@ use claudiofsr_lib::Colors;
 use polars::prelude::*;
 use rayon::prelude::*;
 use regex::Regex;
-use rust_xlsxwriter::{Color, Workbook, Worksheet};
+use rust_xlsxwriter::{Color, Table, TableColumn, TableStyle, Workbook, Worksheet};
 use serde::{Deserialize, Serialize};
 use std::sync::LazyLock;
 
 use crate::{
-    JoinError, JoinResult, PolarsExcelWriter,
+    JoinError, JoinResult, MyColumn, PolarsExcelWriter, Side,
     all_data::AllData,
     format::{COLOR_SALDO_GREEN, COLOR_SALDO_RED, FormatKey, FormatRegistry, RowStyle},
     format_dataframe,
@@ -291,8 +291,66 @@ pub fn populate_worksheet_data(
     // O auto-fit em paralelo é seguro para todos os modos antes de persistir os dados no disco
     auto_fit(&df_to_excel, worksheet)?;
 
+    // MODIFICAÇÃO: Se for a aba de Itens, desativa a tabela única e adiciona os blocos segmentados
+    if context == SheetContext::Itens {
+        writer.set_add_table(false);
+        add_segmented_tables(worksheet, &df_to_excel)?;
+    }
+
     // 4. Executa a gravação de passo único para dados e estilos simultaneamente
     writer.write_dataframe_to_worksheet(&df_to_excel, worksheet, 0, 0)?;
+
+    Ok(())
+}
+
+/// Divide e adiciona dinamicamente tabelas baseando-se no Side das colunas presentes no DataFrame.
+fn add_segmented_tables(worksheet: &mut Worksheet, df: &DataFrame) -> JoinResult<()> {
+    let headers = df.get_column_names();
+    let row_number = df.height() as u32;
+    let side_map = MyColumn::get_side_map();
+
+    if headers.is_empty() {
+        return Ok(());
+    }
+
+    let header_sides: Vec<(&str, Side)> = headers
+        .iter()
+        .map(|name| {
+            let n = name.as_str();
+            let side = side_map.get(n).copied().unwrap_or(Side::Left);
+            (n, side)
+        })
+        .collect();
+
+    let mut col_offset = 0;
+
+    // Agrupa de forma nativa e segura por igualdade direta de enum na CPU
+    for chunk in header_sides.chunk_by(|a, b| a.1 == b.1) {
+        let side = chunk[0].1; // Estaticamente seguro: chunk_by nunca retorna blocos vazios
+        let start = col_offset;
+        let end = col_offset + chunk.len() - 1;
+        col_offset += chunk.len();
+
+        let style = match side {
+            Side::Left => TableStyle::Medium2,   // Azul
+            Side::Middle => TableStyle::Medium5, // Cinza
+            Side::Right => TableStyle::Medium2,  // Azul
+        };
+
+        // Geração limpa baseando-se no fatiamento gerado
+        let table_columns: Vec<TableColumn> = chunk
+            .iter()
+            .map(|&(col_name, _)| TableColumn::new().set_header(col_name.to_string()))
+            .collect();
+
+        let table = Table::new()
+            .set_autofilter(true)
+            .set_total_row(false)
+            .set_columns(&table_columns)
+            .set_style(style);
+
+        worksheet.add_table(0, start as u16, row_number, end as u16, &table)?;
+    }
 
     Ok(())
 }
