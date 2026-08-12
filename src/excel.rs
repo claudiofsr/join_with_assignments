@@ -313,6 +313,7 @@ fn add_segmented_tables(worksheet: &mut Worksheet, df: &DataFrame) -> JoinResult
         return Ok(());
     }
 
+    // OTIMIZAÇÃO: Mapeia e armazena os 'Sides' uma única vez por coluna
     let header_sides: Vec<(&str, Side)> = headers
         .iter()
         .map(|name| {
@@ -324,32 +325,35 @@ fn add_segmented_tables(worksheet: &mut Worksheet, df: &DataFrame) -> JoinResult
 
     let mut col_offset = 0;
 
-    // Agrupa de forma nativa e segura por igualdade direta de enum na CPU
+    // Agrupa as colunas contíguas de mesmo Side
     for chunk in header_sides.chunk_by(|a, b| a.1 == b.1) {
-        let side = chunk[0].1; // Estaticamente seguro: chunk_by nunca retorna blocos vazios
-        let start = col_offset;
-        let end = col_offset + chunk.len() - 1;
-        col_offset += chunk.len();
+        // Desembrulho seguro de compilador: sem pânicos ou valores artificiais
+        if let Some(header_side) = chunk.first() {
+            let side = header_side.1;
+            let start = col_offset;
+            let end = col_offset + chunk.len() - 1;
+            col_offset += chunk.len(); // Avança o cursor com base no bloco real
 
-        let style = match side {
-            Side::Left => TableStyle::Medium2,   // Azul
-            Side::Middle => TableStyle::Medium5, // Cinza
-            Side::Right => TableStyle::Medium2,  // Azul
-        };
+            let style = match side {
+                Side::Left => TableStyle::Medium2,   // Azul
+                Side::Middle => TableStyle::Medium5, // Cinza
+                Side::Right => TableStyle::Medium2,  // Azul
+            };
 
-        // Geração limpa baseando-se no fatiamento gerado
-        let table_columns: Vec<TableColumn> = chunk
-            .iter()
-            .map(|&(col_name, _)| TableColumn::new().set_header(col_name.to_string()))
-            .collect();
+            // Geração das definições de colunas da tabela
+            let table_columns: Vec<TableColumn> = chunk
+                .iter()
+                .map(|&(col_name, _side)| TableColumn::new().set_header(col_name.to_string()))
+                .collect();
 
-        let table = Table::new()
-            .set_autofilter(true)
-            .set_total_row(false)
-            .set_columns(&table_columns)
-            .set_style(style);
+            let table = Table::new()
+                .set_autofilter(true)
+                .set_total_row(false)
+                .set_columns(&table_columns)
+                .set_style(style);
 
-        worksheet.add_table(0, start as u16, row_number, end as u16, &table)?;
+            worksheet.add_table(0, start as u16, row_number, end as u16, &table)?;
+        }
     }
 
     Ok(())
