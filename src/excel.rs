@@ -15,6 +15,7 @@ use std::sync::LazyLock;
 use crate::{
     JoinError, JoinResult, MyColumn, PolarsExcelWriter, Side,
     all_data::AllData,
+    coluna,
     format::{COLOR_SALDO_GREEN, COLOR_SALDO_RED, FormatKey, FormatRegistry, RowStyle},
     format_dataframe,
 };
@@ -313,26 +314,41 @@ fn add_segmented_tables(worksheet: &mut Worksheet, df: &DataFrame) -> JoinResult
         return Ok(());
     }
 
-    // OTIMIZAÇÃO: Mapeia e armazena os 'Sides' uma única vez por coluna
+    // Recupera o nome canônico centralizado em columns.rs para evitar hardcoding
+    let coluna_auditada = coluna(Side::Left, "valor_bc_auditado");
+
+    // MAPEAMENTO SIMPLES E SEGURO: Mapeia as colunas em referências temporárias nativas.
+    // O operador "?" garante a interrupção limpa do programa em caso de colunas não mapeadas.
     let header_sides: Vec<(&str, Side)> = headers
         .iter()
         .map(|name| {
             let n = name.as_str();
-            let side = side_map.get(n).copied().unwrap_or(Side::Left);
-            (n, side)
+
+            let side = if n == coluna_auditada {
+                Side::Middle
+            } else {
+                side_map
+                    .get(n)
+                    .copied()
+                    .ok_or_else(|| JoinError::UnmappedColumn {
+                        name: n.to_string(),
+                    })?
+            };
+
+            Ok((n, side))
         })
-        .collect();
+        .collect::<JoinResult<Vec<_>>>()?;
 
     let mut col_offset = 0;
 
-    // Agrupa as colunas contíguas de mesmo Side
+    // Agrupa as colunas contíguas de mesmo Side de forma puramente funcional
     for chunk in header_sides.chunk_by(|a, b| a.1 == b.1) {
-        // Desembrulho seguro de compilador: sem pânicos ou valores artificiais
+        // Desembrulho idiomático e estaticamente seguro livre de pânicos
         if let Some(header_side) = chunk.first() {
             let side = header_side.1;
             let start = col_offset;
             let end = col_offset + chunk.len() - 1;
-            col_offset += chunk.len(); // Avança o cursor com base no bloco real
+            col_offset += chunk.len(); // Incrementa o cursor com base no tamanho do bloco real
 
             let style = match side {
                 Side::Left => TableStyle::Medium2,   // Azul
@@ -343,7 +359,7 @@ fn add_segmented_tables(worksheet: &mut Worksheet, df: &DataFrame) -> JoinResult
             // Geração das definições de colunas da tabela
             let table_columns: Vec<TableColumn> = chunk
                 .iter()
-                .map(|&(col_name, _side)| TableColumn::new().set_header(col_name.to_string()))
+                .map(|&(col_name, _side)| TableColumn::new().set_header(col_name))
                 .collect();
 
             let table = Table::new()

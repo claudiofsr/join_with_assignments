@@ -99,6 +99,12 @@ pub enum JoinError {
     #[error("Invalid DataFrame count: expected {expected}, found {found}")]
     InvalidDataFrameCount { expected: usize, found: usize },
 
+    // Adicione esta variante em JoinError dentro de error.rs:
+    #[error(
+        "Mapping error: The column '{name}' is present in the DataFrame but was not defined in MyColumn."
+    )]
+    UnmappedColumn { name: String },
+
     // A catch-all for other, less specific errors not covered by specific variants.
     // Uses a String to describe the error. Consider using this sparingly.
     #[error("Other error: {0}")]
