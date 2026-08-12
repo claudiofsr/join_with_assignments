@@ -82,15 +82,13 @@ fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame, auditar: bool) -> JoinR
     // 6: Desconto Efetuado em Período Posterior; 7: Detalhamento.
     let operacoes_desejadas: Expr = col(top).is_not_null().and(col(top).neq(lit(7)));
 
-    // Definição da condição para identificar Devolução de Vendas (item 12)
-    let devolucoes_de_vendas: Expr = col(nat).is_not_null().and(col(nat).eq(lit(12)));
+    // Definição da condição para identificar Aquisição de Bens para Revenda (item 01)
+    // Natureza: '01 - Aquisição de Bens para Revenda'
+    let _bens_para_revenda: Expr = col(nat).is_not_null().and(col(nat).eq(lit(1)));
 
-    // Natureza: '01 - Aquisição de Bens para Revenda' and CST neq 50
-    let _bens_para_revenda: Expr = col(nat)
-        .is_not_null()
-        .and(col(cst).is_not_null())
-        .and(col(nat).eq(1))
-        .and(col(cst).neq(50));
+    // Definição da condição para identificar Devolução de Vendas (item 12)
+    // Natureza: '12 - Devolução de Vendas Sujeitas à Incidência Não-Cumulativa'
+    let devolucoes_de_vendas: Expr = col(nat).is_not_null().and(col(nat).eq(lit(12)));
 
     //let series = Series::new(reg.into(), ["C170"]);
     //let registros_selecionados = col(reg).is_in(lit(series));
@@ -151,7 +149,7 @@ fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame, auditar: bool) -> JoinR
         ])
         .with_columns([
             // 1. Correção de CST: Natureza 12 -> CST 50 (se auditar for true)
-            // Regra de Auditoria: Qualquer CST sob a Natureza 12 é convertido para 50
+            // Regra de Auditoria: Qualquer CST sob a Natureza 12 é convertido para CST 50
             when(devolucoes_de_vendas.clone().and(lit(auditar)))
                 .then(lit(50))
                 .otherwise(col(cst))
@@ -160,7 +158,8 @@ fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame, auditar: bool) -> JoinR
             // 2. Correção de Código de Tipo de Crédito: Natureza 12 -> Código 101 (se auditar for true)
             when(
                 devolucoes_de_vendas
-                    .and(col(cod).neq(101))
+                    .and(col(cod).is_not_null())
+                    .and(col(cod).neq(lit(101)))
                     .and(lit(auditar)),
             )
             .then(lit(101))
@@ -169,17 +168,15 @@ fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame, auditar: bool) -> JoinR
             .alias(cod),
         ])
         /*
-        // Se Natureza: '01 - Aquisição de Bens para Revenda' and CST neq 50
-        // Correção de CST: XX -> 50
-        .with_column(
+        .with_columns([
+            // 1. Correção de CST: Natureza 01 -> CST 50 (se auditar for true)
+            // Regra de Auditoria: Qualquer CST sob a Natureza 01 é convertido para CST 50
             when(bens_para_revenda.clone().and(lit(auditar)))
                 .then(lit(50))
                 .otherwise(col(cst))
                 .cast(DataType::Int64)
                 .alias(cst),
-        )
-        // Correção de 'Código do Tipo de Crédito': XXX -> 101
-        .with_column(
+            // 2. Correção de Código de Tipo de Crédito: Natureza 01 -> Código 101 (se auditar for true)
             when(
                 bens_para_revenda
                     .and(col(cod).is_not_null())
@@ -190,7 +187,7 @@ fn selecionar_colunas_apos_filtros(lazyframe: LazyFrame, auditar: bool) -> JoinR
             .otherwise(col(cod))
             .cast(DataType::Int64)
             .alias(cod),
-        )
+        ])
         */
         /*
         // Correção: CST 9 && Registro C170 --> "valor_item" = 0.0
