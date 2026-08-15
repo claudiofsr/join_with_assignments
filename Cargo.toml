@@ -28,7 +28,7 @@ readme = "README.md"
 [dependencies]
 cc = { version = "1.4", features = ["parallel"] }
 chrono = { version = "0.4", features = [ "serde" ] }
-claudiofsr_lib = "0.19"
+claudiofsr_lib = "0.20"
 colored = "3.1"
 confy = "2.0"
 execution-time = "0.3"
@@ -95,11 +95,11 @@ features = [
 ]
 
 [dependencies.rust_xlsxwriter]
-# version = "0.97.1"
+version = "0.98.0"
 # https://github.com/jmcnamara/rust_xlsxwriter/blob/main/CHANGELOG.md
 # git = "https://github.com/jmcnamara/rust_xlsxwriter.git"
 # Cargo.toml, update polars version
-path = "/home/claudio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rust_xlsxwriter-0.97.1b"
+# path = "/home/claudio/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rust_xlsxwriter-0.97.1b"
 features = [
     "constant_memory",
     "chrono",
