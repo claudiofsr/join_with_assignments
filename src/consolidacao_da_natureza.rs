@@ -53,7 +53,7 @@ pub fn obter_consolidacao_nat(dataframe: &DataFrame, auditar: bool) -> JoinResul
 
     let lazyframe: LazyFrame = formatar_valores(lazyframe);
 
-    let lazyframe: LazyFrame = ordenar_colunas(lazyframe)?;
+    let lazyframe: LazyFrame = ordenar_linhas(lazyframe)?;
 
     let lazyframe: LazyFrame = rename_columns(lazyframe)?;
 
@@ -1087,8 +1087,8 @@ fn formatar_valores(lazyframe: LazyFrame) -> LazyFrame {
     lazyframe.with_columns([when(condicao).then(valor_arredondado).otherwise(lit(NULL))])
 }
 
-/// Ordenar colunas
-fn ordenar_colunas(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
+/// Ordenar linhas da coluna Natureza da Base de Cálculo
+fn ordenar_linhas(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
     let cst: &str = coluna(Left, "cst");
     let tipo_operacao: &str = coluna(Left, "tipo_operacao");
     let tipo_cred: &str = coluna(Left, "tipo_cred");
