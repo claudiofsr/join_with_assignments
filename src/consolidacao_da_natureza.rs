@@ -1108,9 +1108,9 @@ fn ordenar_linhas(lazyframe: LazyFrame) -> JoinResult<LazyFrame> {
                 col("Trimestre do Período de Apuração"),
                 col("Mês do Período de Apuração"), // Jan..Dez -> null (Trimestral)
                 ordem_tipo_de_credito,             // 1..99 -> null (Total)
-                col("Tipo de Operação"),
-                col("Código de Situação Tributária (CST)"),
-                col("Natureza da Base de Cálculo dos Créditos"),
+                col("Tipo de Operação"), // 1: Entrada, 3/4: Ajustes, 5: Desc. Próprio, 6: Desc. Posterior
+                col(cst).fill_null(lit(0)), // <--- CST nulo (0) fica antes do Disponível (405)
+                col("Natureza da Base de Cálculo dos Créditos"), // Desempata PIS (...1) antes de COFINS (...5)
                 col("Alíquota de COFINS (em percentual)"),
                 col("Alíquota de PIS/PASEP (em percentual)"),
                 col("Valor da Base de Cálculo das Contribuições"),
